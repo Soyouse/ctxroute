@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1
+
+- **Fix bug réel trouvé en CI** (invisible en local) : `lock.js` supposait que le dossier parent de `state/` existait déjà. Sur un checkout FRAIS, `fs.mkdirSync(lockDir)` échouait en `ENOENT` (pas `EEXIST`) → interprété à tort comme erreur fatale → lock jamais acquis → toutes les injections silencieusement désactivées (`fallback: {inject:false}`). Fix : créer la chaîne de dossiers parents (`recursive:true`, idempotent, sûr en concurrence) avant la tentative d'acquisition atomique.
+- Nouveau `lock.test.js` (9 tests) qui reproduit EXACTEMENT ce scénario (checkout frais, aucun parent existant) — ne peut plus régresser silencieusement.
+- 109 tests au total (66 unitaires lib-pure + 9 lock + 34 intégration).
+
 ## 1.2.0
 
 - **Isolation décision/I/O** : logique décisionnelle extraite dans `lib-pure.js` (zéro fs/path/process, 66 tests unitaires purs) — `mcp-doc-inject.js`/`mcp-doc-reset.js` deviennent de purs points d'I/O.

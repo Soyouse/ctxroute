@@ -53,6 +53,18 @@ function sleepMs(ms) {
 // lock n'a pas pu être acquis dans le timeout (FAIL-OPEN : ne jamais bloquer
 // le hook indéfiniment à cause d'une contention lock).
 function withLock(lockDir, fn, { timeoutMs = DEFAULT_TIMEOUT_MS, fallback = undefined } = {}) {
+  // ⚠️ BUG RÉEL (trouvé en CI 15/07/2026, PAS en local) : sur un checkout
+  // FRAIS, le dossier PARENT de lockDir (state/) n'existe pas encore →
+  // fs.mkdirSync(lockDir) échoue en ENOENT (pas EEXIST) → interprété comme
+  // "erreur inattendue" → lock jamais acquis → fallback partout. En local,
+  // state/ existait déjà depuis des runs précédents, masquant le bug.
+  // FIX : créer la chaîne de dossiers PARENTS une fois, en amont, avec
+  // `recursive: true` (idempotent — sûr même si plusieurs process concurrents
+  // l'appellent en même temps, aucun ne lève EEXIST). L'acquisition du lock
+  // lui-même reste sur le mkdirSync SANS recursive juste après (seul ce
+  // dernier niveau doit être atomique/exclusif).
+  try { fs.mkdirSync(path.dirname(lockDir), { recursive: true }); } catch { /* fail-open plus bas si vraiment cassé */ }
+
   const deadline = Date.now() + timeoutMs;
   let acquired = false;
 
