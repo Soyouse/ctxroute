@@ -96,7 +96,7 @@ Avec ce réglage, `docs/mcp/odoo/delete_record.md` s'injecte UNIQUEMENT quand `t
 Le repo sépare strictement la **décision** (pure, testable/mutable) de l'**I/O** (fs/stdin/stdout, non muté) :
 
 - `lib-pure.js` — logique décisionnelle pure, ZÉRO import fs/path/process. Testée par `lib-pure.test.js` (tests unitaires directs, pas de spawn) et mutée par Stryker.
-- `lock.js` — lock cross-process (`fs.mkdirSync` atomique) pour sérialiser les accès concurrents à `state/`.
+- `lock.js` — lock cross-process (`fs.mkdirSync` atomique) pour sérialiser les accès concurrents à `state/`. Testé par `lock.test.js`, y compris le scénario "checkout frais" (dossier parent inexistant) qui a réellement cassé en CI.
 - `stdin-json.js` — lecture stdin → JSON, partagée par tous les hooks (extrait après détection de duplication par `jscpd`).
 - `mcp-doc-inject.js` / `mcp-doc-reset.js` — les 2 hooks eux-mêmes, seuls points d'I/O, consomment `lib-pure.js`/`lock.js`/`stdin-json.js`.
 - `.dependency-cruiser.json` — garantit statiquement que `lib-pure.js` ne dépend jamais de fs/path/child_process (règle `lib-pure-must-stay-pure`), et qu'aucune dépendance circulaire n'apparaît.
@@ -111,6 +111,7 @@ npm run check:all      # tout d'un coup
 ```
 
 - `lib-pure.test.js` — tests unitaires purs (appel direct des fonctions, zéro spawn).
+- `lock.test.js` — tests dédiés au lock (contention, lock stale forcé, propagation d'exception, ET la régression "checkout frais" trouvée en CI).
 - `mcp-doc-inject.test.js` — tests d'intégration (spawn les hooks en process enfant, y compris un test de **concurrence réelle** : 20 appels parallèles sur la même session, preuve empirique que le lock cross-process ne perd aucune écriture).
 
 ## Hygiène — purge automatique de `state/`
