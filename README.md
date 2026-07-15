@@ -91,13 +91,27 @@ Avec ce réglage, `docs/mcp/odoo/delete_record.md` s'injecte UNIQUEMENT quand `t
 2. Format : < 10 lignes, 1 ligne = 1 invariant/piège, ton impératif, zéro filler.
 3. Aucun code à écrire — le hook générique lit tous les `.md` du dossier à la volée.
 
+## Architecture
+
+Le repo sépare strictement la **décision** (pure, testable/mutable) de l'**I/O** (fs/stdin/stdout, non muté) :
+
+- `lib-pure.js` — logique décisionnelle pure, ZÉRO import fs/path/process. Testée par `lib-pure.test.js` (tests unitaires directs, pas de spawn) et mutée par Stryker.
+- `lock.js` — lock cross-process (`fs.mkdirSync` atomique) pour sérialiser les accès concurrents à `state/`.
+- `stdin-json.js` — lecture stdin → JSON, partagée par tous les hooks (extrait après détection de duplication par `jscpd`).
+- `mcp-doc-inject.js` / `mcp-doc-reset.js` — les 2 hooks eux-mêmes, seuls points d'I/O, consomment `lib-pure.js`/`lock.js`/`stdin-json.js`.
+- `.dependency-cruiser.json` — garantit statiquement que `lib-pure.js` ne dépend jamais de fs/path/child_process (règle `lib-pure-must-stay-pure`), et qu'aucune dépendance circulaire n'apparaît.
+
 ## Tests
 
 ```
-node mcp-doc-inject.test.js
+npm test              # unitaires (lib-pure) + intégration (hooks, spawn process)
+npm run test:mutation # Stryker sur lib-pure.js (99%+ requis, cliquet jamais baissé)
+npm run check:coupling # dependency-cruiser + jscpd (couplage implicite)
+npm run check:all      # tout d'un coup
 ```
 
-Harnais Node natif (zéro dépendance), spawn le hook en process enfant, vérifie tous les modes/seuils/filtres/reset. Voir le fichier pour la couverture exacte.
+- `lib-pure.test.js` — tests unitaires purs (appel direct des fonctions, zéro spawn).
+- `mcp-doc-inject.test.js` — tests d'intégration (spawn les hooks en process enfant, y compris un test de **concurrence réelle** : 20 appels parallèles sur la même session, preuve empirique que le lock cross-process ne perd aucune écriture).
 
 ## Hygiène — purge automatique de `state/`
 

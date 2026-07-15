@@ -12,5 +12,8 @@ Store = `state/mcp-doc-seen-<session_id>.json` : `{server: {seen, sinceLastCall}
 Ajouter un MCP au standard = déposer `docs/mcp/{server}.md` (<10 lignes). AUCUN code à écrire par serveur.
 ⚠️ RESET ABSOLU sur compaction (tous modes) : `mcp-doc-reset.js` (hook PreCompact) supprime tout le store de session — session_id ne change pas à la compaction, sans ce reset le store resterait "vu" alors que le contexte est vidé.
 `serverName()` extrait `{server}` depuis `mcp__{server}__{tool}` via regex (gère les noms multi-underscore, ex: `plugin_discord_discord`).
+⚠️ **Section critique sous LOCK** (`lock.js`, `fs.mkdirSync` atomique cross-process) : Claude Code peut lancer des appels d'outils indépendants EN PARALLÈLE — sans lock, deux invocations concurrentes du hook pour le MÊME session_id perdraient silencieusement une écriture (race read-modify-write). Testé en vrai (spawn 20 process parallèles, `mcp-doc-inject.test.js` test 18) — pas juste documenté.
+**Logique pure isolée dans `lib-pure.js`** (zéro fs/path/process) — mutée par Stryker (99%+, cliquet jamais baissé, cf `stryker.conf.json`). `mcp-doc-inject.js`/`mcp-doc-reset.js` = seuls points d'I/O, appellent `lib-pure.js` sans jamais dupliquer sa logique.
+`stdin-json.js` = lecture stdin factorisée (détecté dupliqué par `jscpd` entre les 2 hooks avant extraction — `check:coupling` le garde désormais à 0 clone).
 Usage/config détaillés : skill `.claude/commands/mcp-doc-hooks.md`.
 Câblage settings.json → REDÉMARRER la session après modif pour activer.

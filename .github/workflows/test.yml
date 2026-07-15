@@ -20,4 +20,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node mcp-doc-inject.test.js
+      - run: npm test
+
+  coupling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run check:coupling
+
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test:mutation

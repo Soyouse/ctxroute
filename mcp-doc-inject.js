@@ -10,6 +10,11 @@
 // client sans savoir que l'action est irréversible (incident 15/07/2026,
 // cf. project_mcp_hook_docs_standard en mémoire).
 //
+// ⚠️ CE FICHIER = SEUL POINT D'I/O (stdin/fs/stdout). Toute la logique
+// DÉCISIONNELLE pure vit dans lib-pure.js (zéro fs, testable/mutable sans
+// bruit). La sérialisation cross-process vit dans lock.js. Ce fichier ne
+// fait QUE : lire stdin, appeler lib-pure, lire/écrire fs sous lock, écrire stdout.
+//
 // 3 MODES (config.json → "mode") :
 //   - "dumb"  : réinjecte à CHAQUE appel du serveur. Bruyant, jamais le défaut.
 //   - "once"  : injecte au 1er appel du serveur, plus jamais (jusqu'au reset
@@ -70,6 +75,11 @@
 // STORE = state/mcp-doc-seen-<session_id>.json :
 //   { "<server>": { "seen": true, "sinceLastCall": <int> } }
 //   ⚠️ CLÉ = session_id, même isolation voulue que odoo-provenance.js.
+// ⚠️ SECTION CRITIQUE (load→modifier→save de CE fichier) protégée par un lock
+//   inter-process (lock.js) — Claude Code peut lancer des appels d'outils
+//   indépendants EN PARALLÈLE ; sans lock, deux invocations concurrentes de ce
+//   hook pour le MÊME session_id peuvent perdre silencieusement une écriture
+//   (race read-modify-write classique). cf lock.js pour le détail du mécanisme.
 //
 // ⚠️ NE JAMAIS bloquer (deny/ask) — ce hook est PUREMENT informatif.
 // ⚠️ FAIL-OPEN OBLIGATOIRE : toute erreur/parse KO → exit(0).
@@ -79,6 +89,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const lib = require('./lib-pure');
+const { withLock } = require('./lock');
+const { readStdinJson } = require('./stdin-json');
 
 const docsDir = path.join(__dirname, 'docs', 'mcp');
 const stateDir = path.join(__dirname, 'state');
@@ -92,32 +105,12 @@ function loadConfig() {
   }
 }
 
-function thresholdFor(config, server) {
-  const override = config.servers && config.servers[server] && config.servers[server].threshold;
-  return Number.isInteger(override) ? override : (Number.isInteger(config.defaultThreshold) ? config.defaultThreshold : 4);
-}
-
-// Mode effectif pour CE serveur : override servers.{server}.mode > mode global > "smart".
-function modeFor(config, server) {
-  const override = config.servers && config.servers[server] && config.servers[server].mode;
-  return override || config.mode || 'smart';
-}
-
-// Le serveur est-il couvert par le framework selon filterMode/filterList ?
-// ⚠️ "whitelist" et "blacklist" sont symétriques : whitelist = liste des SEULS
-// autorisés, blacklist = liste des SEULS exclus. "none"/valeur inconnue = tout couvert
-// (fail-open : une config cassée ne doit jamais silencieusement tout désactiver).
-function isServerActive(config, server) {
-  const filterMode = config.filterMode || 'none';
-  const list = Array.isArray(config.filterList) ? config.filterList : [];
-  if (filterMode === 'whitelist') return list.includes(server);
-  if (filterMode === 'blacklist') return !list.includes(server);
-  return true;
-}
-
 function storeFile(sessionId) {
-  const safe = String(sessionId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '');
-  return path.join(stateDir, `mcp-doc-seen-${safe || 'unknown'}.json`);
+  return path.join(stateDir, `mcp-doc-seen-${lib.sanitizeSessionId(sessionId)}.json`);
+}
+
+function lockDirFor(sessionId) {
+  return path.join(stateDir, `.lock-${lib.sanitizeSessionId(sessionId)}`);
 }
 
 function loadState(sessionId) {
@@ -164,29 +157,6 @@ function pruneOldStateFiles() {
   }
 }
 
-// Extrait le nom de serveur depuis "mcp__{server}__{tool}".
-function serverName(toolName) {
-  const m = /^mcp__([^_]+(?:_[^_]+)*?)__/.exec(toolName || '');
-  return m ? m[1] : null;
-}
-
-// Extrait le SUFFIXE outil depuis "mcp__{server}__{tool}" (tout ce qui suit
-// le préfixe serveur). Ex: mcp__stripe__authenticate, server="stripe" → "authenticate".
-function toolSuffix(toolName, server) {
-  if (!server) return null;
-  const prefix = `mcp__${server}__`;
-  return toolName && toolName.startsWith(prefix) ? toolName.slice(prefix.length) : null;
-}
-
-// Lit une valeur imbriquée via un chemin pointé ("args.tool" → obj.args.tool).
-// ⚠️ Retourne seulement des valeurs SCALAIRES sûres pour un nom de fichier
-// (string/number) — un objet/array ne correspond à aucun .md, jamais planter.
-function getByPath(obj, dottedPath) {
-  if (!obj || typeof dottedPath !== 'string') return null;
-  const val = dottedPath.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), obj);
-  return (typeof val === 'string' || typeof val === 'number') ? String(val) : null;
-}
-
 function readDocFile(relPath) {
   try {
     return fs.readFileSync(path.join(docsDir, relPath), 'utf8').trim();
@@ -195,35 +165,15 @@ function readDocFile(relPath) {
   }
 }
 
-// Collecte TOUTES les docs qui existent pour cet appel précis, du plus
-// GLOBAL au plus SPÉCIFIQUE (même ordre que protect-files.js) :
-//   1. docs/mcp/{server}.md
-//   2. docs/mcp/{server}/{tool}.md       (suffixe outil, si présent)
-//   3. docs/mcp/{server}/{subTool}.md    (paramètre sous-outil, si configuré ET présent)
-// Concatène avec un séparateur, chaque bloc gardant sa source pour traçabilité.
+// Résout les candidats calculés par lib.docCandidatePaths() en lisant
+// réellement le disque, ne garde que ceux qui existent. Seul point d'I/O
+// de la chaîne de granularité — la logique de calcul des chemins est pure.
 function loadDocParts(config, server, toolName, toolInput) {
   const parts = [];
-
-  const serverDoc = readDocFile(`${server}.md`);
-  if (serverDoc) parts.push(serverDoc + `\n[source: docs/mcp/${server}.md]`);
-
-  const suffix = toolSuffix(toolName, server);
-  if (suffix) {
-    const toolDoc = readDocFile(path.join(server, `${suffix}.md`));
-    if (toolDoc) parts.push(toolDoc + `\n[source: docs/mcp/${server}/${suffix}.md]`);
+  for (const { relPath, sourceLabel } of lib.docCandidatePaths(config, server, toolName, toolInput)) {
+    const content = readDocFile(relPath);
+    if (content) parts.push(content + `\n[source: ${sourceLabel}]`);
   }
-
-  const subToolParam = config.servers && config.servers[server] && config.servers[server].subToolParam;
-  if (subToolParam) {
-    const subTool = getByPath(toolInput, subToolParam);
-    // ⚠️ Évite de relire le même fichier deux fois si suffix === subTool
-    // (arrive si un serveur a À LA FOIS des sous-outils ET une convention de nommage identique).
-    if (subTool && subTool !== suffix) {
-      const subToolDoc = readDocFile(path.join(server, `${subTool}.md`));
-      if (subToolDoc) parts.push(subToolDoc + `\n[source: docs/mcp/${server}/${subTool}.md]`);
-    }
-  }
-
   return parts;
 }
 
@@ -239,12 +189,8 @@ function allow(doc, server) {
   process.exit(0);
 }
 
-let input = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (c) => (input += c));
-process.stdin.on('end', () => {
+readStdinJson((data) => {
   try {
-    const data = JSON.parse(input);
     const toolName = data.tool_name || '';
     const toolInput = data.tool_input || {};
     const sessionId = data.session_id;
@@ -252,53 +198,52 @@ process.stdin.on('end', () => {
 
     pruneOldStateFiles(); // hygiène : borne la croissance de state/, probabiliste, jamais bloquant
 
-    const server = serverName(toolName);
-    const active = server ? isServerActive(config, server) : false;
-    const state = loadState(sessionId);
+    const server = lib.serverName(toolName);
+    const active = server ? lib.isServerActive(config, server) : false;
 
-    // Décision AVANT toute incrémentation : lit le compteur du serveur ciblé
-    // tel qu'il était avant cet appel (non affecté par cet appel lui-même).
-    // ⚠️ Mode PAR SERVEUR : modeFor(config, server) — chaque serveur peut
-    // avoir un mode différent du mode global (ex: Stripe en "dumb" fixe).
-    let shouldInject = false;
-    let serverMode = null;
-    if (server && active) {
-      serverMode = modeFor(config, server);
-      const entry = state[server] || { seen: false, sinceLastCall: 0 };
-      const threshold = thresholdFor(config, server);
-      if (serverMode === 'dumb') shouldInject = true;
-      else if (!entry.seen) shouldInject = true; // 1er appel du serveur, tous modes
-      else if (serverMode === 'smart') shouldInject = entry.sinceLastCall >= threshold;
-      else shouldInject = false; // "once" déjà vu = jamais
-    }
+    // ⚠️ SECTION CRITIQUE sous LOCK : load → décide → modifie compteurs des
+    // AUTRES serveurs → sauvegarde. Protège contre deux invocations parallèles
+    // du hook pour le MÊME session_id qui écraseraient l'une l'autre sans lock.
+    // Fail-open : si le lock ne peut pas être acquis (contention/erreur fs),
+    // fallback = pas d'injection plutôt que planter — cf lock.js.
+    const result = withLock(lockDirFor(sessionId), () => {
+      const state = loadState(sessionId);
 
-    // ⚠️ COMPTEURS INDÉPENDANTS : CET appel (MCP actif/inactif ou natif) est
-    // "étranger" à TOUS les AUTRES serveurs déjà vus SAUF `server` lui-même.
-    // Chaque serveur cible n'avance QUE si SON PROPRE mode est "smart" (le
-    // mode est par serveur, pas global) — un serveur en "once"/"dumb" n'a pas
-    // de compteur à maintenir. Un appel à un serveur EXCLU par le filtre
-    // compte quand même comme "étranger" pour les autres (le filtre ne
-    // change pas la réalité : un outil a bien été appelé entre-temps).
-    {
+      // Décision AVANT toute incrémentation : lit le compteur du serveur ciblé
+      // tel qu'il était avant cet appel (non affecté par cet appel lui-même).
+      let shouldInject = false;
+      if (server && active) {
+        const serverMode = lib.modeFor(config, server);
+        const entry = state[server] || { seen: false, sinceLastCall: 0 };
+        const threshold = lib.thresholdFor(config, server);
+        shouldInject = lib.shouldInjectFor(serverMode, entry.seen, entry.sinceLastCall, threshold);
+      }
+
+      // ⚠️ COMPTEURS INDÉPENDANTS : CET appel (MCP actif/inactif ou natif) est
+      // "étranger" à TOUS les AUTRES serveurs déjà vus SAUF `server` lui-même.
+      // Chaque serveur cible n'avance QUE si SON PROPRE mode est "smart".
       let changed = false;
       for (const key of Object.keys(state)) {
         if (key === server) continue;
-        if (state[key] && state[key].seen && modeFor(config, key) === 'smart') {
+        if (state[key] && state[key].seen && lib.modeFor(config, key) === 'smart') {
           state[key].sinceLastCall = (state[key].sinceLastCall || 0) + 1;
           changed = true;
         }
       }
-      if (changed) saveState(sessionId, state);
-    }
 
-    if (!server || !active) process.exit(0); // outil natif ou serveur filtré : rien d'autre à faire
+      if (!server || !active) {
+        if (changed) saveState(sessionId, state);
+        return { inject: false };
+      }
 
-    // Rappeler ce serveur remet TOUJOURS son propre compteur à 0
-    // (injecté ou non — c'est la "preuve" que le serveur est encore présent).
-    state[server] = { seen: true, sinceLastCall: 0 };
-    saveState(sessionId, state);
+      // Rappeler ce serveur remet TOUJOURS son propre compteur à 0.
+      state[server] = { seen: true, sinceLastCall: 0 };
+      saveState(sessionId, state);
 
-    if (!shouldInject) process.exit(0);
+      return { inject: shouldInject };
+    }, { fallback: { inject: false } });
+
+    if (!result || !result.inject) process.exit(0);
 
     const parts = loadDocParts(config, server, toolName, toolInput);
     if (parts.length === 0) process.exit(0); // aucune doc à aucun des 3 niveaux
@@ -307,4 +252,4 @@ process.stdin.on('end', () => {
   } catch {
     process.exit(0); // fail-open
   }
-});
+}, () => process.exit(0)); // JSON invalide → fail-open

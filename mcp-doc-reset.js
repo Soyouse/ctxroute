@@ -17,25 +17,29 @@
 //
 // ⚠️ FAIL-OPEN : erreur de suppression = pas grave (pire cas = pas de
 // réinjection après compaction, jamais un blocage). Jamais deny/ask ici.
+// ⚠️ sanitizeSessionId vient de lib-pure.js — SOURCE UNIQUE partagée avec
+// mcp-doc-inject.js (un format de nom de fichier dupliqué à 2 endroits
+// diverge silencieusement si l'un des deux change sans l'autre).
+// ⚠️ Lecture stdin factorisée dans stdin-json.js (détecté dupliqué par
+// jscpd avec mcp-doc-inject.js avant extraction).
 // ═══════════════════════════════════════════════════════════════════════
 
 const fs = require('fs');
 const path = require('path');
+const lib = require('./lib-pure');
+const { readStdinJson } = require('./stdin-json');
 
 const stateDir = path.join(__dirname, 'state');
 
-let input = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (c) => (input += c));
-process.stdin.on('end', () => {
-  try {
-    const data = JSON.parse(input);
-    const sessionId = data.session_id;
-    const safe = String(sessionId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '');
-    const storeFile = path.join(stateDir, `mcp-doc-seen-${safe || 'unknown'}.json`);
-    fs.rmSync(storeFile, { force: true });
-  } catch {
-    /* fail-open */
-  }
-  process.exit(0);
-});
+readStdinJson(
+  (data) => {
+    try {
+      const storeFile = path.join(stateDir, `mcp-doc-seen-${lib.sanitizeSessionId(data.session_id)}.json`);
+      fs.rmSync(storeFile, { force: true });
+    } catch {
+      /* fail-open */
+    }
+    process.exit(0);
+  },
+  () => process.exit(0) // JSON invalide → fail-open, pas de reset, jamais de blocage
+);

@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation UNIQUEMENT sur lib-pure.js (logique décisionnelle, zéro I/O). mcp-doc-inject.js/mcp-doc-reset.js/lock.js ne sont PAS mutés : I/O (fs/stdin/stdout) = intégration/contrat, jamais Stryker (doctrine : isoler la décision de l'I/O AVANT de muter).",
+  "testRunner": "command",
+  "commandRunner": { "command": "node lib-pure.test.js" },
+  "coverageAnalysis": "off",
+  "_mutator_comment": "Regex exclu (Stryker mute les regex caractère-par-caractère = surtout du bruit ; serverName()/toolSuffix() sont couverts fonctionnellement par de nombreux cas dans lib-pure.test.js, pas par mutation de regex).",
+  "mutator": { "excludedMutations": ["Regex"] },
+  "reporters": ["clear-text", "progress"],
+  "mutate": ["lib-pure.js"],
+  "incremental": true,
+  "_survivor_connu": "99.15% mesuré 15/07/2026 — 1 seul survivant restant (isServerActive, fallback [] → [\"Stryker was here\"]) : mutant ÉQUIVALENT en pratique. Ce littéral n'est observable QUE si un test appelle isServerActive avec server==='Stryker was here' (chaîne interne à Stryker, pas un cas réel, coupler un test à cette valeur casserait à une future version de l'outil). Break fixé à 99 (cliquet jamais baissé, doctrine Théo) — pas 100, ce dernier point est un vrai plafond outillage, pas un trou de test.",
+  "thresholds": { "high": 99, "low": 90, "break": 99 }
+}

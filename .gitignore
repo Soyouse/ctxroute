@@ -1,3 +1,7 @@
 state/*.json
+state/.lock-*
 docs/mcp/*.md
 !docs/mcp/*.md.example
+node_modules/
+.stryker-tmp/
+reports/

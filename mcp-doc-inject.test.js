@@ -15,7 +15,7 @@
 // Exit 0 si tous tests pass. Exit 1 si au moins un fail.
 // ═══════════════════════════════════════════════════════════════════════
 
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -350,17 +350,71 @@ console.log('mcp-doc-inject.test.js\n');
   sessions.add('test-gc-trigger-17');
 }
 
-// ── Cleanup ──
+// ── Test 18 — CONCURRENCE RÉELLE : N invocations PARALLÈLES du hook sur la
+// MÊME session_id ne doivent perdre AUCUNE écriture (preuve empirique du lock
+// cross-process de lock.js, pas juste une lecture de code). ──
+function callMcpAsync(sessionId, server, tool = 'do_thing') {
+  return new Promise((resolve) => {
+    const p = spawn('node', [HOOK]);
+    let out = '';
+    p.stdout.on('data', (c) => (out += c));
+    p.stdin.write(JSON.stringify({
+      hook_event_name: 'PreToolUse',
+      tool_name: `mcp__${server}__${tool}`,
+      session_id: sessionId,
+      tool_input: {},
+    }));
+    p.stdin.end();
+    p.on('close', () => resolve(out));
+  });
+}
+
+async function runConcurrencyTest() {
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} });
+  const s = 'test-concurrency-18';
+  sessions.add(s);
+  const N_SERVERS = 5, N_CALLS = 20;
+  const dirs = [];
+  for (let i = 0; i < N_SERVERS; i++) {
+    const d = path.join(DOCS_DIR, `concserver${i}`);
+    fs.mkdirSync(path.dirname(d), { recursive: true });
+    fs.writeFileSync(`${d}.md`, `# doc concserver${i}\n`);
+    dirs.push(`${d}.md`);
+  }
+  const calls = [];
+  for (let i = 0; i < N_CALLS; i++) calls.push(callMcpAsync(s, `concserver${i % N_SERVERS}`));
+  await Promise.all(calls);
+
+  const stateFile = path.join(STATE_DIR, `mcp-doc-seen-${s}.json`);
+  let seenCount = 0;
+  try {
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    seenCount = Object.keys(state).filter((k) => state[k] && state[k].seen).length;
+  } catch { /* seenCount reste 0 → test échoue proprement */ }
+
+  ok(`concurrence : ${N_CALLS} appels parallèles sur ${N_SERVERS} serveurs → AUCUNE écriture perdue (lock cross-process)`, seenCount === N_SERVERS);
+
+  for (const d of dirs) { try { fs.unlinkSync(d); } catch {} }
+}
+
+// ── Cleanup synchrone (avant la partie async) ──
 try { fs.unlinkSync(TEST_DOC_PATH); } catch {}
 try { fs.unlinkSync(CROSS_A_PATH); } catch {}
 try { fs.unlinkSync(CROSS_B_PATH); } catch {}
-if (ORIGINAL_CONFIG !== null) fs.writeFileSync(CONFIG_PATH, ORIGINAL_CONFIG);
-else { try { fs.unlinkSync(CONFIG_PATH); } catch {} }
-for (const s of sessions) {
-  const safe = String(s).replace(/[^a-zA-Z0-9_-]/g, '');
-  const f = path.join(STATE_DIR, `mcp-doc-seen-${safe}.json`);
-  try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
-}
 
-console.log(`\n${pass} pass, ${fail} fail`);
-process.exit(fail === 0 ? 0 : 1);
+(async () => {
+  await runConcurrencyTest();
+
+  if (ORIGINAL_CONFIG !== null) fs.writeFileSync(CONFIG_PATH, ORIGINAL_CONFIG);
+  else { try { fs.unlinkSync(CONFIG_PATH); } catch {} }
+  for (const s of sessions) {
+    const safe = String(s).replace(/[^a-zA-Z0-9_-]/g, '');
+    const f = path.join(STATE_DIR, `mcp-doc-seen-${safe}.json`);
+    try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
+    const lockDir = path.join(STATE_DIR, `.lock-${safe}`);
+    try { if (fs.existsSync(lockDir)) fs.rmdirSync(lockDir); } catch {}
+  }
+
+  console.log(`\n${pass} pass, ${fail} fail`);
+  process.exit(fail === 0 ? 0 : 1);
+})();

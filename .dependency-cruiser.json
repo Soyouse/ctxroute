@@ -1,0 +1,37 @@
+{
+  "forbidden": [
+    {
+      "name": "no-circular",
+      "comment": "Aucune dépendance circulaire — le repo est volontairement plat (mcp-doc-inject.js/mcp-doc-reset.js → lib-pure.js/lock.js, jamais l'inverse).",
+      "severity": "error",
+      "from": {},
+      "to": { "circular": true }
+    },
+    {
+      "name": "lib-pure-must-stay-pure",
+      "comment": "⚠️ lib-pure.js NE DOIT JAMAIS importer fs/path/child_process — c'est tout l'intérêt du module (zéro I/O, mutable par Stryker sans bruit). Une dépendance ici casserait l'isolation décision/I/O documentée dans lib-pure.js.",
+      "severity": "error",
+      "from": { "path": "^lib-pure\\.js$" },
+      "to": { "path": "^(fs|path|child_process)$", "dependencyTypes": ["core"] }
+    },
+    {
+      "name": "lock-stays-io-only",
+      "comment": "lock.js est un module I/O (fs.mkdirSync) — ne doit dépendre d'aucune logique métier (lib-pure.js), pour rester réutilisable indépendamment.",
+      "severity": "error",
+      "from": { "path": "^lock\\.js$" },
+      "to": { "path": "^lib-pure\\.js$" }
+    },
+    {
+      "name": "stdin-json-stays-standalone",
+      "comment": "stdin-json.js est un utilitaire I/O générique (lecture stdin) — ne doit dépendre de RIEN d'autre dans ce repo, pour rester réutilisable tel quel ailleurs.",
+      "severity": "error",
+      "from": { "path": "^stdin-json\\.js$" },
+      "to": { "path": "^(lib-pure|lock|mcp-doc-inject|mcp-doc-reset)\\.js$" }
+    }
+  ],
+  "options": {
+    "doNotFollow": { "path": "node_modules" },
+    "includeOnly": "^(mcp-doc-inject|mcp-doc-reset|lib-pure|lock|stdin-json)\\.js$",
+    "tsPreCompilationDeps": false
+  }
+}

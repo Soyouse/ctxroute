@@ -1,13 +1,25 @@
 {
   "name": "mcp-doc-hooks",
-  "version": "1.1.0",
-  "description": "Claude Code framework: inject invariant/pitfall docs into agent context on first contact with each MCP server/tool/sub-tool, with configurable per-server modes, thresholds, whitelist/blacklist filtering, and automatic state cleanup.",
+  "version": "1.2.0",
+  "description": "Claude Code framework: inject invariant/pitfall docs into agent context on first contact with each MCP server/tool/sub-tool, with configurable per-server modes, thresholds, whitelist/blacklist filtering, cross-process locking, and automatic state cleanup.",
   "main": "mcp-doc-inject.js",
   "scripts": {
-    "test": "node mcp-doc-inject.test.js"
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node lib-pure.test.js",
+    "test:integration": "node mcp-doc-inject.test.js",
+    "test:mutation": "stryker run",
+    "check:coupling": "npm run check:deps && npm run check:duplication",
+    "check:deps": "depcruise --config .dependency-cruiser.json .",
+    "check:duplication": "jscpd .",
+    "check:all": "npm test && npm run check:coupling && npm run test:mutation"
   },
   "license": "MIT",
-  "keywords": ["claude-code", "mcp", "hooks", "documentation"],
+  "keywords": [
+    "claude-code",
+    "mcp",
+    "hooks",
+    "documentation"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Soyouse/mcp-doc-hooks.git"
@@ -18,5 +30,10 @@
   "homepage": "https://github.com/Soyouse/mcp-doc-hooks#readme",
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "dependency-cruiser": "^18.1.0",
+    "jscpd": "^5.0.12"
   }
 }
