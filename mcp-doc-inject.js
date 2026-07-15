@@ -49,8 +49,23 @@
 //   global pour CE serveur uniquement (ex: Stripe en "dumb" — toujours
 //   réafficher l'avertissement paiement — pendant que le reste reste "smart").
 //
+// GRANULARITÉ 3 NIVEAUX (toutes les docs matchantes sont CONCATÉNÉES, ordre
+//   global → outil → sous-outil, même logique parent/enfant que protect-files.js) :
+//   1. `docs/mcp/{server}.md`              — invariants du serveur entier.
+//   2. `docs/mcp/{server}/{tool}.md`       — {tool} = ce qui suit "mcp__{server}__"
+//      dans tool_name (ex: mcp__stripe__authenticate → tool="authenticate").
+//   3. `docs/mcp/{server}/{subTool}.md`    — pour les MCP "proxy" à outil UNIQUE
+//      où la vraie opération est un PARAMÈTRE (ex: Odoo : tool_name="odoo_call"
+//      TOUJOURS, l'opération réelle vit dans tool_input.args.tool="update_record").
+//      Activé via `servers.{server}.subToolParam` = chemin pointé du paramètre
+//      à lire dans tool_input (ex: "args.tool"). Sans ce réglage, niveau 3 inactif.
+//      ⚠️ SANS ce niveau, un serveur proxy est un angle mort total : le framework
+//      ne peut distinguer "lecture Odoo" de "delete_record Odoo" — les deux ont
+//      le même tool_name="mcp__odoo__odoo_call".
+//
 // ⚠️ 1 SEUL FICHIER CODE pour TOUS les MCP présents/futurs. Ajouter un MCP
-//   au standard = déposer `docs/mcp/{server}.md`. Aucun code par serveur.
+//   au standard = déposer `docs/mcp/{server}.md` (et optionnellement des .md
+//   par outil/sous-outil). Aucun code par serveur.
 //
 // STORE = state/mcp-doc-seen-<session_id>.json :
 //   { "<server>": { "seen": true, "sinceLastCall": <int> } }
@@ -128,12 +143,61 @@ function serverName(toolName) {
   return m ? m[1] : null;
 }
 
-function loadDoc(server) {
+// Extrait le SUFFIXE outil depuis "mcp__{server}__{tool}" (tout ce qui suit
+// le préfixe serveur). Ex: mcp__stripe__authenticate, server="stripe" → "authenticate".
+function toolSuffix(toolName, server) {
+  if (!server) return null;
+  const prefix = `mcp__${server}__`;
+  return toolName && toolName.startsWith(prefix) ? toolName.slice(prefix.length) : null;
+}
+
+// Lit une valeur imbriquée via un chemin pointé ("args.tool" → obj.args.tool).
+// ⚠️ Retourne seulement des valeurs SCALAIRES sûres pour un nom de fichier
+// (string/number) — un objet/array ne correspond à aucun .md, jamais planter.
+function getByPath(obj, dottedPath) {
+  if (!obj || typeof dottedPath !== 'string') return null;
+  const val = dottedPath.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), obj);
+  return (typeof val === 'string' || typeof val === 'number') ? String(val) : null;
+}
+
+function readDocFile(relPath) {
   try {
-    return fs.readFileSync(path.join(docsDir, `${server}.md`), 'utf8').trim();
+    return fs.readFileSync(path.join(docsDir, relPath), 'utf8').trim();
   } catch {
-    return null; // pas de doc pour ce serveur = rien à injecter
+    return null; // fichier absent = rien à injecter pour ce niveau
   }
+}
+
+// Collecte TOUTES les docs qui existent pour cet appel précis, du plus
+// GLOBAL au plus SPÉCIFIQUE (même ordre que protect-files.js) :
+//   1. docs/mcp/{server}.md
+//   2. docs/mcp/{server}/{tool}.md       (suffixe outil, si présent)
+//   3. docs/mcp/{server}/{subTool}.md    (paramètre sous-outil, si configuré ET présent)
+// Concatène avec un séparateur, chaque bloc gardant sa source pour traçabilité.
+function loadDocParts(config, server, toolName, toolInput) {
+  const parts = [];
+
+  const serverDoc = readDocFile(`${server}.md`);
+  if (serverDoc) parts.push(serverDoc + `\n[source: docs/mcp/${server}.md]`);
+
+  const suffix = toolSuffix(toolName, server);
+  if (suffix) {
+    const toolDoc = readDocFile(path.join(server, `${suffix}.md`));
+    if (toolDoc) parts.push(toolDoc + `\n[source: docs/mcp/${server}/${suffix}.md]`);
+  }
+
+  const subToolParam = config.servers && config.servers[server] && config.servers[server].subToolParam;
+  if (subToolParam) {
+    const subTool = getByPath(toolInput, subToolParam);
+    // ⚠️ Évite de relire le même fichier deux fois si suffix === subTool
+    // (arrive si un serveur a À LA FOIS des sous-outils ET une convention de nommage identique).
+    if (subTool && subTool !== suffix) {
+      const subToolDoc = readDocFile(path.join(server, `${subTool}.md`));
+      if (subToolDoc) parts.push(subToolDoc + `\n[source: docs/mcp/${server}/${subTool}.md]`);
+    }
+  }
+
+  return parts;
 }
 
 function allow(doc, server) {
@@ -155,6 +219,7 @@ process.stdin.on('end', () => {
   try {
     const data = JSON.parse(input);
     const toolName = data.tool_name || '';
+    const toolInput = data.tool_input || {};
     const sessionId = data.session_id;
     const config = loadConfig();
 
@@ -206,10 +271,10 @@ process.stdin.on('end', () => {
 
     if (!shouldInject) process.exit(0);
 
-    const doc = loadDoc(server);
-    if (!doc) process.exit(0); // pas de doc pour ce serveur
+    const parts = loadDocParts(config, server, toolName, toolInput);
+    if (parts.length === 0) process.exit(0); // aucune doc à aucun des 3 niveaux
 
-    allow(doc + `\n[source: .claude/hooks/docs/mcp/${server}.md]`, server);
+    allow(parts.join('\n\n---\n\n'), server);
   } catch {
     process.exit(0); // fail-open
   }

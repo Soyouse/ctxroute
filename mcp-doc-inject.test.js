@@ -39,12 +39,12 @@ function ok(name, cond) {
   else { fail++; console.log(`  ✗ ${name}`); }
 }
 
-function callMcp(sessionId, server, tool = 'do_thing') {
+function callMcp(sessionId, server, tool = 'do_thing', toolInput = {}) {
   return run(HOOK, {
     hook_event_name: 'PreToolUse',
     tool_name: `mcp__${server}__${tool}`,
     session_id: sessionId,
-    tool_input: {},
+    tool_input: toolInput,
   });
 }
 
@@ -262,6 +262,46 @@ console.log('mcp-doc-inject.test.js\n');
   callMcp(a, TEST_SERVER); // injecté + marqué vu en A
   const firstInB = callMcp(b, TEST_SERVER); // toujours "1er appel" en B
   ok('session B voit un 1er appel indépendant de la session A → injecté', wasInjected(firstInB));
+}
+
+// ── Test 12 — granularité OUTIL : docs/mcp/{server}/{tool}.md, en PLUS du serveur ──
+{
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} });
+  const s = 'test-tool-granularity-12';
+  const toolDir = path.join(DOCS_DIR, TEST_SERVER);
+  fs.mkdirSync(toolDir, { recursive: true });
+  fs.writeFileSync(path.join(toolDir, 'special_action.md'), '# Doc spécifique à special_action\n');
+  const specific = callMcp(s, TEST_SERVER, 'special_action');
+  const generic = callMcp(s, TEST_SERVER, 'other_action');
+  ok('outil "special_action" → doc serveur ET doc outil concaténées', wasInjected(specific) && specific.stdout.includes('spécifique à special_action') && specific.stdout.includes('Doc de test'));
+  ok('outil "other_action" (pas de doc dédiée) → SEULE la doc serveur', wasInjected(generic) && !generic.stdout.includes('spécifique à special_action'));
+  fs.rmSync(toolDir, { recursive: true, force: true });
+}
+
+// ── Test 13 — granularité PARAMÈTRE (proxy MCP type Odoo) : subToolParam ──
+{
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: { [TEST_SERVER]: { subToolParam: 'args.tool' } } });
+  const s = 'test-subtool-13';
+  const toolDir = path.join(DOCS_DIR, TEST_SERVER);
+  fs.mkdirSync(toolDir, { recursive: true });
+  fs.writeFileSync(path.join(toolDir, 'delete_record.md'), '# Doc spécifique à delete_record\nDANGER suppression.\n');
+  const dangerous = callMcp(s, TEST_SERVER, 'odoo_call', { args: { tool: 'delete_record', model: 'res.partner' } });
+  const safe = callMcp(s, TEST_SERVER, 'odoo_call', { args: { tool: 'search_records', model: 'res.partner' } });
+  ok('sous-outil "delete_record" (paramètre) → doc ciblée injectée', wasInjected(dangerous) && dangerous.stdout.includes('DANGER suppression'));
+  ok('sous-outil "search_records" (pas de doc dédiée) → pas de doc DANGER', wasInjected(safe) && !safe.stdout.includes('DANGER suppression'));
+  fs.rmSync(toolDir, { recursive: true, force: true });
+}
+
+// ── Test 14 — sans subToolParam configuré, le paramètre est ignoré (rétro-compat) ──
+{
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} }); // pas de subToolParam
+  const s = 'test-no-subtool-config-14';
+  const toolDir = path.join(DOCS_DIR, TEST_SERVER);
+  fs.mkdirSync(toolDir, { recursive: true });
+  fs.writeFileSync(path.join(toolDir, 'delete_record.md'), '# Ne doit jamais apparaître sans config\n');
+  const res = callMcp(s, TEST_SERVER, 'odoo_call', { args: { tool: 'delete_record' } });
+  ok('sans subToolParam configuré → le paramètre args.tool est ignoré (pas de faux positif)', wasInjected(res) && !res.stdout.includes('Ne doit jamais apparaître'));
+  fs.rmSync(toolDir, { recursive: true, force: true });
 }
 
 // ── Cleanup ──

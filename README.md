@@ -65,6 +65,24 @@ Détails d'implémentation, format du store, invariants internes : voir `HOOK-IN
 
 Chaque serveur MCP a son propre compteur "appels étrangers depuis mon dernier appel". Un appel à un AUTRE serveur MCP fait avancer ce compteur au même titre qu'un outil natif (Bash/Read/...) — mais jamais un appel au serveur lui-même. Exemple : Stripe → Odoo → Stripe fait avancer le compteur de Stripe pendant l'appel à Odoo (Odoo est "étranger" à Stripe), et réciproquement.
 
+## Granularité 3 niveaux
+
+Toutes les docs qui matchent un appel sont **concaténées**, du plus global au plus spécifique :
+
+1. `docs/mcp/{server}.md` — invariants du serveur entier.
+2. `docs/mcp/{server}/{tool}.md` — spécifique à un outil précis (`{tool}` = ce qui suit `mcp__{server}__` dans le nom d'outil, ex. `mcp__stripe__authenticate` → `docs/mcp/stripe/authenticate.md`).
+3. `docs/mcp/{server}/{subTool}.md` — pour les MCP **proxy à outil unique** où l'opération réelle est un paramètre à l'intérieur de `tool_input` (ex. Odoo : `tool_name` est toujours `mcp__odoo__odoo_call`, l'opération réelle vit dans `tool_input.args.tool`). Activé via `servers.{server}.subToolParam` (chemin pointé du paramètre à lire) :
+
+```json
+{
+  "servers": {
+    "odoo": { "subToolParam": "args.tool" }
+  }
+}
+```
+
+Avec ce réglage, `docs/mcp/odoo/delete_record.md` s'injecte UNIQUEMENT quand `tool_input.args.tool === "delete_record"`, en plus de `docs/mcp/odoo.md` — le framework distingue une lecture Odoo d'une suppression Odoo, alors que les deux partagent le même `tool_name`.
+
 ## Ajouter un MCP au standard
 
 1. Créer `docs/mcp/{server}.md` (`{server}` = le nom entre les `mcp__`, ex. `mcp__stripe__authenticate` → `stripe.md`).
