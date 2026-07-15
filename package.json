@@ -30,7 +30,7 @@
   },
   "homepage": "https://github.com/Soyouse/mcp-doc-hooks#readme",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "devDependencies": {
     "@stryker-mutator/core": "^9.6.1",
