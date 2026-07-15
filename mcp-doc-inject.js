@@ -137,6 +137,33 @@ function saveState(sessionId, state) {
   }
 }
 
+// ── PURGE des fichiers d'état PÉRIMÉS ──
+// PROBLÈME : 1 session = 1 fichier state/mcp-doc-seen-<id>.json, jamais
+// supprimé automatiquement → croissance illimitée sur des mois d'usage.
+// FIX : purge PROBABILISTE (pas à CHAQUE appel — éviter un readdir+stat sur
+// TOUT le dossier à chaque invocation du hook, coûteux et inutile) des
+// fichiers dont le mtime dépasse le TTL. ~1 invocation sur 50 suffit à
+// borner la croissance sans overhead perceptible.
+// ⚠️ Probabilité et TTL surchargeables par env var UNIQUEMENT pour les
+// tests (déterminisme) — en prod, les valeurs par défaut s'appliquent toujours.
+const GC_PROBABILITY = Number(process.env.MCP_DOC_GC_PROBABILITY) || 0.02;
+const GC_TTL_MS = Number(process.env.MCP_DOC_GC_TTL_MS) || 30 * 24 * 60 * 60 * 1000; // 30 jours
+
+function pruneOldStateFiles() {
+  if (Math.random() >= GC_PROBABILITY) return;
+  try {
+    const now = Date.now();
+    for (const f of fs.readdirSync(stateDir)) {
+      if (!f.startsWith('mcp-doc-seen-') || !f.endsWith('.json')) continue;
+      const full = path.join(stateDir, f);
+      const st = fs.statSync(full);
+      if (now - st.mtimeMs > GC_TTL_MS) fs.rmSync(full, { force: true });
+    }
+  } catch {
+    /* fail-open : la purge est un bonus d'hygiène, jamais un blocage */
+  }
+}
+
 // Extrait le nom de serveur depuis "mcp__{server}__{tool}".
 function serverName(toolName) {
   const m = /^mcp__([^_]+(?:_[^_]+)*?)__/.exec(toolName || '');
@@ -222,6 +249,8 @@ process.stdin.on('end', () => {
     const toolInput = data.tool_input || {};
     const sessionId = data.session_id;
     const config = loadConfig();
+
+    pruneOldStateFiles(); // hygiène : borne la croissance de state/, probabiliste, jamais bloquant
 
     const server = serverName(toolName);
     const active = server ? isServerActive(config, server) : false;

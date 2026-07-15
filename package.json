@@ -1,11 +1,22 @@
 {
   "name": "mcp-doc-hooks",
-  "version": "1.0.0",
-  "description": "Claude Code framework: inject invariant/pitfall docs into agent context on first contact with each MCP server, with configurable per-server modes, thresholds and whitelist/blacklist filtering.",
+  "version": "1.1.0",
+  "description": "Claude Code framework: inject invariant/pitfall docs into agent context on first contact with each MCP server/tool/sub-tool, with configurable per-server modes, thresholds, whitelist/blacklist filtering, and automatic state cleanup.",
   "main": "mcp-doc-inject.js",
   "scripts": {
     "test": "node mcp-doc-inject.test.js"
   },
   "license": "MIT",
-  "keywords": ["claude-code", "mcp", "hooks", "documentation"]
+  "keywords": ["claude-code", "mcp", "hooks", "documentation"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Soyouse/mcp-doc-hooks.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Soyouse/mcp-doc-hooks/issues"
+  },
+  "homepage": "https://github.com/Soyouse/mcp-doc-hooks#readme",
+  "engines": {
+    "node": ">=18"
+  }
 }

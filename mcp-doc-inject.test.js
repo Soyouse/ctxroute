@@ -28,9 +28,13 @@ const DOCS_DIR = path.join(__dirname, 'docs', 'mcp');
 let pass = 0, fail = 0;
 const sessions = new Set();
 
-function run(hook, payload) {
+function run(hook, payload, env = {}) {
   if (payload.session_id) sessions.add(payload.session_id);
-  const r = spawnSync('node', [hook], { input: JSON.stringify(payload), encoding: 'utf8' });
+  const r = spawnSync('node', [hook], {
+    input: JSON.stringify(payload),
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  });
   return { stdout: (r.stdout || '').trim(), status: r.status };
 }
 
@@ -39,13 +43,13 @@ function ok(name, cond) {
   else { fail++; console.log(`  ✗ ${name}`); }
 }
 
-function callMcp(sessionId, server, tool = 'do_thing', toolInput = {}) {
+function callMcp(sessionId, server, tool = 'do_thing', toolInput = {}, env = {}) {
   return run(HOOK, {
     hook_event_name: 'PreToolUse',
     tool_name: `mcp__${server}__${tool}`,
     session_id: sessionId,
     tool_input: toolInput,
-  });
+  }, env);
 }
 
 function callNonMcp(sessionId, toolName = 'Read') {
@@ -302,6 +306,48 @@ console.log('mcp-doc-inject.test.js\n');
   const res = callMcp(s, TEST_SERVER, 'odoo_call', { args: { tool: 'delete_record' } });
   ok('sans subToolParam configuré → le paramètre args.tool est ignoré (pas de faux positif)', wasInjected(res) && !res.stdout.includes('Ne doit jamais apparaître'));
   fs.rmSync(toolDir, { recursive: true, force: true });
+}
+
+// ── Test 15 — config.json CASSÉ (JSON invalide) → fail-open sur les défauts, jamais de crash ──
+{
+  const s = 'test-broken-config-15';
+  fs.writeFileSync(CONFIG_PATH, '{ this is not valid json !!!');
+  const res = callMcp(s, TEST_SERVER);
+  ok('config.json invalide → fail-open (défauts appliqués), pas de crash', res.status === 0 && wasInjected(res));
+}
+
+// ── Test 16 — doc.md existante mais VIDE (0 octet après trim) → aucune injection pour ce niveau ──
+{
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} });
+  const s = 'test-empty-doc-16';
+  const emptyServer = 'emptyserver1';
+  const emptyPath = path.join(DOCS_DIR, `${emptyServer}.md`);
+  fs.writeFileSync(emptyPath, '   \n\n  '); // que du whitespace → trim() = ''
+  const res = callMcp(s, emptyServer);
+  ok('doc.md vide (whitespace only) → traité comme absente, pas d\'injection, pas de crash', res.status === 0 && !wasInjected(res));
+  fs.unlinkSync(emptyPath);
+}
+
+// ── Test 17 — purge des state/ périmés : fichier ancien (mtime > TTL) supprimé, récent conservé ──
+{
+  const s = 'test-gc-old-17', keep = 'test-gc-keep-17';
+  setConfig({ mode: 'once', defaultThreshold: 4, servers: {} });
+  callMcp(s, TEST_SERVER);    // crée state/mcp-doc-seen-test-gc-old-17.json
+  callMcp(keep, TEST_SERVER); // crée state/mcp-doc-seen-test-gc-keep-17.json (restera récent)
+
+  const oldFile = path.join(STATE_DIR, 'mcp-doc-seen-test-gc-old-17.json');
+  const oldMtime = (Date.now() - 60 * 24 * 60 * 60 * 1000) / 1000; // 60 jours dans le passé
+  fs.utimesSync(oldFile, oldMtime, oldMtime);
+
+  // TTL forcé à 30 jours, probabilité forcée à 1 (déterministe pour le test) via env.
+  callMcp('test-gc-trigger-17', TEST_SERVER, 'do_thing', {}, {
+    MCP_DOC_GC_PROBABILITY: '1',
+    MCP_DOC_GC_TTL_MS: String(30 * 24 * 60 * 60 * 1000),
+  });
+
+  ok('fichier state périmé (60j > TTL 30j) → supprimé par la purge', !fs.existsSync(oldFile));
+  ok('fichier state récent → conservé par la purge', fs.existsSync(path.join(STATE_DIR, `mcp-doc-seen-${keep}.json`)));
+  sessions.add('test-gc-trigger-17');
 }
 
 // ── Cleanup ──

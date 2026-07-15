@@ -1,5 +1,7 @@
 # mcp-doc-hooks
 
+[![test](https://github.com/Soyouse/mcp-doc-hooks/actions/workflows/test.yml/badge.svg)](https://github.com/Soyouse/mcp-doc-hooks/actions/workflows/test.yml)
+
 Framework générique Claude Code : injecte automatiquement une doc courte (invariants, pièges, bonnes pratiques) au contexte de l'agent dès qu'il touche un serveur MCP donné — équivalent d'un mini-skill auto-chargé au contact, mais pour la frontière MCP plutôt que la frontière fichier.
 
 ## Pourquoi
@@ -96,6 +98,10 @@ node mcp-doc-inject.test.js
 ```
 
 Harnais Node natif (zéro dépendance), spawn le hook en process enfant, vérifie tous les modes/seuils/filtres/reset. Voir le fichier pour la couverture exacte.
+
+## Hygiène — purge automatique de `state/`
+
+Chaque session Claude Code produit un fichier `state/mcp-doc-seen-<session_id>.json`. Sans purge, ce dossier grossirait indéfiniment sur un usage long terme. Le hook `mcp-doc-inject.js` purge probabilistement (~1 appel sur 50, pour éviter un `readdir`/`stat` coûteux à chaque invocation) les fichiers dont le `mtime` dépasse 30 jours. Réglable via variables d'environnement (usage tests uniquement) : `MCP_DOC_GC_PROBABILITY`, `MCP_DOC_GC_TTL_MS`.
 
 ## Licence
 
