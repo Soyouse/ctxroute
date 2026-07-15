@@ -168,24 +168,35 @@ function readDocFile(relPath) {
 // Résout les candidats calculés par lib.docCandidatePaths() en lisant
 // réellement le disque, ne garde que ceux qui existent. Seul point d'I/O
 // de la chaîne de granularité — la logique de calcul des chemins est pure.
+// ⚠️ Retourne aussi `levels` = les niveaux RÉELLEMENT injectés (fichier trouvé),
+// PAS tous les candidats calculés — le systemMessage doit refléter ce qui a
+// vraiment été lu, pas ce qui aurait pu l'être.
 function loadDocParts(config, server, toolName, toolInput) {
   const parts = [];
-  for (const { relPath, sourceLabel } of lib.docCandidatePaths(config, server, toolName, toolInput)) {
+  const levels = [];
+  for (const { relPath, sourceLabel, level } of lib.docCandidatePaths(config, server, toolName, toolInput)) {
     const content = readDocFile(relPath);
-    if (content) parts.push(content + `\n[source: ${sourceLabel}]`);
+    if (content) {
+      parts.push(content + `\n[source: ${sourceLabel}]`);
+      levels.push(level);
+    }
   }
-  return parts;
+  return { parts, levels };
 }
 
-function allow(doc, server) {
-  console.log(JSON.stringify({
+// ⚠️ `showNotification` NE COUPE JAMAIS l'injection (additionalContext) —
+// contrôle UNIQUEMENT le systemMessage visible. Couper l'injection entière
+// n'aurait aucun sens (c'est la seule raison d'être du hook).
+function allow(doc, server, levels, config) {
+  const out = {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'allow',
       additionalContext: doc,
     },
-    systemMessage: `📄 doc MCP: ${server}`,
-  }));
+  };
+  if (lib.shouldShowNotification(config)) out.systemMessage = lib.formatSystemMessage(server, levels);
+  console.log(JSON.stringify(out));
   process.exit(0);
 }
 
@@ -195,6 +206,12 @@ readStdinJson((data) => {
     const toolInput = data.tool_input || {};
     const sessionId = data.session_id;
     const config = loadConfig();
+
+    // ⚠️ INTERRUPTEUR GLOBAL : config.json → "enabled". ON par défaut. Coupe
+    // TOUT (injection ET tracking d'état) — vérifié EN PREMIER, aucun effet
+    // de bord même partiel quand désactivé. DISTINCT de "showNotification"
+    // (qui ne coupe QUE le message visible, cf allow()) — 2 réglages indépendants.
+    if (!lib.isFrameworkEnabled(config)) process.exit(0);
 
     pruneOldStateFiles(); // hygiène : borne la croissance de state/, probabiliste, jamais bloquant
 
@@ -245,10 +262,10 @@ readStdinJson((data) => {
 
     if (!result || !result.inject) process.exit(0);
 
-    const parts = loadDocParts(config, server, toolName, toolInput);
+    const { parts, levels } = loadDocParts(config, server, toolName, toolInput);
     if (parts.length === 0) process.exit(0); // aucune doc à aucun des 3 niveaux
 
-    allow(parts.join('\n\n---\n\n'), server);
+    allow(parts.join('\n\n---\n\n'), server, levels, config);
   } catch {
     process.exit(0); // fail-open
   }

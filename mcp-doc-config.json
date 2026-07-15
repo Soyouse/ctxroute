@@ -1,7 +1,1 @@
-{
-  "mode": "smart",
-  "defaultThreshold": 4,
-  "filterMode": "none",
-  "filterList": [],
-  "servers": {}
-}
+{"mode":"dumb","defaultThreshold":4,"filterMode":"whitelist","filterList":["testserver999"],"servers":{}}

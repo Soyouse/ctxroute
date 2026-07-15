@@ -67,6 +67,7 @@ function precompact(sessionId) {
 
 const isAllow = (res) => res.stdout.includes('"permissionDecision":"allow"') || res.stdout.includes('"permissionDecision": "allow"');
 const wasInjected = (res) => isAllow(res) && res.stdout.includes('additionalContext');
+const hasNotification = (res) => res.stdout.includes('systemMessage');
 
 // ── Fixture : doc de test temporaire pour un serveur bidon ──
 // ⚠️ Le nom NE DOIT PAS commencer/finir par "_" : serverName() exige un
@@ -230,6 +231,58 @@ console.log('mcp-doc-inject.test.js\n');
   })();
   ok('mode par serveur "dumb" écrase le mode global "once" pour CE serveur', wasInjected(second));
   ok('un serveur sans override reste sur le mode global "once" → pas réinjecté', !wasInjected(otherServerSecond));
+}
+
+// ── Test 7h — interrupteur "showNotification" : contrôle UNIQUEMENT le message
+// visible, NE COUPE JAMAIS l'injection elle-même (additionalContext) ──
+{
+  const s = 'test-notif-toggle-7h';
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} }); // pas de champ → ON par défaut
+  const withNotif = callMcp(s, TEST_SERVER);
+  ok('sans champ "showNotification" → notification ON par défaut', hasNotification(withNotif));
+  ok('sans champ "showNotification" → injection présente (comportement normal)', wasInjected(withNotif));
+
+  setConfig({ showNotification: false, mode: 'dumb', defaultThreshold: 4, servers: {} });
+  const s2 = 'test-notif-toggle-off-7h';
+  const noNotif = callMcp(s2, TEST_SERVER);
+  ok('showNotification:false → PAS de systemMessage', !hasNotification(noNotif));
+  ok('showNotification:false → injection TOUJOURS présente (le toggle ne coupe QUE le message)', wasInjected(noNotif));
+
+  setConfig({ showNotification: true, mode: 'dumb', defaultThreshold: 4, servers: {} });
+  const reenabled = callMcp(s2, TEST_SERVER);
+  ok('showNotification:true explicite → notification réactivée', hasNotification(reenabled));
+}
+
+// ── Test 7h-bis — interrupteur GLOBAL "enabled" : coupe TOUT (injection ET
+// notification), distinct de "showNotification" qui ne coupe QUE le message ──
+{
+  const s = 'test-enabled-toggle-7hbis';
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} }); // pas de champ → ON par défaut
+  ok('sans champ "enabled" → framework ON par défaut', wasInjected(callMcp(s, TEST_SERVER)));
+
+  setConfig({ enabled: false, mode: 'dumb', defaultThreshold: 4, servers: {} });
+  const s2 = 'test-enabled-toggle-off-7hbis';
+  const res = callMcp(s2, TEST_SERVER);
+  ok('enabled:false → AUCUNE injection, même en mode dumb (1er appel)', !wasInjected(res) && res.status === 0);
+  ok('enabled:false → AUCUNE notification non plus (tout est coupé)', !hasNotification(res));
+
+  setConfig({ enabled: true, mode: 'dumb', defaultThreshold: 4, servers: {} });
+  ok('enabled:true explicite → réactive normalement', wasInjected(callMcp(s2, TEST_SERVER)));
+}
+
+// ── Test 7i — systemMessage porte le préfixe [mcp-doc-hooks] + la granularité réelle ──
+{
+  setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} });
+  const s = 'test-systemmessage-7i';
+  const toolDir = path.join(DOCS_DIR, TEST_SERVER);
+  fs.mkdirSync(toolDir, { recursive: true });
+  fs.writeFileSync(path.join(toolDir, 'act.md'), '# doc outil\n');
+  const serverOnly = callMcp(s, TEST_SERVER, 'other_tool_no_doc');
+  const withTool = callMcp(s, TEST_SERVER, 'act');
+  ok('systemMessage porte le préfixe "[mcp-doc-hooks]" (distingue des autres sources de doc injectable)', serverOnly.stdout.includes('[mcp-doc-hooks]'));
+  ok('systemMessage niveau serveur seul → pas de suffixe de granularité', serverOnly.stdout.includes(`[mcp-doc-hooks] ${TEST_SERVER}"`) || serverOnly.stdout.includes(`[mcp-doc-hooks] ${TEST_SERVER}\\"`));
+  ok('systemMessage niveau serveur+outil → suffixe "(tool)" visible', withTool.stdout.includes(`[mcp-doc-hooks] ${TEST_SERVER} (tool)`));
+  fs.rmSync(toolDir, { recursive: true, force: true });
 }
 
 // ── Test 8 — PreCompact reset : après reset, réinjecte comme un 1er appel ──

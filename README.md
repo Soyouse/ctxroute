@@ -62,6 +62,8 @@ Détails d'implémentation, format du store, invariants internes : voir `HOOK-IN
 - **`defaultThreshold`** : N par défaut pour le mode `smart`.
 - **`servers.{name}.threshold`** / **`servers.{name}.mode`** : override par serveur — un MCP à enjeu élevé (paiement, mutation destructive) peut avoir un seuil plus bas ou un mode `dumb` fixe, indépendamment du réglage global.
 - **`filterMode`** (`"none"` / `"whitelist"` / `"blacklist"`) + **`filterList`** : limite quels serveurs sont couverts par le framework.
+- **`enabled`** (défaut `true`) : interrupteur GLOBAL — `false` coupe TOUT (injection ET tracking d'état/compteurs). Pattern standard (cf ESLint, git hooks `SKIP=...`) pour désactiver temporairement sans retirer le câblage `settings.json`.
+- **`showNotification`** (défaut `true`) : contrôle UNIQUEMENT le `systemMessage` visible (le badge `📄 [mcp-doc-hooks] ...`) — `false` n'affiche plus le badge mais l'injection réelle (`additionalContext`, ce que voit l'agent) continue normalement. Indépendant de `enabled`.
 
 ### Compteurs indépendants par serveur
 

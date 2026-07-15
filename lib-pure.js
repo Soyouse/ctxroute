@@ -64,6 +64,44 @@ function modeFor(config, server) {
   return override || config.mode || 'smart';
 }
 
+// Interrupteur GLOBAL du framework entier (config.json → "enabled").
+// ⚠️ Coupe TOUT (injection additionalContext ET tracking d'état/compteurs) —
+// pattern standard (ESLint, git hooks SKIP=...) pour désactiver temporairement
+// sans retirer le câblage settings.json. DISTINCT de "showNotification" (qui ne
+// coupe QUE le message visible) — les 2 réglages sont indépendants et composables :
+// enabled:false + showNotification:true = incohérent mais inoffensif (rien à notifier).
+// ON par défaut — SEULE la valeur `false` littérale désactive (fail-open).
+function isFrameworkEnabled(config) {
+  return config.enabled !== false;
+}
+
+// Interrupteur de la NOTIFICATION VISIBLE uniquement (config.json → "showNotification").
+// ⚠️ NE COUPE JAMAIS l'injection elle-même (additionalContext) — seulement le
+// systemMessage user-only qui l'accompagne. Couper l'injection entière n'aurait
+// aucun sens (c'est la seule raison d'être du framework) ; ce réglage sert
+// uniquement à l'utilisateur qui préfère ne PAS voir le badge "📄 [mcp-doc-hooks]"
+// à chaque injection tout en gardant le bénéfice réel (contexte livré à l'agent).
+// ON par défaut — SEULE la valeur `false` littérale désactive la notification
+// (fail-open : une config cassée ne doit jamais désactiver silencieusement
+// la transparence envers l'utilisateur).
+function shouldShowNotification(config) {
+  return config.showNotification !== false;
+}
+
+// Formatte le systemMessage USER-ONLY affiché quand une injection a lieu.
+// ⚠️ Préfixe "[mcp-doc-hooks]" EXPLICITE pour que l'utilisateur distingue
+// cette source des autres systèmes de doc injectable (ex: protect-files.js
+// affiche juste "📄 doc: xxx" sans préciser sa provenance — ambigu si les
+// deux systèmes tournent dans la même session, cf incident 15/07/2026 où
+// Théo a confondu les deux sources).
+// `levels` = tableau des labels de niveau injectés cette fois (ex: ["server"],
+// ["server","tool"], ["server","tool","subTool"]) — rend visible la granularité
+// réelle, pas juste "un truc a été injecté pour ce serveur".
+function formatSystemMessage(server, levels) {
+  const suffix = Array.isArray(levels) && levels.length > 1 ? ` (${levels.slice(1).join('+')})` : '';
+  return `📄 [mcp-doc-hooks] ${server}${suffix}`;
+}
+
 // Le serveur est-il couvert par le framework selon filterMode/filterList ?
 // ⚠️ "whitelist" et "blacklist" sont symétriques : whitelist = liste des SEULS
 // autorisés, blacklist = liste des SEULS exclus. "none"/valeur inconnue = tout couvert
@@ -93,14 +131,18 @@ function shouldInjectFor(mode, entrySeen, sinceLastCall, threshold) {
 //   2. {server}/{tool}.md       (suffixe outil, si présent)
 //   3. {server}/{subTool}.md    (paramètre sous-outil, si configuré ET présent)
 // ⚠️ Dédoublonne le niveau 3 si subTool === suffix (sinon double lecture du même fichier).
+// ⚠️ Chaque candidat porte un `level` ("server"/"tool"/"subTool") — permet à
+// l'appelant (I/O) de composer un systemMessage qui montre la granularité
+// RÉELLEMENT injectée (pas juste "un truc a été injecté"), cf formatSystemMessage().
 function docCandidatePaths(config, server, toolName, toolInput) {
-  const candidates = [{ relPath: `${server}.md`, sourceLabel: `docs/mcp/${server}.md` }];
+  const candidates = [{ relPath: `${server}.md`, sourceLabel: `docs/mcp/${server}.md`, level: 'server' }];
 
   const suffix = toolSuffix(toolName, server);
   if (suffix) {
     candidates.push({
       relPath: `${server}/${suffix}.md`,
       sourceLabel: `docs/mcp/${server}/${suffix}.md`,
+      level: 'tool',
     });
   }
 
@@ -113,6 +155,7 @@ function docCandidatePaths(config, server, toolName, toolInput) {
     candidates.push({
       relPath: `${server}/${subTool}.md`,
       sourceLabel: `docs/mcp/${server}/${subTool}.md`,
+      level: 'subTool',
     });
   }
 
@@ -127,6 +170,9 @@ module.exports = {
   thresholdFor,
   modeFor,
   isServerActive,
+  isFrameworkEnabled,
+  shouldShowNotification,
+  formatSystemMessage,
   shouldInjectFor,
   docCandidatePaths,
 };

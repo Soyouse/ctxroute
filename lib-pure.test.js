@@ -77,6 +77,30 @@ ok('isServerActive: filterMode inconnu → fail-open (actif)', lib.isServerActiv
 ok('isServerActive: filterMode "none" AVEC filterList non-vide → ignore quand même la liste (pas un blacklist implicite)', lib.isServerActive({ filterMode: 'none', filterList: ['stripe'] }, 'stripe') === true);
 ok('isServerActive: filterMode absent AVEC filterList non-vide → même comportement que "none" explicite', lib.isServerActive({ filterList: ['stripe'] }, 'stripe') === true);
 
+// ── isFrameworkEnabled (interrupteur GLOBAL — coupe injection ET tracking) ──
+ok('isFrameworkEnabled: pas de champ "enabled" → ON par défaut', lib.isFrameworkEnabled({}) === true);
+ok('isFrameworkEnabled: enabled=true explicite → ON', lib.isFrameworkEnabled({ enabled: true }) === true);
+ok('isFrameworkEnabled: enabled=false explicite → OFF', lib.isFrameworkEnabled({ enabled: false }) === false);
+ok('isFrameworkEnabled: valeur inattendue (ni true ni false) → fail-open ON (pas false littéral)', lib.isFrameworkEnabled({ enabled: 'oops' }) === true);
+ok('isFrameworkEnabled: enabled=0 (falsy mais pas false) → ON (seul `false` littéral désactive)', lib.isFrameworkEnabled({ enabled: 0 }) === true);
+ok('isFrameworkEnabled: enabled=null → ON (fail-open)', lib.isFrameworkEnabled({ enabled: null }) === true);
+
+// ── shouldShowNotification (contrôle UNIQUEMENT le systemMessage visible, jamais l'injection) ──
+ok('shouldShowNotification: pas de champ "showNotification" → ON par défaut', lib.shouldShowNotification({}) === true);
+ok('shouldShowNotification: showNotification=true explicite → ON', lib.shouldShowNotification({ showNotification: true }) === true);
+ok('shouldShowNotification: showNotification=false explicite → OFF', lib.shouldShowNotification({ showNotification: false }) === false);
+ok('shouldShowNotification: valeur inattendue (ni true ni false) → fail-open ON (pas false littéral)', lib.shouldShowNotification({ showNotification: 'oops' }) === true);
+ok('shouldShowNotification: showNotification=0 (falsy mais pas false) → ON (seul `false` littéral désactive)', lib.shouldShowNotification({ showNotification: 0 }) === true);
+ok('shouldShowNotification: showNotification=null → ON (fail-open)', lib.shouldShowNotification({ showNotification: null }) === true);
+
+// ── formatSystemMessage ──
+ok('formatSystemMessage: préfixe explicite [mcp-doc-hooks] pour distinguer des autres sources', lib.formatSystemMessage('stripe', ['server']) === '📄 [mcp-doc-hooks] stripe');
+ok('formatSystemMessage: 1 seul niveau (server) → pas de suffixe', lib.formatSystemMessage('stripe', ['server']).includes('(') === false);
+ok('formatSystemMessage: 2 niveaux (server+tool) → suffixe avec le niveau additionnel', lib.formatSystemMessage('stripe', ['server', 'tool']) === '📄 [mcp-doc-hooks] stripe (tool)');
+ok('formatSystemMessage: 3 niveaux (server+tool+subTool) → les 2 niveaux additionnels listés', lib.formatSystemMessage('odoo', ['server', 'tool', 'subTool']) === '📄 [mcp-doc-hooks] odoo (tool+subTool)');
+ok('formatSystemMessage: levels absent/vide → pas de crash, pas de suffixe', lib.formatSystemMessage('stripe', []) === '📄 [mcp-doc-hooks] stripe');
+ok('formatSystemMessage: levels non-array → pas de crash, pas de suffixe', lib.formatSystemMessage('stripe', undefined) === '📄 [mcp-doc-hooks] stripe');
+
 // ── shouldInjectFor ──
 ok('shouldInjectFor: mode dumb → toujours true', lib.shouldInjectFor('dumb', true, 999, 1) === true);
 ok('shouldInjectFor: 1er appel (entrySeen=false) → true, tous modes', lib.shouldInjectFor('once', false, 0, 4) === true);
@@ -93,8 +117,10 @@ ok('shouldInjectFor: mode inconnu, déjà vu → false (comportement "once" par 
   const lvl2 = c1.find((c) => c.relPath === 'stripe/authenticate.md');
   ok('docCandidatePaths: niveau 1 (serveur) toujours présent', !!lvl1);
   ok('docCandidatePaths: niveau 1 sourceLabel correct', lvl1 && lvl1.sourceLabel === 'docs/mcp/stripe.md');
+  ok('docCandidatePaths: niveau 1 label "server"', lvl1 && lvl1.level === 'server');
   ok('docCandidatePaths: niveau 2 (outil) présent si suffixe extrait', !!lvl2);
   ok('docCandidatePaths: niveau 2 sourceLabel correct', lvl2 && lvl2.sourceLabel === 'docs/mcp/stripe/authenticate.md');
+  ok('docCandidatePaths: niveau 2 label "tool"', lvl2 && lvl2.level === 'tool');
   ok('docCandidatePaths: pas de niveau 3 sans subToolParam configuré', c1.length === 2);
 }
 {
@@ -105,6 +131,7 @@ ok('shouldInjectFor: mode inconnu, déjà vu → false (comportement "once" par 
   const lvl3 = c2.find((c) => c.relPath === 'odoo/delete_record.md');
   ok('docCandidatePaths: niveau 3 (sous-outil) ajouté si subToolParam configuré et résolu', !!lvl3);
   ok('docCandidatePaths: niveau 3 sourceLabel correct', lvl3 && lvl3.sourceLabel === 'docs/mcp/odoo/delete_record.md');
+  ok('docCandidatePaths: niveau 3 label "subTool"', lvl3 && lvl3.level === 'subTool');
   ok('docCandidatePaths: niveau 2 aussi présent (odoo_call) en plus du niveau 3', c2.some((c) => c.relPath === 'odoo/odoo_call.md'));
   ok('docCandidatePaths: 3 niveaux distincts quand tool !== subTool', c2.length === 3);
 }
