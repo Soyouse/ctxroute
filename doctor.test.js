@@ -349,9 +349,13 @@ function cloneFrameworkWithSources() {
 }
 
 // ── Cas 6 — le probe ne DOIT JAMAIS toucher les fichiers livrés du repo ──
+// Config utilisateur gitignorée (19/07/2026) : réelle si présente (machine
+// installée), sinon le .example livré (clone vierge/CI) — même invariant.
 {
-  const before = fs.readFileSync(path.join(import.meta.dirname, 'mcp-doc-config.json'), 'utf8');
+  const real = path.join(import.meta.dirname, 'mcp-doc-config.json');
+  const cfg = fs.existsSync(real) ? real : path.join(import.meta.dirname, 'mcp-doc-config.json.example');
+  const before = fs.readFileSync(cfg, 'utf8');
   runDoctor(DOCTOR);
-  const after = fs.readFileSync(path.join(import.meta.dirname, 'mcp-doc-config.json'), 'utf8');
-  ok('le probe ne modifie PAS mcp-doc-config.json (isolation tmpdir totale)', before === after);
+  const after = fs.readFileSync(cfg, 'utf8');
+  ok('le probe ne modifie PAS la config livrée (isolation tmpdir totale)', before === after);
 }
