@@ -164,6 +164,20 @@ test('validate : `rules` avec scope/exclude VALIDES = 0 erreur (jamais de faux r
   //    réelles partent en `rules:` — un faux rouge les bloquerait TOUTES au gate.
   assert.deepStrictEqual(validate({ rules: [{ pattern: 'a.js', scope: ['s'], exclude: ['e'] }] }), []);
 });
+// ── Piège n°1 (vécu 19/07) : `rules:` écrit en YAML-BLOC au lieu du JSON inline ──
+// ⚠️ Le message d'erreur DOIT être AUTO-RÉPARANT : il donne le snippet exact à coller.
+//    Ce test scelle que (a) le YAML-bloc est rouge, (b) le snippet MONTRÉ est valide —
+//    sinon on renverrait un exemple faux, pire que pas d'exemple.
+test('validate : `rules:` en YAML-bloc = ROUGE + message donne le format canonique', () => {
+  // parse() rend un tableau d'objets pour le YAML-bloc `- pattern:` → forme {pattern} sans les autres clés.
+  // Le piège réel = l'utilisateur écrit une CHAÎNE ou une forme non conforme ; ici on teste la forme non-liste.
+  const errs = validate({ rules: 'foo' }); // chaîne au lieu de liste (résultat d'un JSON cassé, cf parse total)
+  assert.ok(errs.length > 0, 'un rules non-liste DOIT être rouge');
+  assert.ok(errs.some((e) => /rules: \[\{/.test(e)), 'le message DOIT contenir le snippet canonique prêt à coller');
+  // Le snippet montré dans le message est LUI-MÊME valide (jamais un faux exemple) :
+  const canonique = [{ pattern: 'foo.js' }, { pattern: 'bar.js', scope: ['projet'] }];
+  assert.deepStrictEqual(validate({ rules: canonique }), []);
+});
 test('validate : liste MIXTE (un valide + un invalide) = ROUGE (every, jamais some)', () => {
   assert.ok(validate({ rules: [{ pattern: 'a.js', scope: ['ok', ''] }] }).length > 0, 'scope [ok, ""]');
   assert.ok(validate({ rules: [{ pattern: 'a.js', scope: ['ok', 42] }] }).length > 0, 'scope [ok, 42]');

@@ -171,7 +171,10 @@ const RULE_KEYS = ['pattern', 'scope', 'exclude', 'rank'];
 function isRulesDecl(rules) {
   const errs = [];
   if (!Array.isArray(rules) || rules.length === 0) {
-    errs.push('`rules` doit être une liste JSON non vide d\'objets {pattern, scope?, exclude?}');
+    // ⚠️ Message AUTO-RÉPARANT (paved-road) : rend le format CANONIQUE prêt à coller —
+    //    le piège n°1 est d'écrire `rules:` en YAML-bloc (`- pattern:`) au lieu du JSON
+    //    inline. Descriptif ne suffit pas : donner l'exemple exact à copier (vécu 19/07).
+    errs.push('`rules` doit être une liste JSON INLINE non vide. Copie ce format : rules: [{"pattern":"foo.js"},{"pattern":"bar.js","scope":["projet"]}]  (PAS de YAML-bloc `- pattern:`)');
     return errs;
   }
   rules.forEach((r, i) => {
