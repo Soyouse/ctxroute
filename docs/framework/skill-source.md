@@ -1,0 +1,12 @@
+---
+rules: [{"pattern":"skill.js","scope":["mcp-doc-hooks"]},{"pattern":"sources-skill.test.js","scope":["mcp-doc-hooks"]},{"pattern":"skill-registry-gate","scope":["mcp-doc-hooks"]}]
+mode: dumb
+confirm: true
+---
+# sources/skill.js — SOURCE « skill » : déclenche un skill par PÉRIMÈTRE (0 doublon)
+⚠️ PUR, muté 100%. RÉUTILISE `matchingDocs` (dimension FICHIER : `match`/`scope`/`exclude` OU `rules` par-entrée depuis 19/07 — MÊME vocabulaire que les docs, `perimeter` supprimé 18/07, synonyme = doublon ; `rules` exclusif de match/scope/exclude, schéma `not` + précédence runtime, validation déléguée à matchingDocs — zéro garde dupliquée) + `lib.serverName`/`toolSuffix`/`getByPath` (dimension MCP, 3 GRAINS : `"srv"` · `"srv/outil"` · `"srv/sous-outil"` via subToolParam) — JAMAIS un 2ᵉ matcher. Les 2 dimensions en UNION dédupée par doc.
+⚠️ Injecte le CORPS DU SKILL lu EN DIRECT (`paths.skillsDir()`, frontmatter harnais strippé) — décision mainteneur 18/07/2026 : injection MÉCANIQUE garantie, jamais « espérer que l'agent obéisse ». Zéro doublon : le fichier du skill = seule vérité, lu à chaque injection. Fallback pointeur UNIQUEMENT si fichier illisible. La lecture vit dans l'ADAPTATEUR (source-adapters), la source reste PURE.
+⚠️ CADENCE = cascade 3 étages `declFor(skillDefaults, entry)` : entrée du skill > `config.skillDefaults` (global) > défaut framework `once`. `driftUnit` (tool|turn, 18/07/2026) suit la MÊME cascade — absent aux 2 étages = omis, gate.driftUnitForDoc finit (defaultDriftUnit > 'tool'). `skillDefaults` est DISTINCT du `mode`/`defaultThreshold` des docs (sémantique propre : un pointeur veut once, pas smart). Uniforme avec les docs (jamais d'exception dans le modèle).
+⚠️ Registre = section `skills` du JSON global (config qu'on POSSÈDE), JAMAIS le frontmatter du skill (fichier du HARNAIS, format non maîtrisé, fragile aux updates). Scellé par `skill-registry-gate` DANS LES 2 SENS (19/07) : skill nommé = fichier existant ET tout skill du harnais = enregistré OU listé `skillsWithoutPerimeter` (le silence n'est pas une option — miroir de `inject: never`).
+⚠️ Nouveau champ/dimension → schéma mcp-doc-config.schema.json D'ABORD (config-gate) + miroir mutate/include/mutation.yml/dep-cruiser (mutation-workflow-gate) + re-mutation 100%.
+⚠️ Garde `if (server == null)` NÉCESSAIRE depuis le grain outil (18/07/2026) : la concaténation `server+'/'+suffix` vaudrait 'null/null' → une entrée pathologique matcherait tout outil non-MCP. Testée (plus un mutant équivalent). `includes(null)` reste le rejet du subCand absent.

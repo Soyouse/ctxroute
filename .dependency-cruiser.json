@@ -1,0 +1,220 @@
+{
+  "forbidden": [
+    {
+      "name": "no-circular",
+      "comment": "Aucune dépendance circulaire — le repo est volontairement plat (mcp-doc-inject.js/mcp-doc-reset.js → lib-pure.js/lock.js, jamais l'inverse).",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "circular": true
+      }
+    },
+    {
+      "name": "lib-pure-must-stay-pure",
+      "comment": "⚠️ lib-pure.js NE DOIT JAMAIS importer fs/path/child_process — c'est tout l'intérêt du module (zéro I/O, mutable par Stryker sans bruit). Une dépendance ici casserait l'isolation décision/I/O documentée dans lib-pure.js.",
+      "severity": "error",
+      "from": {
+        "path": "^lib-pure\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "lock-stays-io-only",
+      "comment": "lock.js est un module I/O (fs.mkdirSync) — ne doit dépendre d'aucune logique métier (lib-pure.js), pour rester réutilisable indépendamment.",
+      "severity": "error",
+      "from": {
+        "path": "^lock\\.js$"
+      },
+      "to": {
+        "path": "^lib-pure\\.js$"
+      }
+    },
+    {
+      "name": "paths-is-the-only-path-source",
+      "comment": "⚠️ paths.js = SOURCE UNIQUE des chemins config/docs/state. Il ne doit dépendre d'aucun autre module du repo (sinon un cycle : tout le monde l'importe). Les hooks passent par lui, jamais par un path.join(__dirname,...) ad-hoc — deux copies d'un même chemin divergent en silence.",
+      "severity": "error",
+      "from": {
+        "path": "^paths\\.js$"
+      },
+      "to": {
+        "path": "^(lib-pure|lock|stdin-json|mcp-doc-inject|mcp-doc-reset|doctor)\\.js$"
+      }
+    },
+    {
+      "name": "lib-pure-must-not-know-paths",
+      "comment": "⚠️ lib-pure.js doit rester PUR : paths.js lit process.env/path, l'importer casserait l'isolation décision/I-O (et le mutant Stryker deviendrait bruyant).",
+      "severity": "error",
+      "from": {
+        "path": "^lib-pure\\.js$"
+      },
+      "to": {
+        "path": "^paths\\.js$"
+      }
+    },
+    {
+      "name": "sources-must-stay-pure",
+      "severity": "error",
+      "comment": "⚠️ Une SOURCE (payload -> quels docs ?) est une DÉCISION, jamais de l'I/O. Même raison que lib-pure : la pureté est la CONDITION pour que Stryker mute sans mutants équivalents. Mêler fs/path ici = perdre le signal de mutation sur la logique de match des 532 règles.",
+      "from": {
+        "path": "^sources/"
+      },
+      "to": {
+        "path": "^(fs|path|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "sources-must-not-know-the-harness",
+      "severity": "error",
+      "comment": "⚠️ Une source ne connaît AUCUN harnais : elle répond à une question, elle ne décide rien et n'écrit nulle part. Importer un hook (qui parle le dialecte Claude Code) casserait le portage Codex — la porte traduit, le coeur jamais.",
+      "from": {
+        "path": "^sources/"
+      },
+      "to": {
+        "path": "^(mcp-doc-inject|mcp-doc-reset|doctor|paths|deadline)\\.js$"
+      }
+    },
+    {
+      "name": "frontmatter-must-stay-pure",
+      "severity": "error",
+      "comment": "⚠️ Parser PUR : l'appelant lit le fichier, jamais lui. Mêler l'I/O ici empêcherait le property-based (fast-check) de couvrir la totalité sur input généré.",
+      "from": {
+        "path": "^frontmatter\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "loader-must-stay-pure",
+      "severity": "error",
+      "comment": "⚠️ Le loader (corpus -> règles ordonnées) est une DÉCISION pure : l appelant lit les .md. Mêler fs/path ici = perdre la mutation sur la pièce qui remplace protected-paths.json à la bascule.",
+      "from": {
+        "path": "^loader\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "deadline-stays-standalone",
+      "severity": "error",
+      "comment": "⚠️ deadline.js ne DOIT dépendre de RIEN (comme stdin-json.js) : il est copiable tel quel dans n'importe quel hook, de n'importe quel projet. C'est ce qui permet d'immuniser les 7 hooks de ~/.claude/hooks/ sans y importer ce framework.",
+      "from": {
+        "path": "^deadline\\.js$"
+      },
+      "to": {
+        "path": "^(lib-pure|lock|stdin-json|paths|mcp-doc-inject|mcp-doc-reset|doctor|frontmatter)\\.js$"
+      }
+    },
+    {
+      "name": "stdin-json-stays-standalone",
+      "comment": "stdin-json.js est un utilitaire I/O générique (lecture stdin) — ne doit dépendre de RIEN d'autre dans ce repo, pour rester réutilisable tel quel ailleurs.",
+      "severity": "error",
+      "from": {
+        "path": "^stdin-json\\.js$"
+      },
+      "to": {
+        "path": "^(lib-pure|lock|mcp-doc-inject|mcp-doc-reset)\\.js$"
+      }
+    },
+    {
+      "name": "lint-must-stay-pure",
+      "severity": "error",
+      "comment": "⚠️ lint.js = NOYAU PUR de l'audit du parc (mute par Stryker). L'appelant lit le disque et fournit un ETAT ; ce module DECIDE. Y mêler fs/path produirait des mutants equivalents sur le seul gate qui detecte les docs mortes.",
+      "from": {
+        "path": "^lint\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|os|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "lint-must-not-know-the-harness",
+      "severity": "error",
+      "comment": "⚠️ Le lint rend des CONSTATS : il n'imprime rien, n'exit() pas, ne formate pas. La porte s'en charge (meme regle que sources/*.js) — c'est ce qui rend le portage Codex trivial et le noyau testable sans spawn. ⚠️ `lint-corpus` est SA PROPRE COQUILLE : l'importer inverserait la dependance (le noyau connaitrait le disque par la bande) et ferait rentrer fs/os dans le module mute — les mutants equivalents que `lint-must-stay-pure` interdit deja en direct.",
+      "from": {
+        "path": "^lint\\.js$"
+      },
+      "to": {
+        "path": "^(mcp-doc-inject|mcp-doc-reset|doctor|paths|deadline|lint-corpus)\\.js$"
+      }
+    },
+    {
+      "name": "collisions-must-stay-pure",
+      "severity": "error",
+      "comment": "⚠️ collisions.js = NOYAU PUR de l'analyse des croisements (mute par Stryker). La coquille check-collisions.js lit le corpus ; ce module TRIE. Meme raison que lint.js : fs/path ici = mutants equivalents sur le seul module qui classe les croisements.",
+      "from": {
+        "path": "^collisions\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|os|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "gate-must-stay-pure",
+      "severity": "error",
+      "comment": "⚠️ gate.js = LA DÉCISION de la porte unifiée (mute par Stryker). L'appelant (doc-inject.js) lit corpus/config/state ; ce module TRANCHE. Y mêler fs/path = mutants équivalents sur la pièce qui remplace l'injection de protect-files à la bascule.",
+      "from": {
+        "path": "^gate\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|os|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
+      "name": "gate-must-not-know-the-io",
+      "severity": "error",
+      "comment": "⚠️ gate.js ne connaît ni le disque ni le harnais par la bande : importer paths/lock/corpus/hooks ferait rentrer l'I/O dans le module muté. Il n'importe QUE lib-pure (pur → pur).",
+      "from": {
+        "path": "^gate\\.js$"
+      },
+      "to": {
+        "path": "^(paths|lock|corpus|stdin-json|deadline|doctor|mcp-doc-inject|mcp-doc-reset|doc-inject)\\.js$"
+      }
+    },
+    {
+      "name": "migrate-must-stay-pure",
+      "severity": "error",
+      "comment": "⚠️ migrate.js = NOYAU PUR de la migration (mute par Stryker). Toute I/O ici la rendrait intestable et produirait des mutants equivalents. La coquille = migrate-to-frontmatter.js.",
+      "from": {
+        "path": "^migrate\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|os|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    }
+  ],
+  "options": {
+    "doNotFollow": {
+      "path": "node_modules"
+    },
+    "includeOnly": "^(mcp-doc-inject|mcp-doc-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count)\\.js$",
+    "tsPreCompilationDeps": false
+  }
+}

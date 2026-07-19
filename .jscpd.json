@@ -1,0 +1,9 @@
+{
+  "threshold": 1,
+  "reporters": ["consoleFull"],
+  "ignore": ["node_modules/**", "*.test.js", ".stryker-tmp/**", "reports/**"],
+  "path": ["."],
+  "format": ["javascript"],
+  "minLines": 5,
+  "minTokens": 50
+}

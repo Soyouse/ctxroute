@@ -1,0 +1,22 @@
+{
+  "$schema": "./mcp-doc-config.schema.json",
+  "enabled": true,
+  "showNotification": true,
+  "mode": "smart",
+  "defaultThreshold": 4,
+  "filterMode": "none",
+  "filterList": [],
+  "servers": {},
+  "confirm": false,
+  "skills": {
+    "mon-projet": {
+      "match": [
+        "mon-projet"
+      ],
+      "mode": "once"
+    }
+  },
+  "skillsWithoutPerimeter": [
+    "exemple-skill-on-demand"
+  ]
+}

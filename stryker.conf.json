@@ -1,0 +1,48 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation UNIQUEMENT sur lib-pure.js (logique décisionnelle, zéro I/O). mcp-doc-inject.js/mcp-doc-reset.js/lock.js ne sont PAS mutés : I/O (fs/stdin/stdout) = intégration/contrat, jamais Stryker (doctrine : isoler la décision de l'I/O AVANT de muter).",
+  "_runner_comment": "⚠️ vitest OBLIGATOIRE (node:test BANNI 16/07/2026, cf stryker-runner-choice.md) : perTest + workers vivants = zéro spawn par mutant (12 min → secondes/minutes mesuré). NE JAMAIS revenir à command/commandRunner — gate dans mutation-workflow-gate.test.js. Les suites lancées par mutant = celles que vitest.config.mjs inclut (include/exclude) : nouveau module pur ⇒ sa suite DOIT être découverte par vitest, pas listée ici.",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.stryker.config.mjs"
+  },
+  "coverageAnalysis": "perTest",
+  "_timeout_comment": "⚠️ CAUSE RACINE du « le score local ment » (trouvée 15/07/2026). Défaut Stryker = timeoutMS 5000 + timeoutFactor 1.5 × baseline. Suite ~5s ⇒ timeout ~12s. Machine CHARGÉE : un run normal à 5s dépasse 12s ⇒ TIMEOUT ⇒ Stryker le compte comme TUÉ ⇒ score GONFLÉ (mesuré : 100% en local avec 411 timeouts / 0.17 test par mutant, vs 97.54% en CI avec 0 timeout). Le local ne mentait pas par fatalité : il manquait ce réglage. 60s = très au-dessus de toute charge réaliste ⇒ un timeout redevient un VRAI signal (test en boucle infinie), plus du bruit de charge. Coût : ~0 (seuls les mutants VRAIMENT infinis attendent). ⚠️ NE JAMAIS baisser pour « accélérer » : ça réintroduit le mensonge silencieux, et un score faux est pire que pas de score.",
+  "timeoutMS": 60000,
+  "_mutator_comment": "Regex exclu (Stryker mute les regex caractère-par-caractère = surtout du bruit ; serverName()/toolSuffix() sont couverts fonctionnellement par de nombreux cas dans lib-pure.test.js, pas par mutation de regex).",
+  "mutator": {
+    "excludedMutations": [
+      "Regex"
+    ]
+  },
+  "reporters": [
+    "clear-text",
+    "progress",
+    "json"
+  ],
+  "mutate": [
+    "lib-pure.js",
+    "sources/file.js",
+    "sources/tool.js",
+    "sources/mcp.js",
+    "sources/session.js",
+    "sources/skill.js",
+    "frontmatter.js",
+    "migrate.js",
+    "loader.js",
+    "lint.js",
+    "collisions.js",
+    "gate.js"
+  ],
+  "incremental": true,
+  "_survivor_connu": "99.15% mesuré 15/07/2026 — 1 seul survivant restant (isServerActive, fallback [] → [\"Stryker was here\"]) : mutant ÉQUIVALENT en pratique. Ce littéral n'est observable QUE si un test appelle isServerActive avec server==='Stryker was here' (chaîne interne à Stryker, pas un cas réel, coupler un test à cette valeur casserait à une future version de l'outil). Break fixé à 99 (cliquet jamais baissé, doctrine le mainteneur) — pas 100, ce dernier point est un vrai plafond outillage, pas un trou de test.",
+  "thresholds": {
+    "high": 99,
+    "low": 90,
+    "break": 99
+  },
+  "_pourquoi_mutate": "TOUS les modules PURS (gates dependency-cruiser garantissent zero I/O). JAMAIS les fichiers I/O : mutants equivalents garantis.",
+  "jsonReporter": {
+    "fileName": "reports/mutation.json"
+  }
+}

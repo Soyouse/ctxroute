@@ -1,0 +1,11 @@
+state/
+docs/mcp/*.md
+!docs/mcp/*.md.example
+docs/session/*.md
+!docs/session/*.md.example
+node_modules/
+.stryker-tmp/
+reports/
+
+# Config UTILISATEUR (noms de skills/projets = données perso) — créer depuis le .example
+mcp-doc-config.json

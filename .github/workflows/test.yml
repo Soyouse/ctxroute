@@ -1,0 +1,50 @@
+name: test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # ⚠️ `npm ci` OBLIGATOIRE ici : la suite dépend de fast-check
+      # (lib-pure.property.test.js). Ce job tournait sans install tant que les
+      # tests étaient zéro-dep — l'oublier = CI rouge sur les 3 OS pour une
+      # raison invisible en local (node_modules déjà présent).
+      - run: npm ci
+      - run: npm test
+
+  coupling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:coupling
+
+# ⚠️ LA MUTATION VIT DANS `.github/workflows/mutation.yml`, PAS ICI.
+#    Raison : `paths:` s'applique au WORKFLOW entier, jamais à un job — la
+#    garder ici la ferait tourner à CHAQUE push (235-296 s mesuré), y compris
+#    sur un commit de doc. Doctrine CLAUDE.md : « job LOURD (> ~3 min) →
+#    workflow SÉPARÉ à paths stricts ». Repo PRIVÉ = 2000 min/mois.
+#    ⚠️ NE PAS la ré-ajouter ici : elle tournerait DEUX fois, et le filtre
+#    `paths` de l'autre workflow deviendrait décoratif.
+#    Le miroir paths ⟷ stryker.conf.json est scellé par
+#    `mutation-workflow-gate.test.js`.

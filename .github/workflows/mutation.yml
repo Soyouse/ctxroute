@@ -1,0 +1,81 @@
+# ═══════════════════════════════════════════════════════════════════════
+# MUTATION — workflow SÉPARÉ, à paths STRICTS
+# ═══════════════════════════════════════════════════════════════════════
+#
+# ⚠️ POURQUOI SÉPARÉ DE test.yml : `paths:` s'applique au WORKFLOW entier,
+#    jamais à un job. La mutation (235-296 s mesuré) tournait donc à CHAQUE
+#    push — y compris sur un commit de doc ou de README. Doctrine CLAUDE.md :
+#    « Job LOURD (> ~3 min) ET non-incrémentable → JAMAIS par-push sous un
+#    path large → workflow SÉPARÉ à paths stricts ». Repo PRIVÉ = 2000 min/mois.
+#
+# ⚠️ `paths` DOIT rester le MIROIR EXACT de `stryker.conf.json` :
+#      - un fichier de `mutate` absent d'ici  → il est muté mais le job ne se
+#        déclenche JAMAIS pour lui = perte de couverture SILENCIEUSE ;
+#      - une suite du `commandRunner` absente → une modif de test qui casse le
+#        score ne serait vue par personne.
+#    ⚠️ DEUX VÉRITÉS À SYNCHRONISER = la classe de bug que ce repo combat.
+#    D'où le gate `mutation-workflow-gate.test.js` : il rougit à la première
+#    dérive. NE JAMAIS éditer ce bloc `paths` sans le relancer.
+# ═══════════════════════════════════════════════════════════════════════
+
+name: mutation
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      # ── modules mutés (miroir de stryker.conf.json `mutate`) ──
+      - 'lib-pure.js'
+      - 'sources/file.js'
+      - 'sources/tool.js'
+      - 'sources/mcp.js'
+      - 'sources/session.js'
+      - 'sources/skill.js'
+      - 'frontmatter.js'
+      - 'migrate.js'
+      - 'loader.js'
+      - 'lint.js'
+      - 'collisions.js'
+      - 'gate.js'
+      # ── suites déterministes couvrant les modules mutés (runner vitest perTest) ──
+      - 'lib-pure.test.js'
+      - 'sources-file.test.js'
+      - 'sources-tool.test.js'
+      - 'sources-mcp.test.js'
+      - 'sources-session.test.js'
+      - 'sources-skill.test.js'
+      - 'frontmatter.test.js'
+      - 'migrate.test.js'
+      - 'loader.test.js'
+      - 'lint.test.js'
+      - 'collisions.test.js'
+      - 'gate.test.js'
+      # ── la config de mutation elle-même + les deps ──
+      - 'stryker.conf.json'
+      - 'vitest.stryker.config.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/mutation.yml'
+  pull_request:
+  # ⚠️ Filet de secours : permet de relancer à la main si un doute subsiste
+  #    (ex. après un changement d'outillage qui ne touche aucun path ci-dessus).
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # ⚠️ Node ≥22 obligatoire (dependency-cruiser l'exige). Un mismatch
+          #    avec la machine dev EST le bug le plus probable si ce job échoue
+          #    en CI mais passe en local (déjà vécu 15/07/2026).
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:mutation

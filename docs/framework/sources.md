@@ -1,0 +1,21 @@
+---
+rules: [{"pattern":"sources/","scope":["mcp-doc-hooks"],"rank":536},{"pattern":"frontmatter.js","scope":["mcp-doc-hooks"],"rank":537},{"pattern":"frontmatter.property.test.js","scope":["mcp-doc-hooks"],"rank":538},{"pattern":"migrate-to-frontmatter.js","scope":["mcp-doc-hooks"],"rank":539},{"pattern":"file-differential.test.js","scope":["mcp-doc-hooks"],"rank":540},{"pattern":"migrate.js","scope":["mcp-doc-hooks"],"rank":548},{"pattern":"migrate.test.js","scope":["mcp-doc-hooks"],"rank":549},{"pattern":"migrate.property.test.js","scope":["mcp-doc-hooks"],"rank":550},{"pattern":"sources-file.test.js","scope":["mcp-doc-hooks"],"rank":551},{"pattern":"sources-mcp.test.js","scope":["mcp-doc-hooks"]},{"pattern":"mcp-differential.test.js","scope":["mcp-doc-hooks"]},{"pattern":"frontmatter.test.js","scope":["mcp-doc-hooks"],"rank":552}]
+mode: dumb
+confirm: true
+rank: 536
+---
+# sources/*.js + frontmatter.js — moteur unifié (✅ LIVE, fusion TERMINÉE 17/07/2026)
+
+⚠️ EN PROD : la porte unique `doc-inject.js` (matcher `*`) consomme sources/file.js (fichier) ET sources/mcp.js (MCP). Historique/décisions : `REFACTOR-PLAN.md` (statut TERMINÉ). Casser une source = plus de doc injectée pour toute la flotte d'agents.
+⚠️ PURS (gate `sources-must-stay-pure` / `frontmatter-must-stay-pure`) : zéro fs/path/process. C'est la CONDITION pour muter sans mutants équivalents, pas un confort de test.
+⚠️ AUCUN DIALECTE DE HARNAIS (gate `sources-must-not-know-the-harness`) : une source répond « quels docs ? », elle ne décide RIEN. `permissionDecision`/`hookSpecificOutput` = le rôle de la PORTE. C'est ce qui rend le portage Codex trivial (écrire une porte, pas un moteur).
+⚠️ `sources/file.js` = réplique EXACTE de `protect-files.js` (Bash + reconstruction `cd &&`, `apply_patch` Codex — patch dans `input`/`patch`/`command`, `command` = shape RÉEL Codex ≥ 0.144 mesuré 19/07/2026 —, scope sur TOUS les params, `norm()` backslash+casse). Toute « amélioration » sans relancer le différentiel = régression silencieuse sur 532 règles que personne ne relit.
+⚠️ ORDRE = rule-major (règles → chemins), dédup = PREMIÈRE règle gagnante. C'est l'ordre parent→enfant de la concaténation. Un Set ou un ordre path-major casse le sens sans rien afficher.
+⚠️ `match` accepte chaîne OU liste : mesuré, 98 des 288 docs ont plusieurs patterns. N'accepter qu'une chaîne rejette un tiers du parc.
+⚠️ CADENCE (17/07/2026, zéro doublon) : doc MCP = frontmatter `mode:`/`threshold:` optionnel (l'auteur propose, fallback global) ; le JSON ne porte QUE du global (`servers` = subToolParam seulement, scellé par config-gate). Précédence : frontmatter doc > global.
+⚠️ `tool:` = 4ᵉ déclencheur (19/07/2026, sources/tool.js + toolAdapter) : nom EXACT (===) d'un OUTIL NATIF — comble l'angle mort WebFetch/WebSearch (ni chemin ni mcp__, prouvé muet par spawn). JAMAIS substring. toolAdapter RÉUTILISE acc.decls/bodies posés par fileAdapter (zéro relecture corpus — l'ordre file→tool dans ADAPTERS est une DÉPENDANCE) ; dédup docId = file gagne. scope/exclude via file.shouldSkip (source unique).
+⚠️ `rules:` = 3ᵉ déclencheur, JSON inline par-entrée `{pattern, scope?, exclude?}` — mesuré 16/07 : 31/103 docs multi-règles ont des scopes DIVERGENTS, irreprésentables avec un scope par doc. `rules` + `match`/`scope`/`exclude` = contradiction ROUGE. `rank` : mesuré (39 paires, 0 conflit) puis CONSERVÉ — parent/enfant abandonné (ordre en partie accidentel, cf plan).
+⚠️ MIGRATION FAITE (16/07/2026) : les 302 docs réelles portent leur frontmatter (dumb+confirm+rank). protected-paths.json reste la vérité de l'ANCIEN moteur jusqu'à la bascule — toute nouvelle règle : l'ajouter au JSON **ET** au frontmatter de la doc (double écriture transitoire, assumée jusqu'à #7).
+⚠️ Parser TOTAL : `parse()` ne throw JAMAIS. Un throw = hook mort = plus AUCUNE doc injectée nulle part (un seul .md malformé casserait tout).
+⚠️ Clé de frontmatter inconnue = ERREUR, jamais ignorée : `mach:` au lieu de `match:` = doc morte en silence — le bug que ce refactor tue.
+Différentiel = `npm run test:differential` (~75 min, 2021 spawns) : gate de BASCULE, JAMAIS de push. Vert prouve l'équivalence du match, jamais que le moment est bon pour basculer.

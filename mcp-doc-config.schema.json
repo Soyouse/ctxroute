@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mcp-doc-hooks — configuration",
+  "description": "Config GLOBALE du framework (décision mainteneur 17/07/2026 : le JSON ne fait QUE du global — la cadence par doc vit dans le frontmatter de la doc, jamais ici. Zéro doublon entre les deux). Cascade : frontmatter de la doc > défauts globaux ici.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "enabled": {
+      "type": "boolean",
+      "description": "Interrupteur GLOBAL — false coupe TOUT (injection ET tracking). Distinct de showNotification."
+    },
+    "showNotification": {
+      "type": "boolean",
+      "description": "Contrôle UNIQUEMENT le badge visuel 📄 — false masque le badge, l'injection réelle continue."
+    },
+    "mode": {
+      "enum": ["dumb", "once", "smart"],
+      "description": "dumb = réinjecte à chaque appel (debug only, jamais en config livrée — gate). once = 1er appel puis silence jusqu'à compaction. smart = once + réinjection après N appels d'autres outils."
+    },
+    "defaultThreshold": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Le N du mode smart : nombre d'appels d'AUTRES outils avant réinjection."
+    },
+    "defaultDriftUnit": {
+      "enum": ["tool", "turn"],
+      "description": "UNITÉ globale du compteur smart (18/07/2026) : tool = appels d'outils (défaut framework, comportement historique) ; turn = tours de conversation (compteur alimenté par turn-count.js sur UserPromptSubmit). Cascade : driftUnit de l'entrée (frontmatter doc / entrée skill) > defaultDriftUnit > défaut framework 'tool'. Dégénéré hors de smart (dumb=0, once=∞)."
+    },
+    "confirm": {
+      "type": "boolean",
+      "description": "Interrupteur GLOBAL des confirmations (ask) déclarées par les docs (frontmatter confirm: true). false = aucun ask (remplace le fichier sentinelle .rush après la bascule — un seul système de config, jamais deux). Le tri « quelles docs méritent un ask » = chantier humain séparé, post-bascule."
+    },
+    "filterMode": {
+      "enum": ["none", "whitelist", "blacklist"],
+      "description": "whitelist = SEULS les serveurs de filterList sont couverts. blacklist = tous SAUF eux. Un serveur exclu compte quand même comme « étranger » pour les compteurs des autres."
+    },
+    "filterList": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Noms de serveurs pour filterMode (ex. [\"stripe\", \"odoo\"])."
+    },
+    "servers": {
+      "type": "object",
+      "description": "Réglages STRUCTURELS par serveur (routage), JAMAIS de cadence : mode/threshold par doc = frontmatter de la doc (clés retirées du schéma 17/07/2026, zéro doublon).",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "subToolParam": {
+            "type": "string",
+            "description": "Chemin du param portant l'opération réelle d'un MCP proxy mono-outil (ex. \"args.tool\" pour Odoo) — active le niveau 3 docs/mcp/{server}/{subTool}.md."
+          }
+        }
+      }
+    },
+    "skillsWithoutPerimeter": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "SKILLS VOLONTAIREMENT SANS PÉRIMÈTRE + INTERRUPTEUR de la discipline zéro-silence (19/07/2026 — miroir de `inject: never`). OPT-IN EXPLICITE : la présence de CETTE clé (même []) active le sens inverse du skill-registry-gate ; absente = aucune exhaustivité exigée (utiliser `skills` n'impose RIEN — un langage n'impose jamais une politique). Tout skill du harnais DOIT être SOIT enregistré dans `skills` (auto-injection par périmètre) SOIT listé ICI (référence/on-demand, invocation manuelle). Un skill dans AUCUNE des deux listes = ROUGE (skill-registry-gate, sens inverse) — un périmètre OUBLIÉ et un skill volontairement muet sont indiscernables sans cette déclaration.",
+      "uniqueItems": true
+    },
+    "skillDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Étage GLOBAL de la cascade des skills (18/07/2026) — défaut appliqué à TOUS les skills sans réglage propre. Cascade : entrée du skill > skillDefaults > défaut framework (once). DISTINCT du mode/defaultThreshold global (ceux-là = docs ; les skills ont leur sémantique propre — un pointeur veut once, pas smart).",
+      "properties": {
+        "mode": { "enum": ["dumb", "once", "smart"], "description": "Cadence par défaut de tous les skills." },
+        "threshold": { "type": "integer", "minimum": 1, "description": "Threshold smart par défaut de tous les skills." },
+        "driftUnit": { "enum": ["tool", "turn"], "description": "Unité smart par défaut de tous les skills (cascade : entrée > skillDefaults > defaultDriftUnit > 'tool')." }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "description": "Registre des skills à déclencher par PÉRIMÈTRE (18/07/2026). Config GLOBALE que le framework POSSÈDE — jamais dans le fichier skill lui-même (propriété du harnais, format non maîtrisé, fragile aux updates : doctrine « frontmatter uniquement dans ce qu'on maîtrise à 100% »). Clé = nom du skill (= fichier .claude/commands/{clé}.md, scellé par skill-registry-gate). Injecte le CORPS du skill lu en direct (source unique — fallback pointeur si illisible). Matching = le MÊME que la source fichier (matchingDocs réutilisé), MÊME vocabulaire que les docs : match/scope/exclude.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "anyOf": [
+          { "required": ["match"] },
+          { "required": ["rules"] },
+          { "required": ["servers"] }
+        ],
+        "not": {
+          "anyOf": [
+            { "required": ["rules", "match"] },
+            { "required": ["rules", "scope"] },
+            { "required": ["rules", "exclude"] }
+          ]
+        },
+        "properties": {
+          "rules": {
+            "type": "array",
+            "minItems": 1,
+            "description": "FORME PAR-ENTRÉE (19/07/2026, parité docs) : conditions DIFFÉRENTES par pattern — [{\"pattern\":\"deploy.sh\",\"scope\":[\"projet-a\"]},{\"pattern\":\"clients-seo\"}]. Remplace match/scope/exclude (les mélanger = contradiction, deux vérités = dérive). Un skill homogène garde le format simple match/scope/exclude.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["pattern"],
+              "properties": {
+                "pattern": { "type": "string", "minLength": 1 },
+                "scope": { "type": "array", "items": { "type": "string" } },
+                "exclude": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          },
+          "match": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "description": "DIMENSION FICHIER — patterns substring (mêmes règles que match fichier) : quand un param d'outil en contient un, le pointeur s'injecte. Choisir des chaînes DISTINCTIVES du projet (sur-généricité = sur-injection)."
+          },
+          "servers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "DIMENSION MCP, 3 GRAINS (18/07/2026, mêmes niveaux que les docs MCP) : \"infra\" = tout outil du serveur · \"gworkspace/send_mail\" = CET outil précis (suffixe de mcp__{serveur}__{outil}) · \"odoo/create_invoice\" = CE sous-outil (via servers.{serveur}.subToolParam). Primitives lib réutilisées (serverName/toolSuffix/getByPath — zéro nouveau match). Un projet se travaille par fichiers ET par MCP — les 2 dimensions sont en UNION."
+          },
+          "mode": {
+            "enum": ["dumb", "once", "smart"],
+            "description": "Cadence (défaut once). Skills = source NEUVE sans parité legacy → once/smart LIBRES d'emblée (contrairement aux docs fichier bloquées en dumb jusqu'au portage Codex)."
+          },
+          "threshold": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Le N du mode smart pour ce skill."
+          },
+          "driftUnit": {
+            "enum": ["tool", "turn"],
+            "description": "Unité du compteur smart pour CE skill : tool (appels d'outils) ou turn (tours de conversation). Dernier mot de la cascade."
+          },
+          "exclude": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Patterns à rejeter (matché sur le path/commande en cours) — homonymes (node_modules, dist...)."
+          },
+          "scope": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Filtre secondaire (parité docs fichier) — matché contre TOUS les params de l'outil concaténés : le pointeur ne s'injecte que si au moins un scope y est présent. Resserre un match large."
+          }
+        }
+      }
+    }
+  }
+}
