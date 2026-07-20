@@ -363,3 +363,42 @@ Contrat = skill §« Porter le framework sur un NOUVEAU HARNAIS » (moteur INTOU
 - [x] Phase 2 — FAIT 19/07/2026 : suites spawn codex-doc-inject.test.js + codex-doc-write-guard.test.js ; doctor probes 7-8 + `--codex-hooks` (câblage 5 voies, fichiers = CE repo, anti-double injection protect-files) ; negative-checks 3g/3h/7 (sabotage copie → hurlement prouvé). npm test + mutation 100% + check:all verts.
 - [x] Phase 3 — FAIT 19/07/2026, câblé + PROUVÉ END-TO-END dans un run Codex VIVANT (`codex exec --dangerously-bypass-hook-trust` : doc porte.md retrouvée dans le transcript du run). **Faits de TERRAIN (contre la doc)** : ① Codex 0.144 IGNORE `~/.codex/hooks.json` quand config.toml existe → câblage = `config.toml` [[hooks.*]] UNIQUEMENT (hooks.json renommé .ignored-by-codex-0144.bak) ; ② payload hook réel : `tool_name: "Bash"` MÊME quand le function_call du modèle s'appelle shell_command → le Bash-scan du moteur marche tel quel ; ③ pas d'agent_id (confirmé live). protect-files retiré du câblage même geste ; doctor --codex-hooks config.toml = 37/37 ; doctor auto à chaque SessionStart Codex. TRUST RÉSOLU 0-HUMAN (19/07/2026 soir) : câblage déplacé en politique machine `C:\ProgramData\OpenAI\Codex\requirements.toml` (hooks MANAGÉS, doc officielle : « trusted by policy ») — PROUVÉ par run `codex exec` SANS bypass (PreToolUse/PostToolUse exécutés + doc dans le transcript). Aucun /hooks requis, ni pour le mainteneur ni pour le cousin (Phase 4 : poser le même requirements.toml chez lui). Piège annexe corrigé : config.toml avait 9 clés mcp_servers DUPLIQUÉES (manuel vs bloc sync) = Codex REFUSAIT de démarrer ; + model gpt-5-codex MORT avec compte ChatGPT (à changer, cf modèles cache gpt-5.5/5.6).
 - [ ] Phase 4 — distribution cousin : repo de parc en git pull (JAMAIS de copie manuelle) + doctor comme gate d'installation sur sa machine. ACCÈS GITHUB POSÉ 19/07/2026 : l'associé invité en READ ONLY sur Soyouse/mcp-doc-hooks — il FORK et propose des PR, SEUL le propriétaire merge (master intouchable par construction ; branch protection impossible en privé gratuit — GitHub Pro si un jour accès write direct voulu)
+
+## 20/07/2026 — 🔴 BACKLOG : INJECTION TRONQUÉE EN SILENCE (défaut VÉCU, prioritaire)
+
+**Classe d'erreur** : le hook a fonctionné, le marqueur était vert, **et le contenu n'est pas arrivé**.
+Vécu deux fois dans une même session, sur deux repos différents.
+
+**Mécanisme** : le hook rend son contenu sur stdout. Au-delà d'un seuil de taille, le harnais
+(Claude Code) n'injecte PAS le texte : il l'écrit dans un fichier de résultats et ne présente
+qu'un **aperçu des ~2 premiers Ko**, précédé de `Output too large (NN KB)`. L'agent reçoit donc
+l'INTRO du skill et rien d'autre — arborescence, invariants et conventions restent hors contexte.
+
+**Mesuré** : skill projet = 45,9 Ko rendus → ~2 Ko reçus (≈ 4 %). Skill du framework lui-même =
+43,4 Ko → même troncature. Les deux ont affiché leur marqueur `🧩 skill:` normalement.
+
+**Pourquoi c'est grave** : l'agent ne peut pas savoir qu'il lui manque quelque chose — il travaille
+sur une intro en croyant avoir le contrat. Aucun signal, aucune ligne rouge. C'est très exactement
+le mode d'échec que le framework existe pour supprimer (le vert qui ment). Un skill qui GROSSIT
+franchit le seuil un jour, et son injection se dégrade en silence à partir de là, sans commit ni
+changement de config — donc sans rien à qui imputer la régression.
+
+**Deux corrections, de natures différentes — les DEUX, jamais l'une à la place de l'autre :**
+
+1. **Moteur (fail-loud, obligatoire)** : mesurer la taille de ce qu'on rend AVANT de le rendre.
+   Au-delà du seuil, ne PAS émettre un pavé en espérant qu'il passe : émettre un contenu court qui
+   DIT qu'il est tronqué + le chemin du fichier complet à lire. Le silence est le bug ; un agent
+   informé va lire, un agent non informé invente. ⚠️ Le seuil est imposé par le HARNAIS, pas par
+   nous : le découvrir par mesure et l'encoder en donnée, ne jamais le deviner.
+2. **Gate statique (0-human)** : tout skill/doc dont le rendu dépasse le seuil ⇒ ROUGE au pre-push,
+   avec le poids mesuré dans le message. Sinon la règle « docs < 10 lignes / progressive
+   disclosure » reste une consigne en prose — et une consigne en prose ne tient pas 40 sessions.
+
+**Conséquence côté CONTENU (hors moteur, à traiter séparément)** : un skill de 45 Ko réinjecté à
+chaque entrée de périmètre viole la progressive disclosure du framework, troncature ou pas.
+Cible = tier-1 court (invariants/pièges) + `*-reference.md` à la demande. Le gate ci-dessus rend
+cette dette VISIBLE au lieu de la laisser grossir jusqu'au seuil.
+
+⚠️ **NE PAS traiter comme un cas particulier d'un skill trop gros.** Le défaut est dans le contrat
+moteur↔harnais : « rendre plus que ce que le harnais accepte » doit être une ERREUR BRUYANTE,
+pour n'importe quelle doc, aujourd'hui et à toute taille future.
