@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "mcp-doc-hooks",
   "version": "1.4.0",
   "description": "Claude Code framework: inject invariant/pitfall docs into agent context on first contact with each MCP server/tool/sub-tool, with configurable per-server modes, thresholds, whitelist/blacklist filtering, cross-process locking, and automatic state cleanup.",
@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:fast": "vitest run lib-pure.test.js sources-file.test.js frontmatter.test.js migrate.test.js lint.test.js gate.test.js lib-pure.property.test.js frontmatter.property.test.js migrate.property.test.js lock.test.js config-gate.test.js mutation-workflow-gate.test.js deadline.test.js deadline-gate.test.js source-drift-gate.test.js",
+    "test:fast": "vitest run lib-pure.test.js sources-file.test.js frontmatter.test.js migrate.test.js lint.test.js gate.test.js lib-pure.property.test.js frontmatter.property.test.js migrate.property.test.js lock.test.js config-gate.test.js mutation-workflow-gate.test.js deadline.test.js deadline-gate.test.js",
     "test:porte": "vitest run gate.test.js doc-inject.test.js porte-differential.test.js",
     "lint": "node lint-corpus.js",
     "test:lint": "vitest run lint-corpus.test.js",
@@ -15,7 +15,7 @@
     "test:property": "vitest run lib-pure.property.test.js frontmatter.property.test.js migrate.property.test.js",
     "test:doctor": "vitest run doctor.test.js",
     "doctor": "node doctor.js",
-    "test:unit": "vitest run lib-pure.test.js sources-file.test.js frontmatter.test.js migrate.test.js lint.test.js gate.test.js source-drift-gate.test.js",
+    "test:unit": "vitest run lib-pure.test.js sources-file.test.js frontmatter.test.js migrate.test.js lint.test.js gate.test.js",
     "test:lock": "vitest run lock.test.js",
     "test:integration": "vitest run mcp-doc-inject.test.js",
     "test:mutation": "stryker run",
