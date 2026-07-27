@@ -32,6 +32,8 @@ const fs = require('fs');
 const path = require('path');
 const { analyser, filtrer, doitHurler, NIVEAU_DEFAUT } = require('./lint');
 const frontmatter = require('./frontmatter');
+const { readCorpus } = require('./corpus');
+const { rulesFromCorpus } = require('./loader');
 
 // ⚠️ Le parc de docs FICHIER vit chez l'utilisateur (~/.claude/hooks/), PAS
 //    dans ce repo : le framework est PUBLIC, il ne DOIT dépendre d'aucun
@@ -124,14 +126,29 @@ function collecter() {
   const DOCS = path.join(HOOKS, 'docs');
   const home = process.env.MCP_DOC_HOME || require('os').homedir();
 
-  const regles = extraireRegles(lireJSON(path.join(HOOKS, 'protected-paths.json')));
+  // ⚠️ SOURCE UNIQUE = LES FRONTMATTERS (27/07/2026). `protected-paths.json` était
+  //    la vérité de l'ANCIEN moteur (`protect-files.js`), remplacé par la porte
+  //    unique le 17/07 ⇒ le JSON est un artefact INERTE. (RIEN à voir avec Codex :
+  //    ses coquilles tournent sur le NOUVEAU moteur, donc sur les frontmatters.)
+  //    Le lire ici ressusciterait la double écriture par la bande —
+  //    le lint réclamerait une entrée JSON pour chaque doc, donc l'auteur devrait
+  //    de nouveau écrire deux fois. NE JAMAIS y revenir : une doc déclare son
+  //    déclencheur dans SON frontmatter, à UN seul endroit.
+  // ⚠️ Parc illisible (dossier absent) = « je n'ai pas pu mesurer », PAS une stack
+  //    trace : un diagnostic hurle proprement, la sonde de vivacité ci-dessous
+  //    tranche. Un crash brut serait indiscernable d'un bug du lint lui-même.
+  let corpus = [];
+  try {
+    corpus = readCorpus(DOCS, 'docs/');
+  } catch { /* laissé vide : la sonde de vivacité s'en charge */ }
+  const regles = rulesFromCorpus(corpus);
 
   // ⚠️ SONDE DE VIVACITÉ — un harnais creux annonce triomphalement « 0 problème ».
   //    Erreur commise 2× le 15/07 (script d'audit filtrant sur `scope`, puis
   //    `Array.isArray` sur une racine objet). Sans preuve d'avoir chargé
   //    quelque chose, un résultat vert ne vaut RIEN.
   if (!regles.length) {
-    console.error(`🚨 lint-corpus : AUCUNE règle chargée depuis ${HOOKS}/protected-paths.json`);
+    console.error(`🚨 lint-corpus : AUCUNE règle chargée depuis les frontmatters de ${DOCS}`);
     console.error('   Le lint ne peut RIEN prouver dans cet état (harnais creux). Vérifie MCP_DOC_HOOKS_DIR.');
     process.exit(2);
   }

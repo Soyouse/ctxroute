@@ -48,3 +48,8 @@ qui sont, elles, courtes et parfaites.)
 **Verdict** : injection GRANULAIRE = état de l'art, aucune régression. Seul point noir = le skill trop gros,
 qui n'est pas un défaut d'injection mais un défaut de RÉDACTION du skill (trop long pour être un contexte).
 Chantier unique : scinder le skill. Le reste tourne.
+
+## 2026-07-24 — session agent-social (pilier + rapport + murs prod)
+- Injection: docs pipeline/testing/runtime/marque-resolve/config-gate injectées au bon moment toute la session (dizaines de déclenchements pertinents, zéro faux positif observé). Nouvelle doc agent-social-rapport.md auto-injectée dès le 1er accès à rapport.mjs (preuve par usage).
+- Valeur mesurée: la doc testing a guidé stryker sandbox/testFiles; la doc runtime a rappelé le mur callBrain au moment du câblage pilier.
+

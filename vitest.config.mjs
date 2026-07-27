@@ -44,6 +44,20 @@ export default defineConfig({
       'vendor-deadline.test.js',
       'deadline-charge.test.js',
     ],
+    // ⚠️ DÉLAI 30 s — NE JAMAIS LE BAISSER (posé 27/07/2026, MESURÉ).
+    //    Le défaut vitest (5 s) produisait des FAUX ROUGES à répétition sur les
+    //    suites qui SPAWNENT de vrais process (doc-inject, turn-count,
+    //    shadow-inject, porte-differential) : mesuré 6082 ms pour un test qui
+    //    lance 4 process, et 4992 ms pour un VERT — on tranchait à 8 ms près.
+    //    Le test n'était pas cassé, le chronomètre l'était.
+    //    ⚠️ POURQUOI ÇA COMPTE : une suite qui rougit au hasard cesse d'être lue,
+    //    et le jour où elle rougit pour une VRAIE raison, personne ne la croit.
+    //    C'est la leçon EXACTE déjà payée sur `deadline.js` (seuil 2 s → 30 s) :
+    //    « un seuil serré tue du travail légitime en silence = pire que le zombie ».
+    //    Prendre la plus GRANDE valeur qui borne encore utilement un vrai blocage,
+    //    jamais la plus petite qui « semble suffire ».
+    testTimeout: 30000,
+    hookTimeout: 30000,
     // ⚠️ Stryker gère SES propres workers parallèles : le runner vitest
     //    force le mono-thread de son côté. Ne pas tenter de régler la
     //    concurrence ici pour « accélérer » — Stryker l'écrase.

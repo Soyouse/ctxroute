@@ -45,6 +45,27 @@ function runLint(parc, args = []) {
 }
 
 /**
+ * Dérive le frontmatter que les `regles` d'un cas décrivent pour la doc `rel`.
+ * ⚠️ Traduction MÉCANIQUE, jamais un jugement : les cas continuent d'exprimer
+ *    leur intention en « règles », le parc les matérialise là où le moteur les
+ *    lit désormais — dans la doc elle-même.
+ * Doc visée par AUCUNE règle → aucun frontmatter : c'est le cas « doc morte »,
+ * et il doit rester détectable.
+ */
+function avecFrontmatter(rel, contenu, regles) {
+  const miennes = regles.filter((r) => r.doc === rel);
+  if (!miennes.length) return contenu;
+  const patterns = miennes.map((r) => r.pattern).filter((p) => typeof p === 'string');
+  if (!patterns.length) return contenu;
+  const decl = { match: patterns.length === 1 ? patterns[0] : patterns };
+  const p0 = miennes[0];
+  if (Array.isArray(p0.scope) && p0.scope.length) decl.scope = p0.scope;
+  if (Array.isArray(p0.exclude) && p0.exclude.length) decl.exclude = p0.exclude;
+  const lignes = Object.entries(decl).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
+  return `---\n${lignes.join('\n')}\n---\n${contenu}`;
+}
+
+/**
  * Fabrique un faux parc minimal mais RÉALISTE (mêmes formes que le vrai :
  * racine objet `{rules:[…]}`, docs sous `docs/`, `mcpServers` dans le home).
  */
@@ -52,11 +73,17 @@ function faireParc({ regles = [], docs = {}, mcpServers = null } = {}) {
   const hooks = fs.mkdtempSync(path.join(os.tmpdir(), 'lint-parc-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'lint-home-'));
   fs.mkdirSync(path.join(hooks, 'docs'), { recursive: true });
+  // ⚠️ Le JSON reste écrit : des cas le visent NOMMÉMENT (isolation, racine objet).
+  //    Il n'est PLUS la source de règles du lint (27/07/2026) — les déclencheurs
+  //    vivent dans le frontmatter de CHAQUE doc. Le JSON servait l'ANCIEN moteur
+  //    (protect-files.js), remplacé le 17/07 ; rien à voir avec Codex.
   fs.writeFileSync(path.join(hooks, 'protected-paths.json'), JSON.stringify({ rules: regles }));
   for (const [rel, contenu] of Object.entries(docs)) {
     const p = path.join(hooks, rel);
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, contenu);
+    // Un cas qui fournit DÉJÀ son frontmatter (`---` en tête) fait autorité :
+    // c'est lui qu'il veut éprouver. Sinon on dérive celui que ses règles décrivent.
+    fs.writeFileSync(p, contenu.startsWith('---') ? contenu : avecFrontmatter(rel, contenu, regles));
   }
   if (mcpServers) fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ mcpServers }));
   return { hooks, home, nettoyer: () => { for (const d of [hooks, home]) fs.rmSync(d, { recursive: true, force: true }); } };
@@ -132,16 +159,25 @@ const SAIN = {
   } finally { parc.nettoyer(); }
 }
 
-// ── Cas 5 — NEGATIVE : règle FANTÔME (le miroir) ─────────────────────
+// ── Cas 5 — la règle FANTÔME est ÉTEINTE PAR CONSTRUCTION (27/07/2026) ──
+// ⚠️ Le cas n'est PAS supprimé, il est RETOURNÉ : il prouve désormais que la
+//    classe d'erreur ne peut plus exister. Une règle fantôme = une règle qui
+//    vise un .md absent. C'était possible tant que les règles vivaient dans un
+//    fichier SÉPARÉ (`protected-paths.json`) : le .md pouvait être supprimé sans
+//    sa règle. Depuis que le déclencheur vit DANS la doc (frontmatter, source
+//    unique), une règle sans doc est INEXPRIMABLE — supprimer la doc supprime
+//    la règle, d'un seul geste. Fermé par la CAUSE, pas par la détection.
+// ⚠️ Restaurer une source de règles externe RESSUSCITERAIT ce bug : ce test
+//    rougirait alors, et c'est exactement son rôle.
 {
   const parc = faireParc({
     regles: [...SAIN.regles, { doc: 'docs/disparue.md', pattern: 'disparu.js' }],
-    docs: SAIN.docs,
+    docs: SAIN.docs, // `docs/disparue.md` n'existe PAS : la règle ne peut pas naître
   });
   try {
     const r = runLint(parc);
-    ok('règle FANTÔME (vise un .md absent) → exit 1', r.status === 1);
-    ok('règle FANTÔME → la nomme', r.stderr.includes('docs/disparue.md'));
+    ok('règle FANTÔME devenue IMPOSSIBLE : parc sain malgré la règle orpheline', r.status === 0);
+    ok('règle FANTÔME : aucune doc absente nommée', !r.stderr.includes('docs/disparue.md'));
   } finally { parc.nettoyer(); }
 }
 
@@ -168,9 +204,18 @@ const SAIN = {
 //    frontmatter sans déclencheur ne retombe PAS sur le JSON. Une doc migrée à
 //    moitié doit rougir, jamais être sauvée en douce par une vieille règle.
 {
+  // ⚠️ Une doc SAINE accompagne la doc à moitié migrée : sans elle le parc n'a
+  //    AUCUN déclencheur, et c'est la sonde de vivacité (exit 2) qui répondrait —
+  //    on ne prouverait plus rien sur la doc muette. Le vrai parc a 300 docs vivantes.
   const parc = faireParc({
-    regles: [{ doc: 'docs/moitie.md', pattern: 'moitie.js' }],
-    docs: { 'docs/moitie.md': '---\ntitle: joli titre\n---\n\n# migrée à moitié\n' },
+    regles: [
+      { doc: 'docs/moitie.md', pattern: 'moitie.js' },
+      { doc: 'docs/saine.md', pattern: 'saine.js' },
+    ],
+    docs: {
+      'docs/moitie.md': '---\ntitle: joli titre\n---\n\n# migrée à moitié\n',
+      'docs/saine.md': '# saine\n\nUne doc correctement déclarée.\n',
+    },
   });
   try {
     const r = runLint(parc);
