@@ -26,7 +26,8 @@
     "test:deadline": "vitest run deadline.test.js deadline-gate.test.js && vitest run --config vitest.heavy.config.mjs deadline-charge.test.js",
     "test:differential": "vitest run --config vitest.heavy.config.mjs file-differential.test.js",
     "test:parc": "vitest run --config vitest.heavy.config.mjs hooks-parc-gate.test.js deadline-vendor.test.js vendor-deadline.test.js",
-    "vendor": "node vendor-deadline.js"
+    "vendor": "node vendor-deadline.js",
+    "test:deps": "vitest run deps-criticite-pure.test.js deps-criticite-gate.test.js"
   },
   "license": "MIT",
   "keywords": [

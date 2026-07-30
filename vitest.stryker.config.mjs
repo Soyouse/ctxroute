@@ -16,6 +16,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: [
+      'deps-criticite-pure.test.js',
       'lib-pure.test.js',
       'sources-file.test.js',
       'sources-tool.test.js',
