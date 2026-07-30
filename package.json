@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "mcp-doc-hooks",
   "version": "1.4.0",
   "description": "Claude Code framework: inject invariant/pitfall docs into agent context on first contact with each MCP server/tool/sub-tool, with configurable per-server modes, thresholds, whitelist/blacklist filtering, cross-process locking, and automatic state cleanup.",

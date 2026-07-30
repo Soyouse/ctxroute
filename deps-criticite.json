@@ -1,0 +1,14 @@
+{
+  "_doc": "CLASSIFICATION DE CRITICITÉ des dépendances du repo (30/07/2026). SOURCE UNIQUE, consommée par `deps-criticite-gate.test.js`. Toute dépendance de TOUT package.json du repo DOIT figurer ici — non classée = ROUGE.",
+  "_doc_classes": "`moteur` = la dépendance DÉTERMINE LA SORTIE livrée (pixels, mesures, encodage) ⇒ épinglage EXACT OBLIGATOIRE (ni ^, ni ~, ni plage), car sa dérive change le produit sans que rien ne rougisse. `ordinaire` = elle ne change pas la sortie (outillage, transport) ⇒ caret SOUHAITABLE (correctifs de sécurité).",
+  "_doc_zero_moteur": "⚠️ AUCUN MOTEUR ICI — et c'est structurel : ce repo n'a QUE des dépendances de développement, son code de production est du JavaScript sans dépendance (les hooks sont spawnés à chaque appel d'outil, toute dépendance runtime se paierait à chaque geste). Le gate n'est donc pas là pour corriger un défaut existant : il rend IMPOSSIBLE l'entrée future d'une dépendance non tranchée, runtime ou moteur. ⚠️ Un gate au périmètre VIDE est un gate DORMANT — d'où le test d'ANTI-DORMANCE qui prouve la mécanique sur un moteur factice.",
+  "moteur": {},
+  "ordinaire": {
+    "vitest": "harnais de test. Une dérive change le comportement des GATES, pas la sortie du produit — et un gate qui casse est BRUYANT (rouge).",
+    "@stryker-mutator/core": "mutation testing (outillage de gate).",
+    "@stryker-mutator/vitest-runner": "runner Stryker (outillage de gate).",
+    "fast-check": "property-based testing (outillage de gate).",
+    "dependency-cruiser": "détection de couplage et gates de pureté (outillage de gate).",
+    "jscpd": "détection de duplication. Sa dérive peut bouger le POURCENTAGE donc le cliquet — mais un cliquet franchi est ROUGE, donc visible."
+  }
+}
