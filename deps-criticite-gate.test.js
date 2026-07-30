@@ -98,7 +98,12 @@ describe("criticité des dépendances", () => {
     expect(surPlage, "aucune dépendance sur une plage : impossible de prouver que le gate mord").toBeTruthy();
 
     const factice = { [surPlage.nom]: "MOTEUR FACTICE — présent UNIQUEMENT pour prouver que le gate mord." };
-    expect(fautesEpinglage(deps, factice)).toHaveLength(1);
+    // ⚠️ Nombre attendu DÉRIVÉ du réel, jamais écrit « 1 » : la même dépendance peut être déclarée dans
+    //    PLUSIEURS package.json — chaque déclaration doit produire sa faute. Écrire 1 en dur fait rougir
+    //    le test pour une mauvaise raison (vécu à la pose, sur un repo multi-paquets).
+    const attendu = deps.filter((d) => d.nom === surPlage.nom && !EXACT.test(d.plage)).length;
+    expect(attendu).toBeGreaterThanOrEqual(1);
+    expect(fautesEpinglage(deps, factice)).toHaveLength(attendu);
     // Et l'inverse : correctement épinglée, elle ne doit PAS être signalée (pas de gate qui crie à tort).
     expect(fautesEpinglage([{ ...surPlage, plage: "1.2.3" }], factice)).toEqual([]);
   });
