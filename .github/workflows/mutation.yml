@@ -38,6 +38,7 @@ on:
       - 'collisions.js'
       - 'gate.js'
       - 'deps-criticite-pure.js'
+      - 'budget.js'
       # ── suites déterministes couvrant les modules mutés (runner vitest perTest) ──
       - 'lib-pure.test.js'
       - 'sources-file.test.js'
@@ -52,6 +53,7 @@ on:
       - 'collisions.test.js'
       - 'gate.test.js'
       - 'deps-criticite-pure.test.js'
+      - 'budget.test.js'
       # ── la config de mutation elle-même + les deps ──
       - 'stryker.conf.json'
       - 'vitest.stryker.config.mjs'

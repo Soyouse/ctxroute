@@ -29,6 +29,7 @@ export default defineConfig({
       'lint.test.js',
       'collisions.test.js',
       'gate.test.js',
+      'budget.test.js',
     ],
     exclude: ['**/node_modules/**'],
     reporters: ['default'],

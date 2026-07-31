@@ -27,6 +27,12 @@
       "enum": ["tool", "turn"],
       "description": "UNITÉ globale du compteur smart (18/07/2026) : tool = appels d'outils (défaut framework, comportement historique) ; turn = tours de conversation (compteur alimenté par turn-count.js sur UserPromptSubmit). Cascade : driftUnit de l'entrée (frontmatter doc / entrée skill) > defaultDriftUnit > défaut framework 'tool'. Dégénéré hors de smart (dumb=0, once=∞)."
     },
+    "budgetInjection": {
+      "type": "integer",
+      "minimum": 200,
+      "description": "Budget d'émission d'une injection, en CARACTÈRES (31/07/2026). Tout harnais borne la taille d'une injection et RANGE le surplus dans un fichier sans prévenir le producteur — l'agent reçoit alors une intro en croyant tenir le contrat. Ce budget garde la sortie sous ce mur : ce qui ne rentre pas est ANNONCÉ (nom + chemin), jamais perdu en silence. Cascade : défaut framework (budget.js) > limite du harnais déclarée par la coquille > cette clé. ⚠️ Cette clé ne peut que RÉDUIRE le budget (Math.min) : la limite du harnais est physique, la dépasser rétablirait la troncature muette au moment même où l'on croit desserrer la contrainte.",
+      "examples": [8000]
+    },
     "confirm": {
       "type": "boolean",
       "description": "Interrupteur GLOBAL des confirmations (ask) déclarées par les docs (frontmatter confirm: true). false = aucun ask (remplace le fichier sentinelle .rush après la bascule — un seul système de config, jamais deux). Le tri « quelles docs méritent un ask » = chantier humain séparé, post-bascule."

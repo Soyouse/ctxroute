@@ -34,6 +34,8 @@ const { ADAPTERS } = require('./source-adapters');
 //    moteur qui n'existe pas — le bug qu'il est censé prévenir. `collect-core`
 //    est la source unique ; ne JAMAIS reconstruire l'accumulateur ici.
 const { collectAll, loadConfig } = require('./collect-core');
+// Budget de TRAME (31/07/2026) : borne ce qui sort, annonce ce qui ne rentre pas.
+const budget = require('./budget');
 const { withLock } = require('./lock');
 const paths = require('./paths');
 const store = require('./session-store');
@@ -47,9 +49,31 @@ const TURN_PREFIX = 'turn-count-';
 //    31/07/2026 (même comportement fail-open : config absente = défauts,
 //    framework ACTIF). Ne pas le réintroduire.
 
+/**
+ * Budget d'émission effectif, en caractères. CASCADE :
+ *   ① défaut FRAMEWORK (`budget.DEFAUT_BUDGET`) — existe même sans config ni coquille
+ *   ② limite du HARNAIS, déclarée par la coquille (`options.budget`)
+ *   ③ config globale (`budgetInjection`) — l'opérateur peut RÉDUIRE, jamais dépasser
+ *
+ * ⚠️ Le `Math.min` n'est PAS une commodité : la limite du harnais est PHYSIQUE
+ *    (au-delà, le contenu est rangé dans un fichier et l'agent ne voit qu'un
+ *    aperçu). Laisser une config la dépasser rendrait la troncature silencieuse
+ *    au moment même où l'opérateur croit desserrer la contrainte.
+ * ⚠️ Aucune valeur de harnais n'est écrite ici : `porte-core` est partagé par
+ *    TOUS les harnais. Le chiffre vient de la coquille, toujours.
+ */
+function budgetPour(config, options) {
+  const duHarnais = options && Number.isFinite(options.budget) && options.budget > 0 ? options.budget : budget.DEFAUT_BUDGET;
+  const c = config && config.budgetInjection;
+  if (Number.isFinite(c) && c > 0) return Math.min(duHarnais, c);
+  return duHarnais;
+}
+
 // Corps commun. `data` = payload stdin déjà parsé du harnais ; `emit` = dialecte
-// de sortie de la coquille. Toute erreur = exit 0 muet (fail-open).
-function run(data, emit) {
+// de sortie de la coquille ; `options.budget` = limite de trame du harnais
+// (facultatif — absent ⇒ défaut framework, donc AUCUNE coquille n'est cassée).
+// Toute erreur = exit 0 muet (fail-open).
+function run(data, emit, options) {
   try {
     const toolName = data.tool_name || '';
     const toolInput = data.tool_input || {};
@@ -88,36 +112,62 @@ function run(data, emit) {
       if (Number.isInteger(t)) turnCount = t;
     }
 
+    // [source: …] — vocabulaire posé par CHAQUE source (acc.labels) :
+    // fichier = '.claude/hooks/docs/…', MCP = 'docs/mcp/…'. Parité gardée.
+    const segmentsPour = (docs) =>
+      docs.map((doc) => ({
+        id: doc,
+        text: (bodies[doc] || '').trim() + '\n[source: ' + acc.labels[doc] + ']',
+        label: acc.labels[doc],
+      }));
+    const budgetMax = budgetPour(config, options);
+
     // Section critique sous lock (état par session, dédup par doc). Un corpus
     // 100% dumb ne produit aucune écriture (changed=false) — parité perf.
     const lockDir = path.join(paths.stateDir(), `.lock-doc-${lib.sanitizeSessionId(sessionId)}`);
     let res = withLock(lockDir, () => {
       const state = store.loadState(STORE_PREFIX, sessionId);
       const r = gate.decide(config, decls, matched, toolName, state, turnCount);
+      const plan = budget.planifier(segmentsPour(r.inject), budgetMax);
+      // ⚠️ UNE DOC DIFFÉRÉE NE DOIT JAMAIS ÊTRE MARQUÉE « VUE ».
+      //    `gate.decide` écrit `{seen:true, sinceLastCall:0}` pour TOUT ce qu'il
+      //    décide d'injecter — il ignore (et doit ignorer) le budget, qui est
+      //    une contrainte de TRANSPORT, pas de décision. Sans cette remise en
+      //    état, une doc `once` évincée par manque de place serait consommée
+      //    sans jamais avoir été livrée : PERDUE POUR TOUTE LA SESSION, en
+      //    silence. C'est très exactement le défaut que ce chantier corrige —
+      //    le réintroduire ici serait le comble. NE PAS SUPPRIMER.
+      for (const d of plan.differes) {
+        if (Object.prototype.hasOwnProperty.call(state, d.id)) r.state[d.id] = state[d.id];
+        else delete r.state[d.id];
+      }
       if (r.changed) store.saveState(STORE_PREFIX, sessionId, r.state);
-      return r;
+      return { r, plan };
     }, { fallback: null });
     // Lock indisponible → décider SANS état (jamais se taire, cf en-tête).
-    if (!res) res = gate.decide(config, decls, matched, toolName, {}, turnCount);
+    if (!res) {
+      const r = gate.decide(config, decls, matched, toolName, {}, turnCount);
+      res = { r, plan: budget.planifier(segmentsPour(r.inject), budgetMax) };
+    }
 
-    if (res.inject.length === 0) process.exit(0);
+    if (res.r.inject.length === 0) process.exit(0);
 
-    // [source: …] — vocabulaire posé par CHAQUE source (acc.labels) :
-    // fichier = '.claude/hooks/docs/…', MCP = 'docs/mcp/…'. Parité gardée.
-    const parts = res.inject.map((doc) => (bodies[doc] || '').trim() + '\n[source: ' + acc.labels[doc] + ']');
-    const fullDoc = parts.join('\n\n---\n\n');
+    const fullDoc = res.plan.texte;
 
     // systemMessage : chaque source compose LE SIEN sur SES docs injectées
     // (contrat message()), joints ' · ' — avant la fusion, deux hooks
     // émettaient deux messages ; on les garde tous.
     const msgs = [];
     for (const a of ADAPTERS) {
-      const injected = res.inject.filter((d) => acc.owner[d] === a.id);
+      // ⚠️ `plan.emis`, PAS `r.inject` : le marqueur (« 🧩 skill: … ») annonce ce
+      //    qui est RÉELLEMENT dans le contexte. Annoncer une doc différée
+      //    ferait croire à l'agent qu'il l'a reçue — le « vert qui ment ».
+      const injected = res.plan.emis.filter((d) => acc.owner[d] === a.id);
       if (injected.length === 0) continue;
       const m = a.message(injected, { fullDoc, config, acc });
       if (m) msgs.push(m);
     }
-    emit(res.decision, fullDoc, msgs.join(' · '));
+    emit(res.r.decision, fullDoc, msgs.join(' · '));
   } catch {
     process.exit(0); // fail-open
   }

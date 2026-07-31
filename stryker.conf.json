@@ -33,7 +33,8 @@
     "lint.js",
     "collisions.js",
     "gate.js",
-    "deps-criticite-pure.js"
+    "deps-criticite-pure.js",
+    "budget.js"
   ],
   "incremental": true,
   "_concurrency_comment": "⚠️ CONCURRENCE BORNÉE — posée le 27/07/2026, NE PAS REMONTER. Par défaut Stryker ouvre 1 worker par thread logique (12 sur un Ryzen 5 5600X) : la machine sature à 100 %. DÉGÂT MESURÉ ce jour-là : sous saturation, les process hooks n'atteignent plus la ligne qui arme leur échéance (deadline.js) ⇒ 502 zombies accumulés, machine inutilisable, `git log` à plus de 60 s, suites en FAUX ROUGES. La mutation est un travail de FOND, pas une course : 3 workers = ~50 % de charge, machine utilisable, résultat identique. Règle de parc (CLAUDE.md) : incremental + perTest + timeoutMS + concurrency bornée, sur TOUS les projets.",
