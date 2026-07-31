@@ -37,6 +37,7 @@ on:
       - 'lint.js'
       - 'collisions.js'
       - 'gate.js'
+      - 'deps-criticite-pure.js'
       # ── suites déterministes couvrant les modules mutés (runner vitest perTest) ──
       - 'lib-pure.test.js'
       - 'sources-file.test.js'
@@ -50,6 +51,7 @@ on:
       - 'lint.test.js'
       - 'collisions.test.js'
       - 'gate.test.js'
+      - 'deps-criticite-pure.test.js'
       # ── la config de mutation elle-même + les deps ──
       - 'stryker.conf.json'
       - 'vitest.stryker.config.mjs'
