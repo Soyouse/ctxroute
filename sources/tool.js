@@ -25,11 +25,42 @@
 
 const file = require('./file');
 
-// `tool:` accepte chaîne OU liste (même totalité que isMatchDecl — un
-// frontmatter est de la donnée non maîtrisée, jamais supposée bien formée).
-function toolList(fm) {
-  if (typeof fm.tool === 'string') return [fm.tool];
-  return Array.isArray(fm.tool) ? fm.tool : [];
+// ⚠️ `toolList` VIT DANS frontmatter.js (c'est de la LECTURE de déclaration,
+//    pas du matching) et n'est que RÉEXPORTÉ ici pour les appelants existants.
+//    Il en existait une COPIE ici jusqu'au 31/07/2026 : deux lectures de la
+//    même clé, donc deux façons de diverger en silence — précisément ce que ce
+//    repo combat. La copie a été supprimée, pas « gardée au cas où ».
+
+// ⚠️ JOKER `*` (31/07/2026, REFACTOR-PLAN §B/§B0) — une VALEUR spéciale, PAS un
+//    opérateur : la base booléenne (match=OU, scope=ET, exclude=NON) reste
+//    FERMÉE, aucun mot n'est ajouté au vocabulaire.
+//    RAISON : `scope` voit tous les paramètres mais ne déclenche JAMAIS seul ;
+//    pour réagir à un GESTE il fallait ÉNUMÉRER les outils
+//    (["Bash","PowerShell","mcp__ssh__ssh_exec"]) — donc coder une liste là où
+//    l'intention est « quel que soit l'outil ». Le jour où un shell/MCP
+//    s'ajoute, la règle devient MUETTE EN SILENCE : précisément le défaut que
+//    ce framework combat partout ailleurs.
+//    ⚠️ AGGRAVANT MESURÉ AVANT LE FIX : `tool: ["*"]` était DÉJÀ accepté par
+//    validate() ET ne matchait RIEN. La syntaxe que tout le monde essaie
+//    spontanément était donc silencieusement morte ET certifiée valide — un
+//    PIÈGE ACTIF, pas une simple fonction absente.
+//    ⚠️ §B0 : c'est aussi ce qui rend la NÉGATION utilisable sur l'axe outil.
+//    `exclude` était déjà matché contre le NOM D'OUTIL ici (cf shouldSkip
+//    ci-dessous, dont le « contexte » est toolName) mais restait inerte : on
+//    n'excluait rien d'une énumération qu'on écrivait soi-même. `*` + exclude
+//    = « tous les outils SAUF X », qui était INEXPRIMABLE. La complétude
+//    booléenne, annoncée par la doctrine, devient VRAIE sur l'axe outil.
+//    ⚠️ SOURCE UNIQUE du symbole : il est défini dans `frontmatter.js` avec le
+//    reste du VOCABULAIRE du langage (MODES, DRIFT_UNITS, KNOWN…). Le redéclarer
+//    ici en ferait deux vérités — celles qui divergent en silence.
+const { WILDCARD, toolList } = require('../frontmatter');
+
+// ⚠️ Nom d'outil VIDE/absent ⇒ le joker NE matche PAS (cas négatif exigé) :
+//    « n'importe quel outil » suppose qu'il y AIT un outil. Sans cette garde,
+//    un payload dégradé déclencherait toutes les docs joker du parc.
+function vise(noms, toolName) {
+  if (noms.includes(toolName)) return true;
+  return noms.includes(WILDCARD) && typeof toolName === 'string' && toolName !== '';
 }
 
 /**
@@ -46,11 +77,14 @@ function matchingDocs(docs, payload) {
   const toolInput = (payload && payload.toolInput) || {};
   const out = [];
   for (const { doc, fm } of docs) {
-    if (!fm || !toolList(fm).includes(toolName)) continue;
+    if (!fm || !vise(toolList(fm), toolName)) continue;
+    // ⚠️ `shouldSkip` reçoit toolName comme CONTEXTE : sur cet axe, `exclude`
+    //    porte donc sur le NOM D'OUTIL (et non sur un chemin). C'est ce qui
+    //    rend « tous SAUF X » exprimable une fois le joker posé (§B0).
     if (file.shouldSkip(fm, toolName, toolInput)) continue;
     out.push({ doc });
   }
   return out;
 }
 
-module.exports = { matchingDocs, toolList };
+module.exports = { matchingDocs, toolList, vise, WILDCARD };

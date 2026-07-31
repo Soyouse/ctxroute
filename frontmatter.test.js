@@ -12,7 +12,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
-import { parse, validate, validateMcp, isMatchDecl, MODES, DRIFT_UNITS, KNOWN, DECLENCHEURS } from './frontmatter.js';
+import { parse, validate, validateMcp, isMatchDecl, toolList, MODES, DRIFT_UNITS, KNOWN, DECLENCHEURS, WILDCARD } from './frontmatter.js';
 
 // ── parse : détection du bloc ──
 test('parse : frontmatter en tête → data + body séparés', () => {
@@ -335,4 +335,45 @@ test('validateMcp : mode inconnu et threshold 0/float/string = ROUGE', () => {
   assert.ok(validateMcp({ threshold: 0 }).length > 0);
   assert.ok(validateMcp({ threshold: 2.5 }).length > 0);
   assert.ok(validateMcp({ threshold: '3' }).length > 0);
+});
+
+// ── JOKER `*` de l'axe outil (31/07/2026, §B) ──
+test('§B : `tool: ["*"]` avec un filtre = VALIDE (le geste devient exprimable)', () => {
+  assert.deepStrictEqual(validate({ tool: ['*'], scope: ['docker run'], mode: 'dumb' }), []);
+  assert.deepStrictEqual(validate({ tool: ['*'], exclude: ['Read'] }), []);
+});
+
+test('§B : `tool: ["*"]` NU = ROUGE (il s\'injecterait à CHAQUE appel d\'outil)', () => {
+  // ⚠️ AVANT le 31/07 : accepté ET inerte — le seul état inacceptable. Désormais
+  //    le joker est soit vivant (avec filtre), soit refusé, jamais toléré muet.
+  const errs = validate({ tool: ['*'], mode: 'dumb' });
+  assert.ok(errs.length > 0);
+  assert.ok(/scope/.test(errs.join(' ')), 'le message doit dire comment réparer');
+  // ⚠️ Un scope/exclude VIDE ou mal typé ne compte PAS pour un filtre — sinon
+  //    `exclude: []` rouvrirait la porte au joker nu, en silence.
+  assert.ok(validate({ tool: ['*'], scope: [] }).length > 0);
+  assert.ok(validate({ tool: ['*'], exclude: [] }).length > 0);
+  assert.ok(validate({ tool: '*' }).length > 0, 'forme chaîne couverte aussi');
+});
+
+test('§B : le joker ne contamine PAS les déclarations sans `*`', () => {
+  assert.deepStrictEqual(validate({ tool: ['Bash'], mode: 'dumb' }), [],
+    'une énumération sans joker n\'a jamais eu besoin de filtre');
+});
+
+test('§B : WILDCARD est un CONTRAT (valeur en dur, jamais dérivée du code)', () => {
+  assert.strictEqual(WILDCARD, '*');
+});
+
+test('toolList : lecture de `tool:` — chaîne, liste, absent, mal typé', () => {
+  // ⚠️ IMPORT DIRECT depuis frontmatter.js, JAMAIS via le ré-export de
+  //    sources/tool.js : le mapping coverage perTest de Stryker RATE les tests
+  //    passés par un re-export (piège documenté dans ce repo, revécu ici — le
+  //    mutant `[] -> ["Stryker was here"]` a survécu tant que ce test n'existait
+  //    qu'en aval). Un module muté se teste en direct, point.
+  assert.deepStrictEqual(toolList({ tool: 'WebFetch' }), ['WebFetch']);
+  assert.deepStrictEqual(toolList({ tool: ['A', 'B'] }), ['A', 'B']);
+  assert.deepStrictEqual(toolList({}), []);
+  assert.deepStrictEqual(toolList({ tool: 42 }), []);
+  assert.deepStrictEqual(toolList({ tool: null }), []);
 });

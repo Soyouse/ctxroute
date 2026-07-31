@@ -39,7 +39,7 @@
 
 const { collectAll, loadConfig } = require('./collect-core');
 const gate = require('./gate');
-const { parse, validate, DECLENCHEURS } = require('./frontmatter');
+const { parse, validate, DECLENCHEURS, WILDCARD } = require('./frontmatter');
 const { readCorpus } = require('./corpus');
 const { rulesFromCorpus } = require('./loader');
 const fileSource = require('./sources/file');
@@ -122,17 +122,24 @@ function diagnostiquer(docId, text, payload) {
       return { ...base, injecte: true, motif: 'MATCH par le NOM D\'OUTIL (`tool`)', axe: 'outil' };
     }
     const noms = toolSource.toolList(fm);
-    if (!noms.includes(payload.toolName)) {
+    // ⚠️ `vise()` = LA fonction de la source, jamais un `includes` réécrit ici :
+    //    avec le joker, un `includes` nu rendrait « outil non listé » alors que
+    //    le vrai motif est le scope — un FAUX MOTIF, soit exactement la faute
+    //    que cet outil existe pour rendre impossible. Toute question sur le
+    //    matching se pose AUX SOURCES, jamais à une copie locale.
+    if (!toolSource.vise(noms, payload.toolName)) {
       const d = { ...base, injecte: false, axe: 'outil', motif: `\`tool\` déclaré mais l'outil reçu n'y figure PAS — déclarés: ${JSON.stringify(noms)}, reçu: ${JSON.stringify(payload.toolName)}` };
-      // ⚠️ Le piège n°1 mesuré le 31/07 : `*` est accepté par validate() et
-      //    ne matche rien. Le NOMMER ici, sinon l'auteur accuse le moteur.
-      if (noms.includes('*')) d.piege = '⚠️ `*` n\'est PAS un joker : les noms d\'outils sont comparés à l\'IDENTIQUE (===). Énumère les outils. Cible REFACTOR-PLAN §B.';
+      // ⚠️ Depuis le 31/07/2026, `*` EST un joker (§B). S'il est déclaré et
+      //    qu'on arrive ici, c'est que le payload n'a PAS de nom d'outil : le
+      //    joker exige qu'il y AIT un outil (cas négatif volontaire). Le dire,
+      //    sinon l'auteur croit son joker cassé et accuse le moteur.
+      if (noms.includes(WILDCARD)) d.piege = '⚠️ `*` EST un joker, mais il exige un nom d\'outil NON VIDE — ici le payload n\'en porte aucun. Vérifie ton `--tool`.';
       return d;
     }
-    // Le nom matche : c'est donc scope ou exclude qui a rejeté (axe outil,
+    // L'outil est visé : c'est donc scope ou exclude qui a rejeté (axe outil,
     // où le « contexte » d'exclude est le NOM D'OUTIL — cf sources/tool.js).
-    const nu = { ...fm };
-    delete nu.scope; delete nu.exclude;
+    // PROBE : on retire `scope` et on redemande à la SOURCE. Si ça passe, c'est
+    // lui ; sinon c'est `exclude` (prioritaire dans shouldSkip).
     if (toolSource.matchingDocs([{ doc: docId, fm: { ...fm, scope: undefined } }], payload).length > 0) {
       return { ...base, injecte: false, axe: 'outil', motif: `\`scope\` NON SATISFAIT — attend l'une de ${JSON.stringify(fm.scope)} dans les paramètres de l'outil` };
     }

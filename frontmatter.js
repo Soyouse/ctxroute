@@ -125,14 +125,18 @@ const KNOWN = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'm
 //    2ᵉ façon de dire ce que `match:`/`mcp:` disent déjà (deux vérités = dérive).
 const INJECT = ['never'];
 
-// ⚠️ DEUX CLÉS DE DÉCLENCHEMENT, SÉMANTIQUES DISJOINTES — NE JAMAIS FUSIONNER.
-//    `match:` → source FICHIER : substring sur le chemin (`chemin.includes(pattern)`).
-//    `mcp:`   → source MCP     : nom EXACT du serveur (`mcp__X__y` → `docs/mcp/X.md`).
+// ⚠️ DÉCLENCHEURS DU CORPUS FICHIER — SÉMANTIQUES DISJOINTES, NE JAMAIS FUSIONNER.
+//    `match:` → substring sur le CHEMIN (`chemin.includes(pattern)`).
+//    `rules:` → idem mais PAR ENTRÉE (scopes divergents).
+//    `tool:`  → nom EXACT d'un OUTIL natif (===), jamais un substring.
 //
-//    ⚠️ Une clé unique serait AMBIGUË : `match: stripe` = le fichier `stripe-config.js`
-//    OU le serveur MCP `stripe` ? Les deux → la doc MCP partirait en éditant un fichier.
-//    Ce serait un faux positif CRÉÉ PAR LA FUSION, là où le MCP n'en a AUCUN aujourd'hui
-//    (son matching est exact, pas substring). Fusionner les MOTEURS ≠ fusionner les
+//    ⚠️ Le canal MCP N'A PAS de clé ici : une doc MCP se déclenche par son
+//    CHEMIN (`docs/mcp/{serveur}.md`) et se valide par `validateMcp`. `mcp:` a
+//    été RETIRÉ des déclencheurs le 31/07/2026 (§A) — il était accepté et
+//    inerte, donc il certifiait des docs muettes.
+//    ⚠️ Une clé de matching UNIQUE serait AMBIGUË : `match: stripe` = le fichier
+//    `stripe-config.js` OU le serveur MCP `stripe` ? Les deux → la doc MCP
+//    partirait en éditant un fichier. Fusionner les MOTEURS ≠ fusionner les
 //    SÉMANTIQUES. Chaque source lit SA clé. Cf REFACTOR-PLAN.md, décision 7.
 // ⚠️ `rules:` = 3ᵉ déclencheur, source FICHIER comme `match:`, mais PAR-ENTRÉE :
 //    liste JSON inline d'objets {pattern, scope?, exclude?}. Existe parce que
@@ -158,6 +162,21 @@ const INJECT = ['never'];
 //    comportement existant changé. Scellé par `triggers-gate.test.js` : tout
 //    déclencheur de cette liste DOIT être prouvé consommé par une source réelle.
 const DECLENCHEURS = ['match', 'rules', 'tool'];
+
+// ⚠️ `*` = JOKER de l'axe OUTIL (31/07/2026, §B/§B0). VALEUR spéciale, PAS un
+//    opérateur : la base booléenne reste FERMÉE (aucun mot ajouté).
+//    SOURCE UNIQUE du symbole (comme MODES/DRIFT_UNITS) — `sources/tool.js`
+//    l'importe d'ICI. Deux littéraux '*' = deux vérités qui divergent.
+const WILDCARD = '*';
+
+// ⚠️ LECTURE de la déclaration `tool:` (chaîne OU liste) — c'est du PARSING,
+//    donc sa place est ICI, pas dans la source qui matche. `sources/tool.js`
+//    l'importe : deux lectures de la même clé finiraient par diverger (un jour
+//    l'une accepterait un cas que l'autre refuse, en silence).
+function toolList(data) {
+  if (typeof data.tool === 'string') return [data.tool];
+  return Array.isArray(data.tool) ? data.tool : [];
+}
 
 // ⚠️ `match` accepte une CHAÎNE **ou** UNE LISTE — pas un caprice de souplesse :
 //    mesuré le 15/07/2026, 98 des 288 docs réelles sont visées par PLUSIEURS patterns
@@ -243,6 +262,19 @@ function validate(data) {
       errs.push(`\`${k}\` vide ou mal typé (chaîne ou liste non vide) — sans lui la doc ne sera JAMAIS injectée`);
     }
   }
+  // ⚠️ JOKER NU = REFUSÉ (31/07/2026, §B). `tool: ["*"]` SANS `scope` ni
+  //    `exclude` injecterait la doc à CHAQUE appel d'outil de CHAQUE agent —
+  //    du bruit permanent, et un système qui injecte à tort finit ignoré.
+  //    Le joker existe pour dire « quel que soit l'outil, QUAND ceci » : le
+  //    filtre n'est pas un confort, c'est la moitié de l'expression.
+  //    ⚠️ Une doc à injecter vraiment partout a déjà son canal : `docs/session/`.
+  if ('tool' in data && toolList(data).includes(WILDCARD)) {
+    const aScope = Array.isArray(data.scope) && data.scope.length > 0;
+    const aExclude = Array.isArray(data.exclude) && data.exclude.length > 0;
+    if (!aScope && !aExclude) {
+      errs.push('`tool: ["*"]` sans `scope` ni `exclude` : la doc serait injectée à CHAQUE appel d\'outil. Ajoute `scope` (ce que fait la commande) ou `exclude` (les outils à écarter). Pour une doc vraiment universelle, utilise `docs/session/`.');
+    }
+  }
   // ⚠️ `rules` : validation STRUCTURELLE par-entrée. Une entrée bancale (pattern
   //    absent, clé inconnue, scope non-liste) = doc morte ou sur-match en silence —
   //    même classe de bug que `mach:`. ROUGE, jamais toléré.
@@ -318,4 +350,4 @@ function cadenceErrors(data) {
 }
 // Stryker restore StringLiteral
 
-module.exports = { parse, validate, validateMcp, isMatchDecl, isRulesDecl, MODES, DRIFT_UNITS, KNOWN, DECLENCHEURS, INJECT, RULE_KEYS };
+module.exports = { parse, validate, validateMcp, isMatchDecl, isRulesDecl, toolList, MODES, DRIFT_UNITS, KNOWN, DECLENCHEURS, INJECT, RULE_KEYS, WILDCARD };

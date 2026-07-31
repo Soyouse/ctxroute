@@ -53,14 +53,24 @@ test('VERDICT : une doc qui matche par le chemin est rendue INJECTÉE', () => {
   assert.equal(r.decision, 'allow');
 });
 
-test('CAS FONDATEUR (a) — `tool: ["*"]` : verdict NON injectée + le piège NOMMÉ', () => {
-  // ⚠️ Le faux vert du 31/07 : validate() rend 0 erreur et la doc est MUETTE.
+test('CAS FONDATEUR (a) — `tool: ["*"]` : le joker INJECTE (verdict inversé le 31/07)', () => {
+  // ⚠️ CE TEST A CHANGÉ DE VERDICT, il n'a PAS été supprimé (cf en-tête) : il
+  //    prouvait le faux vert (`*` accepté ET inerte), il prouve maintenant que
+  //    le joker VIT. C'est le même cas fondateur, devenu preuve de la fonction.
   const parc = parcAvec({ 'joker.md': '---\ntool: ["*"]\nscope: ["docker run"]\nmode: dumb\n---\nCorps.\n' });
   const r = json(['--doc', 'joker', '--tool', 'Bash', '--input', '{"command":"docker run -d nginx"}'], parc);
+  assert.equal(r.diagnostic.injecte, true, 'le joker doit désormais matcher n\'importe quel outil');
+  assert.ok(r.inject.includes('docs/joker.md'));
+});
+
+test('CAS FONDATEUR (a bis) — joker + geste ABSENT : motif = `scope`, jamais « outil non listé »', () => {
+  // ⚠️ RÉGRESSION GUETTÉE : avec un `includes` réécrit dans explain, ce cas
+  //    rendait « l'outil n'y figure pas » (FAUX MOTIF) au lieu du scope. Un
+  //    diagnostic qui se trompe de cause est pire que pas de diagnostic.
+  const parc = parcAvec({ 'joker.md': '---\ntool: ["*"]\nscope: ["docker run"]\nmode: dumb\n---\nCorps.\n' });
+  const r = json(['--doc', 'joker', '--tool', 'Bash', '--input', '{"command":"ls -la"}'], parc);
   assert.equal(r.diagnostic.injecte, false);
-  assert.ok(/n'y figure PAS/.test(r.diagnostic.motif), 'le motif doit dire que l\'outil n\'est pas listé');
-  assert.ok(r.diagnostic.piege && /joker/.test(r.diagnostic.piege),
-    'le piège `*` DOIT être nommé : sans lui, l\'auteur accuse le moteur (vécu 31/07)');
+  assert.ok(/scope/.test(r.diagnostic.motif), 'motif attendu: scope, reçu: ' + r.diagnostic.motif);
 });
 
 test('CAS FONDATEUR (b) — `mcp:` dans le corpus fichier : muette, et on dit OÙ aller', () => {
