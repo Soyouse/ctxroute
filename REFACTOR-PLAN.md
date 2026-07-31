@@ -6,6 +6,48 @@
 > oracle du différentiel + rollback). Doctrine du patrimoine (CLAUDE.md) :
 > plus AUCUN chantier ouvert sur ce framework — scaler = ajouter des docs .md.
 
+## ✅ TRAITÉS LE 31/07/2026 (branche `chantier-explain`, EN ATTENTE DE BASCULE)
+
+> ⚠️ Fait dans un **worktree isolé** — le dossier live est resté sur `master` tout
+> du long : d'autres agents utilisaient le framework pendant ce chantier.
+> Bascule = `git merge --ff-only` (fenêtre ~50 ms, fail-open, aucun état touché).
+> ⚠️ La doc injectable (`sources.md`, nouvelle `explain.md`) et son miroir
+> `docs/framework/` se posent DANS LE MÊME GESTE que la bascule : les écrire
+> avant décrirait un moteur qui n'est pas encore en prod (et `parc-sync-gate`
+> rougirait, à raison).
+
+- **§E — `explain` LIVRÉ.** `collect-core.js` (collecte = source unique porte↔explain)
+  + `explain.js` (verdict via `gate.decide` + le « pourquoi PAS » par PROBES qui
+  ré-interrogent les vraies sources, jamais une 2ᵉ logique). 14 tests par spawn réel.
+  Motifs distingués : frontmatter invalide · `inject: never` · corps vide · déclencheur
+  inerte · outil non visé · scope · exclude · pattern absent (avec les contextes
+  RÉELLEMENT confrontés) · **commande git ignorée par construction** — ce dernier
+  n'était documenté nulle part et se lit comme une règle cassée.
+- **§A — FAUX VERT TUÉ.** `mcp` retiré de `DECLENCHEURS` + message qui dit OÙ aller.
+  Mesuré avant de toucher : **0 doc du parc (344) ne portait `mcp:`** ⇒ rien d'existant
+  invalidé. Tombe aux 3 étages sans les modifier (garde d'écriture, lint, gate de push)
+  puisque tous délèguent à `validate()`. Scellé par `triggers-gate.test.js`, qui APPELLE
+  les sources au lieu de lire une liste. ⚠️ 3 suites certifiaient le faux vert lui-même :
+  réécrites.
+- **§B + §B0 — JOKER `tool: ["*"]`, traités ENSEMBLE** (le joker seul aurait laissé
+  l'autre moitié inexprimable). Mesuré dans le code : `exclude` visait DÉJÀ le nom
+  d'outil, il était juste inutilisable sans joker ⇒ `*` + `exclude` = « tous SAUF X ».
+  **Zéro mot ajouté** (valeur spéciale, pas opérateur). Joker NU = ROUGE. Cas négatif
+  (outil vide) scellé. Prouvé par spawn sur 4 canaux dont un outil inexistant.
+  ⚠️ La table §B0 ci-dessous est donc PÉRIMÉE : l'axe outil a ses 3 opérateurs.
+- **Dette trouvée en chemin** : `toolList` existait en 2 exemplaires ; `porte-core`/
+  `guard-core` n'étaient dans AUCUN `includeOnly` dependency-cruiser (donc jamais
+  analysés) ; le miroir CI de `mutation.yml` avait raté `deps-criticite-pure`.
+
+**Reste ouvert** : §C (doc — la recette « geste » est écrite, reste la clarification
+« `match` = CHEMINS ») · §D (`docs/mcp/ssh.md`, zéro code) · le 29/07 (cohérence
+clé×clé — **session dédiée exigée par son propre backlog**, matrice complète) · le
+20/07 (troncature — ⚠️ mesurer le seuil dans la **doc officielle Claude Code**, pas
+en rétro-ingénierie).
+⚠️ Survivant Stryker PRÉEXISTANT hors périmètre : `deps-criticite-pure.js` 98,08 %.
+
+---
+
 ## 🔵 OUVERT — 3 manques trouvés le 31/07/2026 en écrivant une doc « déclencher sur un GESTE »
 
 > Contexte : première doc du parc dont l'intention n'est pas « quel FICHIER touches-tu » mais
