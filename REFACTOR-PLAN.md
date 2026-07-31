@@ -70,6 +70,17 @@
   livrée. Le défaut même qu'on corrigeait.
   ⚠️ **Fragmentation multi-émissions ÉCARTÉE** (elle marcherait : la mesure est par hook et par
   champ) — elle exigerait N hooks dans `settings.json`, dialecte Claude Code non portable.
+  **CODEX — recherche FAITE le 31/07/2026, ne pas la refaire à l'aveugle** (binaire Rust
+  `codex.exe` 0.144.6, `strings`) : `outputBytesCap` / `disableOutputCap` existent mais bornent
+  l'EXÉCUTION DE COMMANDES (`process/spawn`), pas les hooks. `HookOutputEntry`, `HookRunSummary`,
+  `hookSpecificOutput.additionalContext` existent SANS constante de troncature ni message
+  « output too large » sur ce chemin. ⚠️ **AUCUN plafond trouvé ≠ preuve qu'il n'y en a pas**
+  (binaire Rust : les constantes numériques ne sont pas en clair comme dans un bundle JS).
+  Conséquence assumée : aucune coquille ne passe `options.budget` — TOUS les harnais tournent sur
+  `DEFAUT_BUDGET` (8 000), prudent partout. C'est le SCEAU qui couvre le risque résiduel : si
+  Codex coupait, l'agent recevrait l'en-tête SANS le marqueur de fin et le saurait. Mesure fine
+  possible plus tard (payload réel capturé), pas bloquante.
+
   **Reste (CONTENU, pas moteur)** : scinder les 3 skills > budget (agent-social 79 516,
   webzenon-infra 69 017, mcp-doc-hooks 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
   ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.

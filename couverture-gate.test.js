@@ -43,6 +43,8 @@ const BUDGET_NEUF = DEFAUT_BUDGET;
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const PARC = path.join(os.homedir(), '.claude', 'hooks', 'docs');
 const SKILL = path.join(os.homedir(), '.claude', 'commands', 'mcp-doc-hooks.md');
+// Arbo sortie du skill le 31/07/2026 (progressive disclosure) — cf volet ②.
+const ARBO = path.join(ICI, 'ARBORESCENCE.md');
 
 const fichiersTrackes = () =>
   execFileSync('git', ['ls-files'], { cwd: ICI, encoding: 'utf8' })
@@ -77,7 +79,13 @@ test('① tout module et toute suite du repo reçoit une doc injectable', () => 
 
 test('② tout fichier TRACKÉ figure dans l\'arbo du skill (filet d\'exhaustivité)', () => {
   if (!fs.existsSync(SKILL)) return; // clone vierge
-  const skill = fs.readFileSync(SKILL, 'utf8');
+  // ⚠️ L'arbo VIT DANS `ARBORESCENCE.md` depuis le 31/07/2026 (progressive
+  //    disclosure : 48 % du skill, qui passait donc au-dessus du budget et se
+  //    faisait ÉVINCER en entier). Le filet d'exhaustivité couvre LES DEUX
+  //    fichiers — chercher dans le skill seul rendrait ce volet aveugle à
+  //    tout le repo, donc VERT en n'analysant rien.
+  const skill = fs.readFileSync(SKILL, 'utf8') + '\n' +
+    (fs.existsSync(ARBO) ? fs.readFileSync(ARBO, 'utf8') : '');
   // Les docs perso (gitignorées) et les .example n'ont pas à y figurer.
   const cibles = fichiersTrackes().filter(
     (f) => !f.startsWith('docs/framework/') && !f.startsWith('docs/mcp/') && !f.endsWith('.md.example')
@@ -157,8 +165,19 @@ test('④ aucune doc injectable ne GROSSIT (cliquet, dette qui ne peut que rétr
 //    donc pas dans le contexte de l'agent, qui doit aller le lire.
 //    ⚠️ La sortie de dette = SCINDER (tier-1 court réinjecté + `*-reference.md`
 //    à la demande), JAMAIS monter le plafond : ce serait acter la dérive.
+// ⚠️ CES SKILLS VIVENT HORS DU REPO et appartiennent à des CHANTIERS ACTIFS :
+//    d'autres agents les éditent en parallèle. Constaté le 31/07/2026 en
+//    l'espace d'une demi-heure : `webzenon-infra` 69 017 → 70 525 et
+//    `pw-mcp-proxy` 17 423 → 19 797. Ce n'est PAS un défaut du gate — c'est
+//    exactement ce qu'il doit voir. Conséquence pratique : une dérive d'un
+//    autre chantier peut faire rougir CETTE suite ; on RE-PHOTOGRAPHIE alors
+//    la valeur (jamais on ne monte un plafond pour « avoir la paix »), et la
+//    vraie sortie de dette reste la SCISSION, dans la session du chantier
+//    concerné. Le cliquet garde son pouvoir sur le LONG terme : sans lui, ces
+//    skills passeraient de 20 à 80 Ko sans que rien n'alerte — l'histoire même
+//    qui a produit le backlog §20/07.
 const DETTE_SKILLS = {
-  'agent-social': 79516, 'webzenon-infra': 69017, 'mcp-doc-hooks': 51480, 'pw-mcp-proxy': 17423,
+  'agent-social': 79516, 'webzenon-infra': 70525, 'mcp-doc-hooks': 27431, 'pw-mcp-proxy': 19797,
 };
 
 test('⑤ aucun skill enregistré ne GROSSIT au-delà de sa dette (cliquet)', () => {
