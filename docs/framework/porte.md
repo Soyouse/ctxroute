@@ -6,6 +6,7 @@ confirm: true
 # gate.js / doc-inject.js / corpus.js / session-store.js — PORTE UNIQUE (LIVE 17/07/2026)
 
 ⚠️ `doc-inject.js` = HOOK UNIQUE PreToolUse (matcher `*`) : injecte TOUTES les docs — fichier (frontmatters, sources/file.js) ET MCP (docs/mcp/, sources/mcp.js). `mcp-doc-inject.js` RETIRÉ du câblage — le recâbler = double injection, le doctor hurle.
+⚠️ **COLLECTE = `collect-core.js` (SOURCE UNIQUE, 31/07/2026)** : la porte ET `explain.js` collectent par le MÊME code. Reconstruire un accumulateur ailleurs = l'outil d'introspection décrirait un moteur qui n'existe pas — le bug qu'il prévient.
 ⚠️ EXTENSION = `source-adapters.js` (registre, contrat documenté en tête) : nouvelle source = 1 module PUR dans sources/ + 1 adaptateur au registre — JAMAIS éditer doc-inject.js/gate.js pour ça. docId unique inter-sources (préfixe dédié).
 ⚠️ `gate.js` = PUR (muté Stryker 100%) : décision par DOC (dumb/once/smart, compteurs étrangers, threshold PAR DOC via decl, ask via confirmFor). Corpus fichier 100% dumb ⇒ AUCUNE écriture d'état.
 ⚠️ PARITÉ scellée par `porte-differential.test.js` (fichier, octet) ET `mcp-differential.test.js` (MCP, vieux vs nouveau). Toute modif de format de sortie = relancer LES DEUX.

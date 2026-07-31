@@ -71,6 +71,8 @@ Chaque MCP (Stripe, Odoo, SSH, Infra...) est une frontière à risque au même t
 - `Desktop/mcp-doc-hooks/oracle.js` — SEULE lecture de la sortie de protect-files.js (spawn + parse JSON) — partagé par file-differential et shadow-reconcile.
 - `Desktop/mcp-doc-hooks/gate.js` — PUR : LA décision de la porte unifiée (par DOC : dumb/once/smart, compteurs étrangers, ask via confirmFor, docLabel). Muté 100%.
 - `Desktop/mcp-doc-hooks/doc-inject.js` — PORTE UNIFIÉE (✅ CÂBLÉE, LIVE 17/07/2026, hook unique PreToolUse `*`) : coquille Claude Code = stdin + emit (allow/ask) ; corps commun dans porte-core.js. Ne lit JAMAIS `.rush` (rush = `confirm: false` config).
+- `Desktop/mcp-doc-hooks/explain.js` — OUTIL D'INTROSPECTION (31/07/2026) : « pour CE geste, qu'est-ce qui s'injecte, et POURQUOI (ou pourquoi PAS) ? ». Lecture seule, ZÉRO écriture d'état, fail-LOUD (exit 2). Consomme les MÊMES fonctions que la porte ; le « pourquoi PAS » vient de PROBES qui ré-interrogent les vraies sources — jamais une 2ᵉ logique. ⚠️ À dégainer AVANT de conclure qu'une doc est muette : réimplémenter le moteur pour le sonder a coûté une session entière.
+- `Desktop/mcp-doc-hooks/collect-core.js` — COLLECTE PARTAGÉE porte↔explain (source unique de « quelles docs pour ce payload ? »). Zéro décision (gate.js tranche). La dupliquer rouvre la divergence qu'`explain` existe pour tuer.
 - `Desktop/mcp-doc-hooks/porte-core.js` — CŒUR DE PORTE PreToolUse (19/07/2026, source unique multi-harnais) : collecte registre → gate → format, run(data, emit). Toute évolution d'orchestration ICI, jamais dans une coquille.
 - `Desktop/mcp-doc-hooks/codex-doc-inject.js` — coquille CODEX PreToolUse (19/07/2026) : porte-core + emit Codex (SANS permissionDecision, ask DÉGRADÉ en contexte préfixé — « ask » Codex parsed-not-supported).
 - `Desktop/mcp-doc-hooks/codex-doc-inject.test.js` — suite spawn de la coquille Codex (dialecte seul : dégradation ask, clé sans agent_id, fail-open).
@@ -98,6 +100,8 @@ Chaque MCP (Stripe, Odoo, SSH, Infra...) est une frontière à risque au même t
 
 **Tests & qualité** (tous OBLIGATOIRES, jamais temporaires) :
 - `Desktop/mcp-doc-hooks/lib-pure.test.js` — tests unitaires purs (zéro spawn), cible de Stryker. ⚠️ Ne JAMAIS écrire un compte de tests ici : deux skills l'ont déjà désynchronisé (66/34 vs 81/40) — le runner est la seule source.
+- `Desktop/mcp-doc-hooks/explain.test.js` — suite d'`explain` par SPAWN RÉEL sur parc jetable (14 tests). ⚠️ Contient les 2 CAS FONDATEURS qui rejouent les faux verts du 31/07 : ne JAMAIS les supprimer — si le comportement change, le verdict s'INVERSE (fait pour le joker), le cas reste.
+- `Desktop/mcp-doc-hooks/triggers-gate.test.js` — GATE : tout déclencheur de `DECLENCHEURS` DOIT être prouvé consommé par une source RÉELLE (appel, jamais une liste recopiée) ; aucun message de `validate` ne conseille une clé rejetée. Ajouter un déclencheur sans son cas de preuve = ROUGE.
 - `Desktop/mcp-doc-hooks/config-gate.test.js` — GATE : la config COMMITTÉE doit couvrir tout serveur documenté. Dead-man switch né du bug "framework désactivé en silence" (15/07/2026).
 - `Desktop/mcp-doc-hooks/collisions.test.js` — tests DÉTERMINISTES de collisions.js (cible Stryker, briques internes testées en direct).
 - `Desktop/mcp-doc-hooks/doc-write-guard.test.js` — intégration de la garde (spawn, parc tmpdir) : block sur typo/clé interdite, silence sur sain/session/hors-parc, fail-open.
@@ -172,21 +176,23 @@ Le MOTEUR est portable PAR CONSTRUCTION (gate `sources-must-not-know-the-harness
 Le cas d'usage FONDATEUR du framework est une ACTION (un clic de paiement), mais le vocabulaire
 n'expose que des LIEUX. La recette n'était écrite nulle part et a coûté une session entière :
 ```yaml
-tool: ["Bash", "PowerShell", "mcp__ssh__ssh_exec"]   # QUI agit (nom EXACT de l'outil)
-scope: ["docker run", "systemctl enable"]            # CE QU'IL FAIT (scope voit TOUS les params)
+tool: ["*"]                                  # QUI agit — `*` = N'IMPORTE QUEL outil (joker)
+scope: ["docker run", "systemctl enable"]    # CE QU'IL FAIT (scope voit TOUS les params)
 ```
+(énumérer reste possible : `tool: ["Bash", "PowerShell", "mcp__ssh__ssh_exec"]` — mais le jour où
+un shell/MCP s'ajoute, l'énumération devient MUETTE en silence. Préférer le joker pour un GESTE.)
 - ⚠️ **`match` NE SERT À RIEN ICI** : il ne regarde que les CHEMINS (+ la commande du shell POSIX).
   Il ne verra jamais un `docker run` lancé par un autre shell ni par un outil MCP.
 - ⚠️ **`scope` est le seul opérateur qui voit TOUS les paramètres** — c'est lui qui filtre le geste ;
   mais il ne déclenche jamais seul, d'où le `tool:` qui lui ouvre la porte.
-- ⚠️ **ÉNUMÉRATION OBLIGATOIRE aujourd'hui** (`tool: ["*"]` = ACCEPTÉ mais INERTE, mesuré) : un
-  outil ajouté demain ne sera PAS couvert, **en silence**. Cible = joker, REFACTOR-PLAN §B0/§B.
-- ⚠️ **VÉRIFIER PAR SPAWN RÉEL, un cas positif ET un cas négatif** (doctrine anti-périmètre-faible).
-  ⚠️ Un harnais Node maison qui appelle les sources en direct est un PIÈGE : formats réels =
-  `loader.rulesFromCorpus([{doc, text}])` (texte BRUT) et `tool.matchingDocs([{doc, fm}], …)`.
-  **Les inventer produit un « muet » qu'on prend pour un verdict SUR LE MOTEUR** (3 fois le 31/07,
-  d'où une conclusion FAUSSE « il faut modifier le moteur »). Valider le harnais sur un cas CONNU
-  avant toute conclusion. Tant que §E (`explain`) n'existe pas, c'est le seul garde-fou.
+- ⚠️ **JOKER `*` LIVRÉ le 31/07/2026** : `tool: ["*"]` matche n'importe quel outil (y compris ceux
+  qui n'existent pas encore) ; `*` + `exclude` = « tous SAUF X ». **Joker SANS `scope` ni `exclude`
+  = ROUGE** (il s'injecterait à chaque appel d'outil ; une doc vraiment universelle → `docs/session/`).
+- ⚠️ **VÉRIFIER : `node explain.js --doc <nom> --tool X --input '{...}'`** — il rend le motif exact,
+  y compris le « pourquoi PAS ». **NE JAMAIS écrire un harnais Node maison pour sonder le moteur** :
+  mesuré le 31/07, ça a coûté une session (3 sondes fausses, chacune rendant un « muet » pris pour
+  un verdict SUR LE MOTEUR, d'où une conclusion FAUSSE « il faut modifier le moteur »). L'outil
+  consomme les vraies sources : il ne peut pas se tromper de format.
 
 ## Configurer `mcp-doc-config.json`
 ```json
