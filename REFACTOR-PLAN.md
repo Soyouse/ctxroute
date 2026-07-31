@@ -52,10 +52,27 @@
   `smart`). **Session dédiée exigée par son propre backlog** : matrice complète des combinaisons,
   puis error/warn tranché pour chacune. ⚠️ Arbitrage de sûreté : `warn` au lint plutôt que rejet au
   chargement — un durcissement qui COUPE une injection est pire que le défaut qu'il corrige.
-- **20/07 — troncature silencieuse.** ⚠️ **CONFIRMÉE EN PROD le 31/07** par différentiel réel :
-  le skill injecté pèse **80 Ko**, une doc fichier **50 Ko** — largement au-delà du seuil du harnais.
-  Ce n'est plus une hypothèse. ⚠️ Chercher le seuil dans la **DOC OFFICIELLE du harnais**, jamais en
-  rétro-ingénierie. Cible = budget de contexte (priorité/éviction via `rank`) + fail-loud.
+- **20/07 — troncature silencieuse : ✅ FERMÉ le 31/07/2026** (moteur ET gate, les deux du backlog).
+  **Seuil MESURÉ dans le binaire Claude Code 2.1.220** (non documenté, non configurable — donc la
+  lecture du code EST la mesure, pas de la rétro-ingénierie d'un comportement documenté) :
+  `BYe(e, t, r, n = TCu) { if (e.length <= n) return e; … }` avec `TCu = 1e4` ⇒ **10 000 caractères
+  par hook ET par champ** (et non 50 000 = `LYr`, qui borne les RÉSULTATS D'OUTIL). Au-delà :
+  `tool-results/hook-<id>-<n>-additionalContext.txt`, aperçu de 2 000 caractères, **zéro signal au
+  producteur**. Unique override = feature-gate DISTANT `tengu_velvet_ibis` (indexé par outil) ⇒
+  **le seuil peut changer sans mise à jour ni commit**.
+  → `budget.js` (PUR, muté 100 %) : le noyau ne lit JAMAIS le seuil, il reçoit un budget de la
+  COQUILLE. Segment INDIVISIBLE, éviction ANNONCÉE (nom + chemin), sceau `###FIN:xxx###` au-delà
+  de 50 % du budget — sous ce seuil, format HISTORIQUE à l'octet (bascule sûre : les 347 docs du
+  parc, médiane 1 367 caractères, sont inchangées).
+  → Gate statique = volet ⑤ de `couverture-gate.test.js` (cliquet de dette sur le poids des skills).
+  ⚠️ **Piège découvert** : `gate.decide` marque `seen:true` sans connaître le budget ⇒ `porte-core`
+  REMET l'état des docs différées, sinon une doc `once` évincée serait consommée sans avoir été
+  livrée. Le défaut même qu'on corrigeait.
+  ⚠️ **Fragmentation multi-émissions ÉCARTÉE** (elle marcherait : la mesure est par hook et par
+  champ) — elle exigerait N hooks dans `settings.json`, dialecte Claude Code non portable.
+  **Reste (CONTENU, pas moteur)** : scinder les 3 skills > budget (agent-social 79 516,
+  webzenon-infra 69 017, mcp-doc-hooks 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
+  ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.
 
 ⚠️ Survivant Stryker PRÉEXISTANT hors périmètre : `deps-criticite-pure.js` 98,08 %.
 

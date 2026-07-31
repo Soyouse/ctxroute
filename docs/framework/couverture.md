@@ -4,10 +4,9 @@ mode: dumb
 confirm: true
 ---
 # couverture-gate.test.js — le repo se documente lui-même, ou il rougit
-
-⚠️ 4 volets DÉRIVÉS (jamais une liste recopiée — ce serait le même bug) : ① tout `.js` racine/`sources/` reçoit une doc injectable (mesuré par la VRAIE source) · ② tout fichier TRACKÉ est dans l'arbo du skill · ③ tout module est dans l'`includeOnly` de dependency-cruiser · ④ aucune doc injectable ne GROSSIT.
-⚠️ Né d'un audit qui a trouvé 5 oublis dont 3 PRÉEXISTANTS (suites nues, fichiers hors arbo, et 4 modules jamais analysés par dependency-cruiser — faux négatif silencieux depuis leur création).
+⚠️ 5 volets DÉRIVÉS (jamais une liste recopiée — ce serait le même bug) : ① tout `.js` racine/`sources/` reçoit une doc injectable (mesuré par la VRAIE source) · ② tout fichier TRACKÉ est dans l'arbo du skill · ③ tout module est dans l'`includeOnly` de dependency-cruiser · ④ aucune doc injectable ne GROSSIT · ⑤ aucun skill enregistré ne dépasse sa dette de poids.
+⚠️ Né d'un audit qui a trouvé 5 oublis dont 3 PRÉEXISTANTS (suites nues, fichiers hors arbo, 4 modules jamais analysés par dependency-cruiser — faux négatif silencieux depuis leur création).
 ⚠️ **Volet ③ = le plus traître** : un module hors `includeOnly` rend le gate de couplage VERT en n'analysant RIEN.
-⚠️ La DETTE de taille (④) est une liste qui ne peut que RÉTRÉCIR — l'élargir, c'est acter la dérive qu'on prétend combattre.
-⚠️ Volets ①②④ dépendent du parc/skill (hors repo) ⇒ skip propre sur clone vierge. ③ vaut partout.
-⚠️ NE JAMAIS retirer le negative-check : un gate qui ne peut pas rougir CERTIFIE au lieu de protéger (déjà vécu ici avec `deadline-gate`, vert en n'analysant aucun hook réel).
+⚠️ **Volet ⑤ (31/07/2026)** : un skill au-dessus du budget d'émission est ÉVINCÉ de la trame — annoncé, jamais perdu, mais ABSENT du contexte. Plafond des skills NEUFS = `DEFAUT_BUDGET` de budget.js, DÉRIVÉ (jamais recopié).
+⚠️ Les DETTES (④ docs, ⑤ skills) ne peuvent que RÉTRÉCIR ; sortie de dette = SCINDER (tier-1 + `*-reference.md`), JAMAIS monter le plafond — ce serait acter la dérive qu'on combat. Volets ①②④⑤ dépendent du parc/skill ⇒ skip propre sur clone vierge ; ③ vaut partout.
+⚠️ NE JAMAIS retirer un negative-check : un gate qui ne peut pas rougir CERTIFIE au lieu de protéger (déjà vécu avec `deadline-gate`, vert en n'analysant aucun hook réel). Sabotage vérifié 31/07 sur ⑤.

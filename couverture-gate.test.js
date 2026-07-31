@@ -33,6 +33,12 @@ import { fileURLToPath } from 'node:url';
 import { readCorpus } from './corpus.js';
 import { rulesFromCorpus } from './loader.js';
 import fileSource from './sources/file.js';
+import { DEFAUT_BUDGET } from './budget.js';
+
+// ⚠️ DÉRIVÉ du moteur, jamais recopié : le plafond des skills NEUFS est le
+//    budget d'émission lui-même. Un chiffre en dur ici divergerait de
+//    budget.js en silence — la classe de bug que tout ce fichier combat.
+const BUDGET_NEUF = DEFAUT_BUDGET;
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const PARC = path.join(os.homedir(), '.claude', 'hooks', 'docs');
@@ -142,6 +148,53 @@ test('④ aucune doc injectable ne GROSSIT (cliquet, dette qui ne peut que rétr
     'Doc(s) au-dessus du plafond. Une doc réinjectée à CHAQUE accès coûte à chaque geste\n' +
     '      de chaque agent — et au-delà du seuil du harnais, elle est TRONQUÉE EN SILENCE.\n' +
     '      Corrige en SCINDANT (tier-1 court + `*-reference.md` on-demand), pas en montant le plafond.');
+});
+
+// ⚠️ DETTE DE SKILL — poids ACTUEL (caractères) des skills enregistrés qui
+//    dépassent déjà le budget d'émission. MÊME cliquet que DETTE_TAILLE :
+//    cette liste ne peut que RÉTRÉCIR. ⚠️ Un skill au-dessus du budget est
+//    ÉMIS mais ÉVINCÉ par budget.js (annoncé, jamais perdu) — il ne rentre
+//    donc pas dans le contexte de l'agent, qui doit aller le lire.
+//    ⚠️ La sortie de dette = SCINDER (tier-1 court réinjecté + `*-reference.md`
+//    à la demande), JAMAIS monter le plafond : ce serait acter la dérive.
+const DETTE_SKILLS = {
+  'agent-social': 79516, 'webzenon-infra': 69017, 'mcp-doc-hooks': 51480, 'pw-mcp-proxy': 17423,
+};
+
+test('⑤ aucun skill enregistré ne GROSSIT au-delà de sa dette (cliquet)', () => {
+  // ⚠️ Volet né du backlog §20/07 : « tout skill/doc dont le rendu dépasse le
+  //    seuil ⇒ ROUGE, avec le poids mesuré ». Sans lui, la règle de
+  //    progressive disclosure reste une consigne en prose — et une consigne en
+  //    prose ne tient pas 40 sessions (c'est très exactement ce qui a produit
+  //    ce backlog : trois skills passés de « court » à 80 Ko sans rien alerter).
+  const dir = path.join(os.homedir(), '.claude', 'commands');
+  const confPath = path.join(ICI, 'mcp-doc-config.json');
+  if (!fs.existsSync(dir) || !fs.existsSync(confPath)) return; // clone vierge
+  const conf = JSON.parse(fs.readFileSync(confPath, 'utf8'));
+  const noms = Object.keys(conf.skills || {});
+  assert.ok(noms.length > 0, 'aucun skill enregistré : le gate ne prouverait rien');
+
+  const trop = [];
+  for (const n of noms) {
+    const p = path.join(dir, n + '.md');
+    if (!fs.existsSync(p)) continue; // couvert par skill-registry-gate
+    const taille = fs.readFileSync(p, 'utf8').length; // borne SUPÉRIEURE (frontmatter compris)
+    const plafond = DETTE_SKILLS[n] || BUDGET_NEUF;
+    if (taille > plafond) trop.push(`${n}: ${taille} caractères (plafond ${plafond})`);
+  }
+  assert.deepStrictEqual(trop, [],
+    'Skill(s) au-dessus du plafond. Un skill trop lourd est ÉVINCÉ de la trame :\n' +
+    '      il est ANNONCÉ, mais PAS dans le contexte de l\'agent.\n' +
+    '      Corrige en SCINDANT (tier-1 + `*-reference.md`), pas en montant le plafond.');
+});
+
+test('NEGATIVE-CHECK : le volet ⑤ détecte un skill qui grossit', () => {
+  // ⚠️ Un gate qui ne peut pas rougir CERTIFIE au lieu de protéger.
+  assert.ok(DETTE_SKILLS['agent-social'] > BUDGET_NEUF, 'la dette doit être au-dessus du neuf');
+  assert.equal(DETTE_SKILLS['skill-inexistant'], undefined,
+    'un skill NON listé tombe sur le budget strict — c\'est le but du cliquet');
+  // Et le budget de référence est bien celui du moteur, pas un chiffre recopié.
+  assert.equal(BUDGET_NEUF, DEFAUT_BUDGET);
 });
 
 test('NEGATIVE-CHECK : le volet ④ détecte un dépassement', () => {
