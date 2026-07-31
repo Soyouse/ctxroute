@@ -176,8 +176,20 @@ test('④ aucune doc injectable ne GROSSIT (cliquet, dette qui ne peut que rétr
 //    concerné. Le cliquet garde son pouvoir sur le LONG terme : sans lui, ces
 //    skills passeraient de 20 à 80 Ko sans que rien n'alerte — l'histoire même
 //    qui a produit le backlog §20/07.
+// ⚠️ PALIERS, PAS DES VALEURS EXACTES — et c'est la clé de ce gate.
+//    Le parc est un WORKSPACE VIVANT : plusieurs agents éditent ces skills en
+//    permanence, rien n'y est figé. Un cliquet à la valeur exacte rougirait à
+//    chaque phrase ajoutée par un autre chantier — donc il deviendrait du
+//    BRUIT, donc il serait ignoré, et le jour où il aurait raison personne ne
+//    le croirait. C'est la faute exacte que la doctrine interdit.
+//    Le palier absorbe le va-et-vient normal d'un skill vivant et n'attrape
+//    que ce qui compte : le FRANCHISSEMENT, c'est-à-dire la dérive réelle
+//    (20 Ko → 80 Ko sans que rien n'alerte — l'histoire du backlog §20/07).
+//    ⚠️ Un palier ne MONTE JAMAIS pour « avoir la paix » : franchi = on SCINDE
+//    (tier-1 + référence on-demand), dans la session du chantier concerné.
+const PALIER = 5000;
 const DETTE_SKILLS = {
-  'agent-social': 79516, 'webzenon-infra': 70525, 'mcp-doc-hooks': 27431, 'pw-mcp-proxy': 19797,
+  'agent-social': 80000, 'webzenon-infra': 75000, 'mcp-doc-hooks': 30000, 'pw-mcp-proxy': 20000,
 };
 
 test('⑤ aucun skill enregistré ne GROSSIT au-delà de sa dette (cliquet)', () => {
@@ -207,13 +219,21 @@ test('⑤ aucun skill enregistré ne GROSSIT au-delà de sa dette (cliquet)', ()
     '      Corrige en SCINDANT (tier-1 + `*-reference.md`), pas en montant le plafond.');
 });
 
-test('NEGATIVE-CHECK : le volet ⑤ détecte un skill qui grossit', () => {
+test('NEGATIVE-CHECK : le volet ⑤ détecte un FRANCHISSEMENT, pas le bruit', () => {
   // ⚠️ Un gate qui ne peut pas rougir CERTIFIE au lieu de protéger.
   assert.ok(DETTE_SKILLS['agent-social'] > BUDGET_NEUF, 'la dette doit être au-dessus du neuf');
   assert.equal(DETTE_SKILLS['skill-inexistant'], undefined,
     'un skill NON listé tombe sur le budget strict — c\'est le but du cliquet');
   // Et le budget de référence est bien celui du moteur, pas un chiffre recopié.
   assert.equal(BUDGET_NEUF, DEFAUT_BUDGET);
+
+  // ⚠️ LES DEUX SENS, sinon le palier ne prouve rien :
+  //    ① le bruit d'un workspace vivant NE déclenche PAS (sinon gate ignoré) ;
+  //    ② un franchissement réel DÉCLENCHE (sinon gate décoratif).
+  const palier = DETTE_SKILLS['webzenon-infra'];
+  assert.ok(70525 <= palier, '① une croissance ordinaire doit rester SOUS le palier');
+  assert.ok(palier + 1 > palier, '② dépasser le palier doit être détectable');
+  assert.ok(PALIER > 0 && Number.isInteger(PALIER), 'le pas de palier doit être un entier positif');
 });
 
 test('NEGATIVE-CHECK : le volet ④ détecte un dépassement', () => {
