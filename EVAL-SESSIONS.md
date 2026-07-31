@@ -83,3 +83,19 @@ COHÉRENCE ENTRE CLÉS**.
 - ⚠️ **Arbitrage de sûreté à trancher dans cette session** : `error` dans `validate()` peut RENDRE UNE DOC
   INVALIDE, donc la priver d'injection — un durcissement qui COUPE un garde-fou est pire que le défaut.
   Piste : `warn` bruyant côté lint (diagnostic, exit≠0) plutôt que rejet côté chargement.
+
+## 2026-07-31 — session « backlog des faux verts » (chantier SUR le framework, agents en parallèle)
+- **Contexte** : d'autres agents utilisaient le framework pendant tout le chantier. Travail fait dans
+  un `git worktree` isolé, dossier live laissé sur `master` ; bascule finale par `merge --ff-only`.
+- **Injection** : les docs `porte.md`/`sources.md`/`lint.md`/`quality-configs.md` sont arrivées au bon
+  moment tout du long. **Valeur mesurée, 2 fois** : (a) `quality-configs.md` a rappelé « un test passant
+  par un RE-EXPORT n'est pas mappé par perTest » — c'était EXACTEMENT le dernier mutant survivant, tué
+  en 1 test ; (b) `gitignore.md` a évité d'écrire un gate exigeant des fichiers gitignorés.
+- **Preuve par usage immédiate** : la doc corrigée à la bascule s'est réinjectée dans le tour suivant.
+- **Défaut de terrain relevé (§20/07, NON traité)** : mesuré par différentiel réel, le skill injecté
+  pèse **80 Ko** et une doc fichier **50 Ko**. La troncature silencieuse frappe donc DÉJÀ en prod —
+  ce n'est plus une hypothèse. ⚠️ Chercher le seuil dans la DOC OFFICIELLE du harnais, pas en
+  rétro-ingénierie.
+- **Méthode qui a payé** : mesurer AVANT de toucher (0 doc du parc portait `mcp:` ⇒ durcissement sans
+  risque), et comparer ANCIEN vs NOUVEAU sur le parc RÉEL plutôt que de raisonner sur les tests seuls
+  (mêmes 2 docs mortes des deux côtés ⇒ preuve que la régression n'existait pas).
