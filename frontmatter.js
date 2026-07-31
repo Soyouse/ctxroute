@@ -254,7 +254,11 @@ function validate(data) {
   // ⚠️ `!mcpInerte` : le message dédié ci-dessus suffit — empiler « aucun
   //    déclencheur » par-dessus noierait la seule ligne utile.
   if (declares.length === 0 && !silenceDeclare && !mcpInerte) {
-    errs.push('aucun déclencheur : il faut `match` (fichier), `mcp` (serveur MCP) et/ou `tool` (outil natif) — sans lui la doc ne sera JAMAIS injectée. Si le silence est VOULU (doc de référence), déclare-le : `inject: never`.');
+    // ⚠️ Ce message ne DOIT PLUS conseiller `mcp` (corrigé 31/07/2026) : la clé
+    //    est désormais REJETÉE (§A). Conseiller une clé interdite envoie l'auteur
+    //    droit dans le mur suivant — un validateur doit rendre autonome, sinon il
+    //    déplace le temps perdu au lieu de le supprimer. Scellé par un test.
+    errs.push('aucun déclencheur : il faut `match` (chemin), `rules` (chemins par-entrée) et/ou `tool` (nom exact d\'un outil) — sans lui la doc ne sera JAMAIS injectée. Une doc MCP, elle, se déclenche par son CHEMIN (`docs/mcp/{serveur}.md`), pas par une clé. Si le silence est VOULU (doc de référence), déclare-le : `inject: never`.');
   }
   for (const k of declares) {
     if (k === 'rules') continue; // validé par isRulesDecl ci-dessous (structure par-entrée)

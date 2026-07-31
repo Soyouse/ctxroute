@@ -25,11 +25,15 @@
 
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
 const lib = require('./lib-pure');
 const gate = require('./gate');
 const { ADAPTERS } = require('./source-adapters');
+// ⚠️ COLLECTE PARTAGÉE (31/07/2026) : la porte et `explain.js` DOIVENT collecter
+//    par le MÊME code, sinon l'outil d'introspection finirait par décrire un
+//    moteur qui n'existe pas — le bug qu'il est censé prévenir. `collect-core`
+//    est la source unique ; ne JAMAIS reconstruire l'accumulateur ici.
+const { collectAll, loadConfig } = require('./collect-core');
 const { withLock } = require('./lock');
 const paths = require('./paths');
 const store = require('./session-store');
@@ -39,13 +43,9 @@ const STORE_PREFIX = 'doc-seen-';
 // Compteur de TOURS (porte turn-count.js, UserPromptSubmit) — préfixe distinct.
 const TURN_PREFIX = 'turn-count-';
 
-function loadConfig() {
-  try {
-    return JSON.parse(fs.readFileSync(paths.configPath(), 'utf8'));
-  } catch {
-    return {}; // config absente = défauts (fail-open, framework actif)
-  }
-}
+// ⚠️ `loadConfig` vivait ICI en copie — déplacé dans collect-core.js le
+//    31/07/2026 (même comportement fail-open : config absente = défauts,
+//    framework ACTIF). Ne pas le réintroduire.
 
 // Corps commun. `data` = payload stdin déjà parsé du harnais ; `emit` = dialecte
 // de sortie de la coquille. Toute erreur = exit 0 muet (fail-open).
@@ -65,17 +65,16 @@ function run(data, emit) {
     // Interrupteur global — même sémantique sur tous les harnais.
     if (!lib.isFrameworkEnabled(config)) process.exit(0);
 
-    // ── COLLECTE PAR LE REGISTRE (source-adapters.js) ──
+    // ── COLLECTE (collect-core.js → registre source-adapters.js) ──
     // Chaque adaptateur pose ses docs matchées + decls/bodies/labels dans
     // l'accumulateur. Ordre du registre = ordre de concaténation.
-    const acc = { matched: [], decls: {}, bodies: {}, labels: {}, owner: {}, meta: {} };
     // `cwd` = champ COMMUN des contrats de hooks MESURÉ sur les 2 harnais
     // (Claude Code : champ commun de tout payload · Codex CLI : payload de
     // base session_id/transcript_path/cwd/hook_event_name). Consommé
     // UNIQUEMENT par la source skill, FAIL-SOFT : absent → comportement
     // d'avant. Les sources fichier/MCP l'IGNORENT — parité protect-files.
     const payload = { toolName, toolInput, cwd: data.cwd };
-    for (const a of ADAPTERS) a.collect(config, payload, acc);
+    const acc = collectAll(config, payload);
     const { matched, decls, bodies } = acc;
 
     // Compteur de TOURS lu UNIQUEMENT si une doc matchée est en driftUnit

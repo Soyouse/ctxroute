@@ -114,3 +114,16 @@ test('NEGATIVE-CHECK : une clé de KNOWN ne suffit JAMAIS à déclencher', () =>
   assert.ok(validate({ scope: ['x'] }).length > 0,
     'une doc avec `scope` seul serait muette : elle DOIT être rouge');
 });
+
+test('§A : AUCUN message de validate ne conseille une clé REJETÉE', () => {
+  // ⚠️ Un validateur qui refuse doit rendre l'auteur AUTONOME. Conseiller `mcp`
+  //    (désormais rejeté) l'enverrait droit dans le mur suivant — le message
+  //    deviendrait lui-même un piège. Ce gate lit les messages RÉELS.
+  const messages = [
+    ...validate({}),                       // aucun déclencheur
+    ...validate({ mcp: 'stripe' }),        // clé inerte
+    ...validate({ tool: ['*'] }),          // joker nu
+  ].join(' | ');
+  assert.ok(!/il faut .*`mcp`|et\/ou `mcp`/.test(messages),
+    'un message conseille `mcp` comme déclencheur alors qu\'il est rejeté : ' + messages);
+});
