@@ -64,10 +64,20 @@ test('doc avec `inject: never` = SILENCIEUSE ET VALIDE (le silence déclaré)', 
   assert.deepStrictEqual(analyser({ docs: [doc('docs/pw-mcp-proxy-reference.md', { inject: 'never' })] }), []);
 });
 
-test('doc avec un déclencheur = valide (fichier, MCP, ou les deux)', () => {
+test('doc avec un déclencheur du corpus FICHIER = valide (match / rules / tool)', () => {
+  // ⚠️ RÉÉCRIT le 31/07/2026 (§A) : les cas `mcp:` certifiaient une doc MUETTE
+  //    comme « valide » — le faux vert gravé dans la suite. Le lint DÉLÈGUE à
+  //    validate() (seule autorité) : il devient rouge avec lui, par construction.
   assert.deepStrictEqual(analyser({ docs: [doc('a.md', { match: 'lock.js' })] }), []);
-  assert.deepStrictEqual(analyser({ docs: [doc('b.md', { mcp: ['stripe'] })] }), []);
-  assert.deepStrictEqual(analyser({ docs: [doc('c.md', { match: 'ssh.js', mcp: ['ssh'] })] }), []);
+  assert.deepStrictEqual(analyser({ docs: [doc('b.md', { tool: ['WebFetch'] })] }), []);
+  assert.deepStrictEqual(analyser({ docs: [doc('c.md', { match: 'ssh.js', tool: ['WebSearch'] })] }), []);
+});
+
+test('§A : le lint HURLE sur une doc fichier portant `mcp:` (délégation à validate)', () => {
+  const c = analyser({ docs: [doc('b.md', { mcp: ['stripe'] })] });
+  assert.equal(c.length, 1);
+  assert.equal(c[0].niveau, 'error');
+  assert.ok(/CHEMIN/.test(c[0].message), 'le lint doit relayer le message qui répare');
 });
 
 test('clé mal orthographiée (`mach:`) = ERREUR, jamais ignorée en silence', () => {

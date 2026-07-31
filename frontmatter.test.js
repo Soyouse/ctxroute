@@ -116,13 +116,15 @@ test('validate : clé INCONNUE rejetée (typo `mach:` = doc morte en silence)', 
 //    par conception — `inject: never` EXCLUT tout déclencheur. Un tel test
 //    exigerait d'accepter une contradiction. Les 2 familles se testent séparément.
 test('validate : toutes les clés COMPATIBLES acceptées ensemble', () => {
-  assert.deepStrictEqual(validate({ match: 'a', mcp: ['stripe'], scope: ['s'], exclude: ['e'], mode: 'dumb', confirm: true, rank: 1, threshold: 3 }), []);
+  // ⚠️ `mcp` RETIRÉ de ce cas le 31/07/2026 : il n'est plus un déclencheur du
+  //    corpus fichier (§A) — l'y laisser reviendrait à re-certifier le faux vert.
+  assert.deepStrictEqual(validate({ match: 'a', scope: ['s'], exclude: ['e'], mode: 'dumb', confirm: true, rank: 1, threshold: 3 }), []);
   // ⚠️ Contrat écrit EN DUR — ne JAMAIS le dériver de KNOWN (il muterait avec le code).
   assert.deepStrictEqual(KNOWN, ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit']);
   // ⚠️ Contrat EN DUR aussi pour DRIFT_UNITS (source unique du vocabulaire d'unité).
   assert.deepStrictEqual(DRIFT_UNITS, ['tool', 'turn']);
   // ⚠️ Contrat EN DUR des DÉCLENCHEURS (4 depuis 19/07/2026 : + `tool`).
-  assert.deepStrictEqual(DECLENCHEURS, ['match', 'mcp', 'rules', 'tool']);
+  assert.deepStrictEqual(DECLENCHEURS, ['match', 'rules', 'tool']);
 });
 
 test('validate : `tool` SEUL = déclencheur suffisant ; vide/mal typé = ROUGE', () => {
@@ -213,30 +215,40 @@ test('validate : `inject` n\'accepte QUE "never" (pas de 2e façon de dire match
   }
 });
 
-// ── Déclencheurs : `match` (fichier) / `mcp` (serveur) — sémantiques DISJOINTES ──
-// ⚠️ Ces gates scellent la décision 7 du REFACTOR-PLAN. Une clé unique serait
-//    ambiguë (`match: stripe` = le fichier stripe-config.js OU le serveur MCP ?)
-//    et créerait un faux positif que le moteur MCP n'a PAS aujourd'hui.
-test('validate : une doc MCP SEULE est valide (pas de `match` — elle n\'a aucun fichier)', () => {
-  assert.deepStrictEqual(validate({ mcp: 'stripe' }), []);
-  assert.deepStrictEqual(validate({ mcp: ['stripe', 'odoo'] }), []);
+// ── Déclencheurs du corpus FICHIER : `match` / `rules` / `tool` ──
+// ⚠️ RÉÉCRIT le 31/07/2026 (§A). Ces tests certifiaient qu'une doc FICHIER
+//    portant `mcp:` est VALIDE — c'était le FAUX VERT lui-même, gravé dans la
+//    suite : validate() rendait 0 erreur et la doc était MUETTE (aucune source
+//    ne consomme cette clé pour ce corpus ; le canal MCP se déclenche par le
+//    CHEMIN docs/mcp/{serveur}.md et se valide par validateMcp).
+//    ⚠️ Un test qui certifie du mort est PIRE qu'une absence de test : il
+//    transforme le bug en contrat, et le prochain agent le défend.
+test('§A : `mcp:` dans une doc FICHIER = ROUGE (avant : 0 erreur, doc muette)', () => {
+  assert.ok(validate({ mcp: 'stripe' }).length > 0);
+  assert.ok(validate({ mcp: ['stripe', 'odoo'] }).length > 0);
+  // Même avec un déclencheur VALIDE à côté : la clé inerte reste une erreur —
+  // l'auteur croirait sinon avoir branché deux canaux, il n'en a qu'un.
+  assert.ok(validate({ match: 'ssh-helper.js', mcp: ['ssh'] }).length > 0);
 });
-test('validate : une doc FICHIER seule reste valide (pas de `mcp`)', () => {
+test('§A : le message dit OÙ la doc aurait dû aller (paved road, pas juste un refus)', () => {
+  const texte = validate({ mcp: 'stripe' }).join(' | ');
+  assert.ok(/CHEMIN/.test(texte));
+  assert.ok(/docs\/mcp\//.test(texte));
+});
+test('validate : une doc FICHIER seule reste valide', () => {
   assert.deepStrictEqual(validate({ match: 'lock.js' }), []);
-});
-test('validate : les deux déclencheurs ensemble = valide', () => {
-  assert.deepStrictEqual(validate({ match: 'ssh-helper.js', mcp: ['ssh'] }), []);
 });
 test('validate : ZÉRO déclencheur = ROUGE (doc morte en silence = le bug qu\'on tue)', () => {
   assert.ok(validate({}).length > 0);
   assert.ok(validate({ mode: 'dumb', confirm: true }).length > 0);
 });
 test('validate : un déclencheur PRÉSENT mais vide/mal typé = ROUGE', () => {
-  assert.ok(validate({ mcp: '' }).length > 0);
-  assert.ok(validate({ mcp: [] }).length > 0);
-  assert.ok(validate({ mcp: 42 }).length > 0);
-  assert.ok(validate({ match: 'a', mcp: [''] }).length > 0);
-  assert.ok(validate({ match: '', mcp: 'stripe' }).length > 0);
+  assert.ok(validate({ match: '' }).length > 0);
+  assert.ok(validate({ match: [] }).length > 0);
+  assert.ok(validate({ match: 42 }).length > 0);
+  assert.ok(validate({ match: [''] }).length > 0);
+  assert.ok(validate({ tool: '' }).length > 0);
+  assert.ok(validate({ match: 'a', tool: [''] }).length > 0);
 });
 
 // ── isMatchDecl ──

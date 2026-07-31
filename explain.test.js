@@ -63,12 +63,18 @@ test('CAS FONDATEUR (a) — `tool: ["*"]` : verdict NON injectée + le piège NO
     'le piège `*` DOIT être nommé : sans lui, l\'auteur accuse le moteur (vécu 31/07)');
 });
 
-test('CAS FONDATEUR (b) — `mcp:` dans le corpus fichier : déclencheur INERTE nommé', () => {
+test('CAS FONDATEUR (b) — `mcp:` dans le corpus fichier : muette, et on dit OÙ aller', () => {
+  // ⚠️ Depuis le durcissement du 31/07 (§A), ce cas est attrapé PLUS TÔT : par
+  //    `validate()`, donc aussi par la garde d'écriture (l'auteur est bloqué à
+  //    la seconde où il écrit, il ne découvre plus le silence des jours après).
+  //    explain le confirme et RELAIE le message qui répare. Le test suit la
+  //    réalité du moteur — il ne fige pas un chemin de code particulier.
   const parc = parcAvec({ 'mauvais.md': '---\nmcp: stripe\n---\nCorps.\n' });
   const r = json(['--doc', 'mauvais', '--tool', 'mcp__stripe__foo', '--input', '{}'], parc);
   assert.equal(r.diagnostic.injecte, false);
-  assert.ok(/INERTE/.test(r.diagnostic.motif), 'le motif doit dire que le déclencheur est inerte ICI');
-  assert.ok(/CHEMIN/.test(r.diagnostic.piege), 'le piège doit dire où la doc aurait dû aller');
+  const tout = [r.diagnostic.motif, r.diagnostic.piege, JSON.stringify(r.diagnostic.detail)].join(' | ');
+  assert.ok(/CHEMIN/.test(tout), 'le diagnostic DOIT dire où la doc aurait dû aller, reçu: ' + tout);
+  assert.ok(/docs\/mcp\//.test(tout), 'le chemin exact doit être donné (paved road)');
 });
 
 test('MOTIF `scope` non satisfait — distingué de « pattern absent »', () => {

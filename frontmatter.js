@@ -143,7 +143,21 @@ const INJECT = ['never'];
 //    harnais (WebFetch, WebSearch…) — l'angle mort mesuré des outils sans
 //    chemin ni préfixe mcp__. Sémantique DISJOINTE (=== sur tool_name, jamais
 //    substring) : cf sources/tool.js. Chaîne ou liste, même shape que `match`.
-const DECLENCHEURS = ['match', 'mcp', 'rules', 'tool'];
+// ⚠️ `mcp` N'EST PAS UN DÉCLENCHEUR — retiré le 31/07/2026 (REFACTOR-PLAN §A).
+//    Il y figurait par héritage d'une époque où l'on imaginait déclencher le
+//    canal MCP par frontmatter. Ce n'est PAS ce qui a été construit : une doc
+//    MCP se déclenche par son CHEMIN (`docs/mcp/{serveur}.md`) et se valide par
+//    `validateMcp` (qui n'admet que mode/threshold/driftUnit).
+//    ⚠️ CONSÉQUENCE MESURÉE avant retrait : `validate()` répondait 0 ERREUR sur
+//    une doc du corpus FICHIER portant `mcp:` — clé CONNUE, donc acceptée, et
+//    pourtant consommée par AUCUNE source ⇒ doc MUETTE, validateur content.
+//    C'est PIRE qu'une typo (`mach:` = rejeté) : un validateur qui approuve du
+//    mort n'est pas neutre, il oriente activement vers la mauvaise cause (le
+//    31/07 il a fait accuser le MOTEUR de ne pas lire les commandes).
+//    ⚠️ Vérifié avant retrait : 0 doc du parc (344) portait `mcp:` — aucun
+//    comportement existant changé. Scellé par `triggers-gate.test.js` : tout
+//    déclencheur de cette liste DOIT être prouvé consommé par une source réelle.
+const DECLENCHEURS = ['match', 'rules', 'tool'];
 
 // ⚠️ `match` accepte une CHAÎNE **ou** UNE LISTE — pas un caprice de souplesse :
 //    mesuré le 15/07/2026, 98 des 288 docs réelles sont visées par PLUSIEURS patterns
@@ -210,7 +224,17 @@ function validate(data) {
   //    refactor (une doc sans déclencheur = doc morte en silence, le bug qu'on tue).
   const declares = DECLENCHEURS.filter((k) => k in data);
   const silenceDeclare = data.inject === 'never';
-  if (declares.length === 0 && !silenceDeclare) {
+  // ⚠️ `mcp:` dans une doc du corpus FICHIER = DÉCLENCHEUR INERTE (§A) : message
+  //    DÉDIÉ qui dit OÙ la doc aurait dû aller, jamais un « clé inconnue » sec.
+  //    Un validateur qui refuse doit rendre l'auteur autonome (paved road) —
+  //    sinon il déplace le temps perdu au lieu de le supprimer.
+  const mcpInerte = 'mcp' in data;
+  if (mcpInerte) {
+    errs.push('`mcp:` ne déclenche RIEN ici : une doc MCP se déclenche par son CHEMIN (`docs/mcp/{serveur}.md`), jamais par une clé de frontmatter. Déplace le fichier, et garde dedans uniquement mode/threshold/driftUnit.');
+  }
+  // ⚠️ `!mcpInerte` : le message dédié ci-dessus suffit — empiler « aucun
+  //    déclencheur » par-dessus noierait la seule ligne utile.
+  if (declares.length === 0 && !silenceDeclare && !mcpInerte) {
     errs.push('aucun déclencheur : il faut `match` (fichier), `mcp` (serveur MCP) et/ou `tool` (outil natif) — sans lui la doc ne sera JAMAIS injectée. Si le silence est VOULU (doc de référence), déclare-le : `inject: never`.');
   }
   for (const k of declares) {
