@@ -39,11 +39,24 @@
   `guard-core` n'étaient dans AUCUN `includeOnly` dependency-cruiser (donc jamais
   analysés) ; le miroir CI de `mutation.yml` avait raté `deps-criticite-pure`.
 
-**Reste ouvert** : §C (doc — la recette « geste » est écrite, reste la clarification
-« `match` = CHEMINS ») · §D (`docs/mcp/ssh.md`, zéro code) · le 29/07 (cohérence
-clé×clé — **session dédiée exigée par son propre backlog**, matrice complète) · le
-20/07 (troncature — ⚠️ mesurer le seuil dans la **doc officielle Claude Code**, pas
-en rétro-ingénierie).
+- **§C — FAIT.** Recette « geste » + « `match` = CHEMINS uniquement » écrites dans le skill,
+  la doc injectable `sources.md` ET le `CLAUDE.md` global (+ miroirs Codex). ⚠️ `match` **N'A PAS**
+  été renommé (décision maintenue) : ~532 règles le portent. Si un jour on renomme, ce sera
+  par ALIAS + codemod + dépréciation (jamais un rename sec), au moment du packaging public.
+- **§D — FAIT.** `docs/mcp/ssh.md` (outils fichiers dédiés, Tailscale, infra-MCP d'abord, correctif
+  serveur = sursis, zone à déclarer, `ssh_exec` non annulable). Déclenchement vérifié par cas
+  POSITIF (`mcp__ssh__ssh_exec` → injectée) et NÉGATIF (autre serveur → silence).
+
+**Reste ouvert — 2 chantiers, chacun à part :**
+- **29/07 — cohérence clé×clé** (`threshold` avec `dumb`/`once` ignoré en silence, `driftUnit` hors
+  `smart`). **Session dédiée exigée par son propre backlog** : matrice complète des combinaisons,
+  puis error/warn tranché pour chacune. ⚠️ Arbitrage de sûreté : `warn` au lint plutôt que rejet au
+  chargement — un durcissement qui COUPE une injection est pire que le défaut qu'il corrige.
+- **20/07 — troncature silencieuse.** ⚠️ **CONFIRMÉE EN PROD le 31/07** par différentiel réel :
+  le skill injecté pèse **80 Ko**, une doc fichier **50 Ko** — largement au-delà du seuil du harnais.
+  Ce n'est plus une hypothèse. ⚠️ Chercher le seuil dans la **DOC OFFICIELLE du harnais**, jamais en
+  rétro-ingénierie. Cible = budget de contexte (priorité/éviction via `rank`) + fail-loud.
+
 ⚠️ Survivant Stryker PRÉEXISTANT hors périmètre : `deps-criticite-pure.js` 98,08 %.
 
 ---

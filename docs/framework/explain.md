@@ -1,5 +1,5 @@
 ---
-match: [explain.js, collect-core.js]
+rules: [{"pattern":"explain.js","scope":["mcp-doc-hooks"]},{"pattern":"explain.test.js","scope":["mcp-doc-hooks"]},{"pattern":"collect-core.js","scope":["mcp-doc-hooks"]}]
 mode: dumb
 confirm: true
 ---
@@ -11,3 +11,4 @@ confirm: true
 ⚠️ **Il consomme les MÊMES fonctions que la porte** (`collect-core` → ADAPTERS → `gate.decide`). Le « pourquoi PAS » vient de PROBES qui ré-interrogent les vraies sources avec une règle amputée d'un opérateur — jamais d'une 2ᵉ logique de match. Motif manquant ⇒ ajouter une probe, JAMAIS une condition maison.
 ⚠️ **FAIL-LOUD** (exit 2 + « PANNE DE L'OUTIL »), à l'inverse des hooks fail-open : un diagnostic muet sur sa propre panne se lit comme « rien ne s'injecte » = faux verdict moteur.
 ⚠️ `collect-core.js` = collecte PARTAGÉE porte↔explain. La dupliquer rouvre la divergence que cet outil existe pour tuer.
+⚠️ `explain.test.js` : les 2 CAS FONDATEURS rejouent les faux verts du 31/07. **Ne JAMAIS les supprimer** — si le comportement change, on INVERSE le verdict attendu (fait pour le joker), le cas reste. Un cas fondateur supprimé, c'est la classe de bug qui redevient invisible.

@@ -92,6 +92,10 @@ Chaque MCP (Stripe, Odoo, SSH, Infra...) est une frontière à risque au même t
 - `Desktop/mcp-doc-hooks/vendor-deadline.js` — vendorise `deadline.js` dans `~/.claude/hooks/` + arme les 7 hooks du parc. Dry-run par défaut, idempotent, insertion AVANT la 1ʳᵉ ligne exécutable, signale (jamais devine) les fichiers non patchables.
 
 **Config & état** :
+- `Desktop/mcp-doc-hooks/deps-criticite.json` — MANIFESTE de criticité des dépendances : chaque dépendance de chaque `package.json` est classée `moteur` (détermine la sortie livrée ⇒ épinglage EXACT obligatoire) ou `ordinaire`. Non classée = ROUGE — trancher EST le but.
+- `Desktop/mcp-doc-hooks/deps-criticite-pure.js` — NOYAU PUR du gate de criticité (muté Stryker). La règle vit ICI, pas dans le test : Stryker ne mute pas le code des tests, une règle qui y vivrait serait INVÉRIFIABLE.
+- `Desktop/mcp-doc-hooks/mcp-doc-config.json.example` — config générique livrée (le vrai `mcp-doc-config.json` est gitignoré : il porte les noms de skills/projets = données perso).
+- `Desktop/mcp-doc-hooks/package-lock.json` — verrou de dépendances (`npm ci`). Ne jamais l'éditer à la main.
 - `Desktop/mcp-doc-hooks/mcp-doc-config.json` — config (mode + seuils + filtres). Prise en compte immédiate, pas de redémarrage. `$schema` → validation IDE.
 - `Desktop/mcp-doc-hooks/mcp-doc-config.schema.json` — JSON Schema de la config (enums fermés, clés strictes). Drift-test dans config-gate.test.js : clé de config hors schéma = ROUGE (la classe du bug testserver999).
 - `Desktop/mcp-doc-hooks/docs/mcp/{server}.md` / `{server}/{tool}.md` / `{server}/{subTool}.md` — docs par serveur/outil/sous-outil. ⚠️ Gitignoré (vrais invariants perso : emails, clients). Versions génériques poussées sur GitHub = `{server}.md.example`.
@@ -101,6 +105,8 @@ Chaque MCP (Stripe, Odoo, SSH, Infra...) est une frontière à risque au même t
 **Tests & qualité** (tous OBLIGATOIRES, jamais temporaires) :
 - `Desktop/mcp-doc-hooks/lib-pure.test.js` — tests unitaires purs (zéro spawn), cible de Stryker. ⚠️ Ne JAMAIS écrire un compte de tests ici : deux skills l'ont déjà désynchronisé (66/34 vs 81/40) — le runner est la seule source.
 - `Desktop/mcp-doc-hooks/explain.test.js` — suite d'`explain` par SPAWN RÉEL sur parc jetable (14 tests). ⚠️ Contient les 2 CAS FONDATEURS qui rejouent les faux verts du 31/07 : ne JAMAIS les supprimer — si le comportement change, le verdict s'INVERSE (fait pour le joker), le cas reste.
+- `Desktop/mcp-doc-hooks/deps-criticite-pure.test.js` — tests DÉTERMINISTES du noyau de criticité (cible Stryker), edge cases adverses inclus (`/regex/.test(['1.2.3'])` vaut TRUE par coercition JS — la garde `typeof` n'est PAS décorative).
+- `Desktop/mcp-doc-hooks/deps-criticite-gate.test.js` — GATE : toute dépendance réelle est classée, un `moteur` est épinglé EXACT, une entrée FANTÔME est ROUGE. ⚠️ Périmètre vide ici (zéro dépendance runtime) ⇒ test d'ANTI-DORMANCE obligatoire, sinon le gate dormirait au vert.
 - `Desktop/mcp-doc-hooks/triggers-gate.test.js` — GATE : tout déclencheur de `DECLENCHEURS` DOIT être prouvé consommé par une source RÉELLE (appel, jamais une liste recopiée) ; aucun message de `validate` ne conseille une clé rejetée. Ajouter un déclencheur sans son cas de preuve = ROUGE.
 - `Desktop/mcp-doc-hooks/config-gate.test.js` — GATE : la config COMMITTÉE doit couvrir tout serveur documenté. Dead-man switch né du bug "framework désactivé en silence" (15/07/2026).
 - `Desktop/mcp-doc-hooks/collisions.test.js` — tests DÉTERMINISTES de collisions.js (cible Stryker, briques internes testées en direct).
@@ -152,6 +158,7 @@ Chaque MCP (Stripe, Odoo, SSH, Infra...) est une frontière à risque au même t
 - `Desktop/mcp-doc-hooks/HOOK-INTERNALS.md` — doc interne détaillée (mécanisme, invariants).
 - `Desktop/mcp-doc-hooks/README.md` — doc d'installation/usage publique.
 - `Desktop/mcp-doc-hooks/CHANGELOG.md` — historique versionné.
+- `Desktop/mcp-doc-hooks/EVAL-SESSIONS.md` — JOURNAL D'ÉVALUATION du framework en usage réel (ce qui s'est injecté au bon moment, ce qui a manqué, valeur MESURÉE). ⚠️ Repo public : zéro donnée perso (« le mainteneur », jamais un nom de client).
 - `Desktop/mcp-doc-hooks/LICENSE` — MIT.
 - `Desktop/mcp-doc-hooks/.gitattributes` — normalisation LF.
 - `Desktop/mcp-doc-hooks/.gitignore` — exclut state/, docs perso, node_modules, artefacts Stryker/jscpd.
