@@ -97,4 +97,18 @@ describe("deps-criticite-pure", () => {
     expect(entreesFantomes([], {}, {})).toEqual([]);
     expect(entreesFantomes(null, { a: "r" }, null)).toEqual(["a"]);
   });
+
+  test("entrée NULL dans la liste : le gate ne MEURT pas (les 2 fonctions, même input)", () => {
+    // ⚠️ Tue le DERNIER mutant survivant du repo (`.filter(Boolean)` supprimé).
+    //    Sans cette garde, un `null` fait throw sur `.nom` — et un gate qui MEURT
+    //    sur une entrée malformée ne rapporte plus RIEN. Même doctrine que la
+    //    lecture tolérante au BOM : un gate ne meurt jamais du défaut qu'il signale.
+    //    ⚠️ Les DEUX fonctions sont éprouvées sur le MÊME input dégradé, sinon la
+    //    robustesse de l'une ne serait qu'un hasard.
+    const deps = [d("a", "1.0.0"), null, undefined, d("b", "^2")];
+    expect(entreesFantomes(deps, { a: {} }, { b: {} })).toEqual([]);
+    expect(entreesFantomes(deps, { fantome: {} }, {})).toEqual(["fantome"]);
+    expect(entreesFantomes([null, undefined], { x: {} }, {})).toEqual(["x"]);
+    expect(depsNonClassees(deps, { a: {} }, {}).map((x) => x.nom)).toEqual(["b"]);
+  });
 });
