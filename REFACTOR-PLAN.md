@@ -68,8 +68,12 @@
   ⚠️ **Piège découvert** : `gate.decide` marque `seen:true` sans connaître le budget ⇒ `porte-core`
   REMET l'état des docs différées, sinon une doc `once` évincée serait consommée sans avoir été
   livrée. Le défaut même qu'on corrigeait.
-  ⚠️ **Fragmentation multi-émissions ÉCARTÉE** (elle marcherait : la mesure est par hook et par
-  champ) — elle exigerait N hooks dans `settings.json`, dialecte Claude Code non portable.
+  ⚠️ **CECI NE FERME QUE LA MOITIÉ DU PROBLÈME** — cf. chantier « INJECTION INTÉGRALE » ci-dessous.
+  Le silence est mort ; l'injection COMPLÈTE, non. Un manque bien signalé reste un manque : un
+  skill annoncé mais absent du contexte oblige l'agent à aller le lire — c'est le « pointeur qui
+  espère que l'agent obéisse » que le CONTRAT D'EXTENSION §4 INTERDIT. La cible n'a jamais été
+  « prévenir », c'est « LIVRER ». (Fragmentation d'abord écartée le 31/07 au motif « dialecte non
+  portable » : jugement RENVERSÉ le jour même par la mesure — cf. ci-dessous.)
   **CODEX — recherche FAITE le 31/07/2026, ne pas la refaire à l'aveugle** (binaire Rust
   `codex.exe` 0.144.6, `strings`) : `outputBytesCap` / `disableOutputCap` existent mais bornent
   l'EXÉCUTION DE COMMANDES (`process/spawn`), pas les hooks. `HookOutputEntry`, `HookRunSummary`,
@@ -84,6 +88,45 @@
   **Reste (CONTENU, pas moteur)** : scinder les 3 skills > budget (agent-social 79 516,
   webzenon-infra 69 017, mcp-doc-hooks 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
   ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.
+
+## 🔴 OUVERT — INJECTION INTÉGRALE D'UN SKILL (la VRAIE cible du §20/07, ouvert 31/07/2026)
+
+**Le problème, sans détour** : un skill fait des CENTAINES DE LIGNES **par conception** — c'est le
+contrat du projet, pas une dérive. ⚠️ La règle « doc réinjectée < ~10 lignes » vaut pour les
+**DOCS**, JAMAIS pour les skills : les confondre a produit une conclusion fausse (« il suffit de
+condenser »). La trame du harnais fait 10 000 caractères. **Ça ne rentre pas, et aucune réécriture
+ne changera ça** — condenser un skill pour entrer dans la plomberie, c'est dégrader le LIVRABLE
+pour une limite de TRANSPORT : exactement ce que la doctrine interdit (« réparer le tuyau, pas le
+livrable »).
+
+**LA SOLUTION = FRAGMENTATION.** Tout réseau fait ça depuis 40 ans : une trame trop petite ne se
+règle pas en raccourcissant le message, elle se règle en PAQUETS.
+
+⚠️ **FAIT MESURÉ le 31/07/2026 — il RENVERSE le rejet initial** (binaire Claude Code 2.1.220) :
+```js
+async function* ATo(e, t = 1/0) { … while (o.size < t && n.length > 0) { o.add(r(n.shift())) } }
+for await (let j of ATo(M))   // appelé SANS 2e argument ⇒ t = Infinity
+```
+Les hooks d'un même événement sont lancés **TOUS EN PARALLÈLE, concurrence ILLIMITÉE**. Donc
+N hooks ≠ N × la latence : le temps reste celui du plus lent, seul le CPU monte. Et la persistance
+est mesurée **par hook** (`${toolUseID}-${V}`, V incrémenté par hook) **ET par champ** ⇒ chaque
+paquet a sa PROPRE trame de 10 000. **Le multi-hooks est VIABLE — ce n'est pas un hack.**
+
+**Architecture visée (le noyau ne change pas de NATURE)** :
+- `budget.js` rend des **PAQUETS** au lieu d'« un bloc + une annonce ». L'invariant de CONSERVATION
+  se RENFORCE : tout segment est dans EXACTEMENT un paquet (property-based à étendre).
+- Le MÊME script déclaré N fois avec un index (`--paquet k`). « N déclarations » est un concept de
+  CONFIGURATION, pas de code : Codex a le même mécanisme ⇒ ZÉRO dialecte dans le noyau.
+- Paquet vide ⇒ sortie immédiate (fail-open). Le SCEAU reste, et se renforce : il devient la preuve
+  que les N paquets sont bien arrivés ET recollés dans l'ordre.
+- ⚠️ **Coût CPU à MESURER avant de fixer N** (poste sujet à la saturation : 875 zombies le 15/07,
+  502 le 27/07). N se DÉRIVE du plus gros skill, il ne se devine pas.
+- ⚠️ Le mode `once` des skills joue en notre faveur : l'injection d'un skill est PONCTUELLE par
+  agent, seul le SPAWN est permanent. C'est le spawn qu'il faut chiffrer, pas l'injection.
+
+**NE PAS CONFONDRE avec la scission de contenu** : scinder reste utile contre la DILUTION (90 % d'un
+skill est hors-sujet pour un geste donné), JAMAIS comme moyen de tenir dans la trame. Les deux
+sujets sont désormais SÉPARÉS — les avoir mélangés est ce qui a fait dériver ce backlog.
 
 ⚠️ Survivant Stryker PRÉEXISTANT hors périmètre : `deps-criticite-pure.js` 98,08 %.
 
