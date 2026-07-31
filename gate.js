@@ -36,9 +36,17 @@ function modeForDoc(config, decl) {
 
 // Seuil effectif pour UNE doc : decl.threshold (posé par une SOURCE — ex. MCP,
 // résolu depuis servers.{name}.threshold) > defaultThreshold global > 4.
-// ⚠️ Les docs FICHIER n'ont pas de threshold dans leur frontmatter (clé
-//    inconnue = frontmatter rejeté) : elles tombent toujours sur le global —
-//    aucun changement de comportement pour le parc migré.
+// ⚠️ COMMENTAIRE CORRIGÉ LE 29/07/2026 — il affirmait l'INVERSE de la réalité et a
+//    coûté un doute en session (« ma doc va-t-elle être rejetée ? »).
+//    Il disait : « les docs FICHIER n'ont pas de threshold dans leur frontmatter
+//    (clé inconnue = frontmatter rejeté) ». C'était vrai AVANT le 17/07/2026 ;
+//    depuis, `threshold` est une clé ADMISE du frontmatter fichier (validée par
+//    frontmatter.js : entier ≥ 1) et arrive donc bien jusqu'ici dans `decl`.
+//    VÉRIFIÉ en direct : `{mode:'smart', threshold:5}` → validate() = [] et
+//    thresholdForDoc rend 5 (4 sans la clé).
+//    ⚠️ `threshold` n'a d'effet QUE si `mode: smart` — en `dumb`/`once` le compteur
+//    n'est jamais consommé (cf plus bas), donc le seuil est MORT EN SILENCE.
+//    Cette incohérence n'est encore détectée par AUCUN gate (tracé EVAL-SESSIONS).
 function thresholdForDoc(config, decl) {
   if (decl && Number.isInteger(decl.threshold)) return decl.threshold;
   return Number.isInteger(config && config.defaultThreshold) ? config.defaultThreshold : 4;

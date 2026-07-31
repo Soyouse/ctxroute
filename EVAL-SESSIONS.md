@@ -53,3 +53,33 @@ Chantier unique : scinder le skill. Le reste tourne.
 - Injection: docs pipeline/testing/runtime/marque-resolve/config-gate injectées au bon moment toute la session (dizaines de déclenchements pertinents, zéro faux positif observé). Nouvelle doc agent-social-rapport.md auto-injectée dès le 1er accès à rapport.mjs (preuve par usage).
 - Valeur mesurée: la doc testing a guidé stryker sandbox/testFiles; la doc runtime a rappelé le mur callBrain au moment du câblage pilier.
 
+
+## 2026-07-29 — session moteur vidéo (montée de version + gates)
+- **Injection** : docs moteur/worker/tests/charte injectées au bon moment toute la session, zéro faux positif.
+  Preuve par usage : la doc worker a rappelé « code BAKÉ ⇒ rebuild obligatoire » juste avant un rebuild oublié ;
+  la doc testing a rappelé la contrainte sandbox Stryker au moment d'écrire un test lisant hors du dossier.
+- **Doc trop LOURDE réinjectée** : une doc moteur pèse **8,8 Ko / 22 lignes** en `mode: dumb` avec des `match`
+  larges ⇒ réinjectée à presque chaque outil d'une session dense. Elle viole la règle des ~10 lignes : elle
+  contient un RÉCIT (scènes d'une démo, liste de bruitages, numéros d'assets) au lieu d'invariants seuls.
+  Passée en `smart` + `threshold: 5` en attendant. ⚠️ **Compromis assumé, PAS la règle** : la doctrine dit
+  « garde-fou → dumb », et cette doc EN EST un. La vraie correction reste de la SCINDER (tier-1 court
+  réinjecté + `*-reference.md` on-demand). Même classe que le skill trop gros déjà noté plus haut :
+  le défaut n'est pas l'injection, c'est la RÉDACTION.
+
+### 🔴 DÉFAUT DE VALIDATION TROUVÉ — combinaisons de cadence incohérentes acceptées EN SILENCE
+`threshold: N` posé avec `mode: dumb` (ou `once`) est **ignoré sans le moindre avertissement** : `gate.js`
+ne consomme le compteur que hors de `dumb`. L'auteur croit avoir réglé la cadence ; **rien ne change**.
+`validate()` vérifie aujourd'hui chaque clé ISOLÉMENT (mode ∈ MODES, threshold entier ≥ 1) mais **aucune
+COHÉRENCE ENTRE CLÉS**.
+- Vécu en session : la combinaison a été posée, le linter est resté vert, et l'erreur n'a été vue qu'en
+  RELISANT `gate.js` — parce qu'une question a été posée. Sans ça, elle serait partie en prod comme un
+  réglage « appliqué » qui n'existe pas. C'est la classe de défaut la plus coûteuse : **la config morte muette**.
+- Même famille probable (à inventorier, ne PAS se limiter à ce cas) : `driftUnit` hors de `smart` (dégénéré
+  par contrat, donc mort), `threshold` sur une entrée `once`, et toute clé dont la sémantique dépend d'une autre.
+- ⏭️ **CHANTIER = SESSION DÉDIÉE** (pas un patch au fil de l'eau) : établir la MATRICE complète des
+  combinaisons clé×clé, décider pour chacune error/warn, puis l'implémenter dans `validate()` — SOURCE
+  UNIQUE du jugement, le lint DÉLÈGUE (ne jamais poser un 2ᵉ juge). Négative-check obligatoire par
+  combinaison : un gate de cohérence qui ne peut pas rougir ne vaut rien.
+- ⚠️ **Arbitrage de sûreté à trancher dans cette session** : `error` dans `validate()` peut RENDRE UNE DOC
+  INVALIDE, donc la priver d'injection — un durcissement qui COUPE un garde-fou est pire que le défaut.
+  Piste : `warn` bruyant côté lint (diagnostic, exit≠0) plutôt que rejet côté chargement.

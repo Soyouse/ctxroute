@@ -168,6 +168,26 @@ Le MOTEUR est portable PAR CONSTRUCTION (gate `sources-must-not-know-the-harness
 2. C'est tout. Aucun code à écrire — le hook générique lit tous les `.md` du dossier à la volée.
 3. Par défaut : documenter dès qu'un MCP a un invariant/piège/contexte à transmettre (presque toujours) — pas seulement après un incident.
 
+## Déclencher sur un GESTE (une commande), pas sur un LIEU — recette, prouvée 31/07/2026
+Le cas d'usage FONDATEUR du framework est une ACTION (un clic de paiement), mais le vocabulaire
+n'expose que des LIEUX. La recette n'était écrite nulle part et a coûté une session entière :
+```yaml
+tool: ["Bash", "PowerShell", "mcp__ssh__ssh_exec"]   # QUI agit (nom EXACT de l'outil)
+scope: ["docker run", "systemctl enable"]            # CE QU'IL FAIT (scope voit TOUS les params)
+```
+- ⚠️ **`match` NE SERT À RIEN ICI** : il ne regarde que les CHEMINS (+ la commande du shell POSIX).
+  Il ne verra jamais un `docker run` lancé par un autre shell ni par un outil MCP.
+- ⚠️ **`scope` est le seul opérateur qui voit TOUS les paramètres** — c'est lui qui filtre le geste ;
+  mais il ne déclenche jamais seul, d'où le `tool:` qui lui ouvre la porte.
+- ⚠️ **ÉNUMÉRATION OBLIGATOIRE aujourd'hui** (`tool: ["*"]` = ACCEPTÉ mais INERTE, mesuré) : un
+  outil ajouté demain ne sera PAS couvert, **en silence**. Cible = joker, REFACTOR-PLAN §B0/§B.
+- ⚠️ **VÉRIFIER PAR SPAWN RÉEL, un cas positif ET un cas négatif** (doctrine anti-périmètre-faible).
+  ⚠️ Un harnais Node maison qui appelle les sources en direct est un PIÈGE : formats réels =
+  `loader.rulesFromCorpus([{doc, text}])` (texte BRUT) et `tool.matchingDocs([{doc, fm}], …)`.
+  **Les inventer produit un « muet » qu'on prend pour un verdict SUR LE MOTEUR** (3 fois le 31/07,
+  d'où une conclusion FAUSSE « il faut modifier le moteur »). Valider le harnais sur un cas CONNU
+  avant toute conclusion. Tant que §E (`explain`) n'existe pas, c'est le seul garde-fou.
+
 ## Configurer `mcp-doc-config.json`
 ```json
 {

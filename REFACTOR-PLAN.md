@@ -6,6 +6,124 @@
 > oracle du différentiel + rollback). Doctrine du patrimoine (CLAUDE.md) :
 > plus AUCUN chantier ouvert sur ce framework — scaler = ajouter des docs .md.
 
+## 🔵 OUVERT — 3 manques trouvés le 31/07/2026 en écrivant une doc « déclencher sur un GESTE »
+
+> Contexte : première doc du parc dont l'intention n'est pas « quel FICHIER touches-tu » mais
+> « quel GESTE poses-tu » (poser un conteneur / un service / une tâche planifiée ⇒ le déclarer).
+> Cas d'usage central du framework (il est né d'un clic de paiement — donc d'une ACTION), et
+> pourtant jamais exprimé jusqu'ici. Les 3 points ci-dessous sont sortis de cette écriture.
+> ⚠️ **Le MOTEUR de matching n'est PAS en cause** : le besoin s'est révélé exprimable avec les
+> primitives existantes (`tool` pour cibler + `scope` pour filtrer), prouvé sur 4 canaux par
+> spawn réel (shell POSIX, shell Windows, outil MCP distant, lecture de fichier). La base
+> booléenne a tenu sa promesse — c'est l'ERGONOMIE et un FAUX VERT qui ont coûté la session.
+
+### A. 🔴 FAUX VERT — un déclencheur DÉCLARÉ mais INERTE passe la validation
+`validate()` répond **0 erreur** sur une doc du corpus FICHIER qui porte `mcp:` — alors qu'aucune
+source ne consomme cette clé pour ce corpus (le canal MCP se déclenche par le CHEMIN
+`docs/mcp/{server}.md`, pas par une clé de frontmatter). Résultat : doc muette, validateur content.
+- ⚠️ **C'est la classe de bug que le projet dit avoir tuée** (« clé inconnue = ERREUR, jamais
+  ignorée : `mach:` = doc morte en silence »). Ici c'est PIRE qu'une typo : la clé est CONNUE,
+  donc acceptée, et pourtant morte. Un validateur qui approuve du mort n'est pas neutre — **il
+  oriente activement vers la mauvaise cause** (ici : accuser le moteur de ne pas lire les commandes).
+- **Cible** : gate statique « tout déclencheur déclaré est consommé par ≥1 source POUR LE CORPUS
+  où la doc vit », message qui dit où la doc aurait dû aller. Dérivé du registre d'adaptateurs,
+  jamais une liste recopiée.
+- ⚠️ Negative-check obligatoire : une doc volontairement inerte doit ROUGIR (sonde → rouge → retrait).
+
+### B0. 🔴 LE DÉFAUT DE FOND — la complétude booléenne est vraie PAR AXE, pas UNIFORMÉMENT
+**Mesuré 31/07/2026 par audit d'expressivité** (chaque intention testée par appel réel des sources,
+harnais validé sur les cas de base avant toute conclusion) :
+
+| Axe | OU | ET | NON |
+|---|---|---|---|
+| fichier / chemin | ✅ `match` | ✅ `scope` | ✅ `exclude` |
+| **outil** | ✅ `tool` (énumération) | ✅ `scope` | ❌ **ABSENT** |
+
+`exclude` est matché contre le CHEMIN en cours, jamais contre le nom d'outil ⇒ **« tous les outils
+SAUF celui-ci » est INEXPRIMABLE**, et « n'importe quel outil » aussi (§B).
+- ⚠️ **C'est une correction à apporter à la PHILOSOPHIE, pas juste au code** : le modèle mental
+  annonce « OU+ET+NON = complétude fonctionnelle, N'IMPORTE QUELLE condition de déclenchement est
+  exprimable ». C'est vrai sur l'axe FICHIER (l'axe d'origine, hérité de `protect-files`), FAUX sur
+  l'axe OUTIL. Tant que la doctrine affirme la complétude, personne ne cherchera le trou — et un
+  auteur de doc conclura que SON besoin est illégitime, pas que le langage est incomplet.
+- ⚠️ **Le joker (§B) est un SYMPTÔME, pas la maladie.** Traiter §B seul rendrait « tout outil »
+  exprimable mais laisserait « tout sauf X » inexprimable ⇒ la même session se reproduira sur
+  l'autre moitié. **Traiter l'axe, pas le cas.**
+- **Cible** : rendre les 3 opérateurs uniformes sur l'axe outil (joker + négation), SANS ajouter de
+  mot — la négation existe déjà (`exclude`), il lui manque de pouvoir viser l'axe outil.
+  Décider explicitement : `exclude` devient-il multi-axes, ou un axe se déclare-t-il autrement ?
+  ⚠️ Quelle que soit la forme retenue : **comportement par défaut inchangé** (contrat d'extension §6).
+- ⏭️ **NON AUDITÉ à ce jour** (ne pas conclure « sain » sur ces points sans la même méthode) :
+  axe MCP (les 3 opérateurs y sont-ils uniformes ?), cadence (`dumb`/`once`/`smart` + `threshold`
+  + `driftUnit`), cascade des 3 autorités, ordre/`rank` et dédup, isolation multi-agents (`scopeId`).
+
+### B. 🟠 IMPOSSIBLE d'exprimer « n'importe quel outil » — on énumère là où on veut un INVARIANT
+`scope` voit TOUS les paramètres, mais ne déclenche jamais seul : il faut lui ouvrir la porte par
+un déclencheur. Pour un GESTE, ça oblige à **lister les outils** (`["Bash","PowerShell","mcp__…"]`).
+- ⚠️ Conséquence : le jour où un shell / un MCP / un outil de harnais s'ajoute, la règle devient
+  **MUETTE EN SILENCE**. On a codé une énumération là où l'intention est « quel que soit l'outil ».
+  C'est le défaut que le framework combat partout ailleurs (liste à la main = fantôme en devenir).
+- ⚠️ **AGGRAVANT — MESURÉ 31/07 : `tool: ["*"]` est DÉJÀ ACCEPTÉ par `validate()` (0 erreur) et ne
+  matche RIEN.** La syntaxe que n'importe qui essaierait spontanément pour dire « tous les outils »
+  est donc **silencieusement morte ET certifiée valide** (même classe que §A, 3ᵉ chemin trouvé dans
+  la même session). Ce n'est pas qu'une fonction absente : c'est un PIÈGE ACTIF. Donc soit le joker
+  est implémenté, soit `"*"` est REJETÉ à la validation — l'état actuel (accepté + inerte) est le
+  seul qui soit inacceptable.
+- **Cible** : joker `tool: ["*"]` = n'importe quel outil, `scope` fait le tri. **Zéro mot ajouté**
+  (base booléenne fermée respectée) — une VALEUR spéciale, pas un opérateur.
+- ⚠️ Parité : comportement par défaut inchangé (aucune doc existante n'utilise `*`) ⇒ différentiel
+  vert sans modification. Mutation + cas négatif (`*` ne doit pas matcher un nom d'outil vide).
+
+### C. 🟡 DOC — aucune recette « geste », et `match` promet plus qu'il ne fait
+1. **Aucune recette documentée pour déclencher sur une COMMANDE.** Le vocabulaire décrit `match`
+   (chemins), `mcp` (serveur), `tool` (outil) — nulle part « pour réagir à un geste, combine
+   `tool` + `scope` ». Il faut le DÉDUIRE, alors que tout le framework repose sur l'inverse
+   (« la machine tranche, on n'espère jamais que l'agent devine »). Ajouter la recette + l'exemple
+   validé sur les 4 canaux. **Sans ça, le prochain agent refera le même parcours** (mesuré : il a
+   coûté une session, dont une conclusion FAUSSE « il faut modifier le moteur »).
+2. **`match` est nommé par son ACTION quand les 3 autres déclencheurs le sont par leur DIMENSION**
+   (`mcp` = serveur, `tool` = outil). « match » se lit comme universel (« ça matche les arguments »)
+   alors qu'il signifie `path`. A induit en erreur l'agent ET le mainteneur dans la même session.
+   ⚠️ **NE PAS RENOMMER** : ~532 règles portent le mot, migration coûteuse pour un gain cosmétique.
+   Écrire explicitement « `match` = CHEMINS uniquement (+ commande du shell POSIX) » dans le skill
+   et la doc injectable — corriger la compréhension, pas le vocabulaire.
+3. ⚠️ **`match` NE DOIT PAS devenir universel** (tranché 31/07, ne pas rouvrir) : il deviendrait
+   la même SOURCE que `scope` (loi anti-synonyme), et surtout les règles existantes portent la
+   sémantique « chemin » ⇒ un pattern comme `index.ts` matcherait toute commande le mentionnant
+   = faux positifs de masse, silencieux, sur des docs que personne ne relit. Un système qui injecte
+   à tort finit ignoré. La séparation « OÙ j'agis » (chemin) / « QUOI je fais » (outil+params) est
+   SAINE — c'est un axe de plus, pas une limite à lever.
+
+### E. 🔴 LE LANGAGE REVENDIQUE L'EXPLICABILITÉ MAIS N'OFFRE AUCUN MOYEN DE L'EXERCER
+Le modèle mental pose comme feature centrale : « on peut TOUJOURS répondre à *pourquoi ça s'est
+injecté ?* ». **Aucun outil ne permet de poser la question.** `doctor` prouve que le moteur vit,
+`lint-corpus` traque les docs mortes, `check-collisions` arbitre les croisements — mais rien ne
+répond à « pour CE geste, qu'est-ce qui s'injecterait, et POURQUOI ».
+- ⚠️ **COÛT MESURÉ (31/07/2026) : une session entière.** Faute d'outil d'introspection, l'agent a
+  reconstruit le moteur à la main pour tester sa doc — et s'est trompé **3 fois** de harnais
+  (mauvais nombre d'arguments, puis `{id,fm,body}` au lieu de `{doc,text}`). Chaque sonde fausse a
+  produit un « muet » interprété comme un verdict SUR LE MOTEUR ⇒ conclusion FAUSSE « il faut
+  modifier le moteur », défendue plusieurs fois avant d'être infirmée.
+- ⚠️ **LA LEÇON N'EST PAS « l'agent doit être plus rigoureux »** (une consigne en prose ne tient pas
+  40 sessions, doctrine du projet) : c'est que **la seule façon d'interroger le langage aujourd'hui
+  est de le RÉIMPLÉMENTER**, et réimplémenter c'est se tromper. L'outil rend la faute impossible.
+- **Cible** : `explain` — entrée = un payload (outil + params), sortie = docs qui s'injecteraient,
+  **la règle exacte qui a déclenché chacune**, et pour les non-déclenchées le motif du rejet
+  (pattern absent / `scope` non satisfait / `exclude` / mauvais corpus). Le « pourquoi PAS » est le
+  plus précieux : c'est la question qu'on se pose quand on écrit une doc.
+- ⚠️ Il ne DÉCIDE rien (lecture seule, hors chemin critique) : il expose la décision existante,
+  jamais une 2ᵉ implémentation qui divergerait. **Il consomme les MÊMES sources que la porte**,
+  sinon on recrée exactement le bug qu'il vient prévenir.
+- Précédent dans le parc : un `npm run explain -- <cible>` existe déjà côté projet applicatif
+  (config effective + refus motivés). Même besoin, même forme.
+
+### D. ⏭️ HORS MOTEUR — le MCP le plus sensible du parc n'a AUCUNE doc
+`docs/mcp/` ne contient que browser / gworkspace / odoo / stripe. **Le MCP d'accès SSH aux serveurs
+n'a rien**, alors que la philosophie pose que « chaque MCP est une frontière à risque au même titre
+qu'un fichier critique » et que le défaut est « documenter ». Zéro code : un `.md`.
+
+---
+
 ## État au 16/07/2026 (fin de session — reprendre ICI)
 
 **FAIT (sur GO explicite du mainteneur, prod touchée et vérifiée)** :
