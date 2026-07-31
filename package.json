@@ -17,6 +17,7 @@
     "doctor": "node doctor.js",
     "explain": "node explain.js",
     "test:explain": "vitest run explain.test.js",
+    "test:couverture": "vitest run couverture-gate.test.js triggers-gate.test.js",
     "test:unit": "vitest run lib-pure.test.js sources-file.test.js frontmatter.test.js migrate.test.js lint.test.js gate.test.js",
     "test:lock": "vitest run lock.test.js",
     "test:integration": "vitest run mcp-doc-inject.test.js",
