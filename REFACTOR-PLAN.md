@@ -172,6 +172,29 @@ répond à « pour CE geste, qu'est-ce qui s'injecterait, et POURQUOI ».
 - Précédent dans le parc : un `npm run explain -- <cible>` existe déjà côté projet applicatif
   (config effective + refus motivés). Même besoin, même forme.
 
+### F. 🟡 `sources.md` DÉPASSE LE SEUIL DE DILUTION — et la session du 31/07 l'a AGGRAVÉ
+La doc injectable du moteur était déjà au-delà du seuil « < 10 lignes / progressive
+disclosure » ; 3 lignes y ont été ajoutées le 31/07 (recette geste, faux verts, explain)
+parce que le savoir manquait CRUELLEMENT — mais le bon geste était de SCINDER
+(tier-1 réinjecté + `sources-reference.md` on-demand sans pattern).
+- ⚠️ Elle est réinjectée à CHAQUE accès aux fichiers du moteur : chaque ligne se paie en
+  tokens sur toutes les sessions de tous les agents. C'est la doctrine que ce repo
+  applique aux AUTRES docs (précédent : `pw-mcp-proxy.md` scindée à 16 lignes).
+- Non traité sciemment : scinder une doc RÉINJECTÉE pendant qu'un autre agent modifie le
+  moteur créerait un conflit sur le fichier le plus chaud du repo. À faire à froid.
+
+### G. 🔴 3 TESTS ROUGES PRÉEXISTANTS dans `mutation-workflow-gate.test.js` (constaté 31/07)
+`npm test` = **711 verts / 3 rouges** : « tout module muté déclenche le workflow »,
+« toute suite lancée par Stryker déclenche le workflow », et son propre negative-check.
+- ⚠️ **NON causés par la session du 31/07** : vérifié, aucun des fichiers que ce gate lit
+  (`stryker.conf.json`, `.github/workflows/**`, `vitest.stryker.config.mjs`) n'a été
+  touché ce jour-là. La dérive est ANTÉRIEURE.
+- ⚠️ **Personne ne les avait vus parce que la CI est à l'arrêt** (quota Actions des repos
+  privés épuisé) — exactement le scénario « ① un gate rouge + ② la CI muette » déjà vécu
+  ailleurs dans le parc : un gate qui ne s'exécute pas ne protège rien.
+- ⚠️ Un rouge permanent est le pire état d'un filet : on cesse de le lire. Le traiter OU
+  écrire le refus — jamais le laisser.
+
 ### D. ⏭️ HORS MOTEUR — le MCP le plus sensible du parc n'a AUCUNE doc
 `docs/mcp/` ne contient que browser / gworkspace / odoo / stripe. **Le MCP d'accès SSH aux serveurs
 n'a rien**, alors que la philosophie pose que « chaque MCP est une frontière à risque au même titre
