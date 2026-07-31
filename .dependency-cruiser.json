@@ -196,6 +196,28 @@
       }
     },
     {
+      "name": "explain-stays-out-of-the-hot-path",
+      "severity": "error",
+      "comment": "⚠️ explain.js est un outil de DIAGNOSTIC (fail-LOUD, lecture seule, hors chemin critique). Aucune porte/garde ne doit l'importer : un hook est spawné à CHAQUE appel d'outil de CHAQUE agent, et un outil qui hurle n'a rien à faire dans un chemin fail-open. Le sens inverse est la règle : explain consomme collect-core, jamais l'inverse.",
+      "from": {
+        "path": "^(doc-inject|porte-core|guard-core|doc-write-guard|session-inject|turn-count|mcp-doc-reset|mcp-doc-inject|codex-doc-inject|codex-doc-write-guard)\\.js$"
+      },
+      "to": {
+        "path": "^explain\\.js$"
+      }
+    },
+    {
+      "name": "collect-core-must-not-know-the-harness",
+      "severity": "error",
+      "comment": "⚠️ collect-core.js = collecte PARTAGÉE porte↔explain. Il ne connaît aucun dialecte : importer une coquille (doc-inject/codex-*) inverserait la dépendance et ferait entrer un harnais dans la pièce commune — exactement ce que le portage multi-harnais interdit.",
+      "from": {
+        "path": "^collect-core\\.js$"
+      },
+      "to": {
+        "path": "^(doc-inject|codex-doc-inject|codex-doc-write-guard|doc-write-guard|session-inject|explain)\\.js$"
+      }
+    },
+    {
       "name": "migrate-must-stay-pure",
       "severity": "error",
       "comment": "⚠️ migrate.js = NOYAU PUR de la migration (mute par Stryker). Toute I/O ici la rendrait intestable et produirait des mutants equivalents. La coquille = migrate-to-frontmatter.js.",
@@ -214,7 +236,7 @@
     "doNotFollow": {
       "path": "node_modules"
     },
-    "includeOnly": "^(mcp-doc-inject|mcp-doc-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure)\\.js$",
+    "includeOnly": "^(mcp-doc-inject|mcp-doc-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure|explain|collect-core|porte-core|guard-core)\\.js$",
     "tsPreCompilationDeps": false
   }
 }
