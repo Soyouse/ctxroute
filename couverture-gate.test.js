@@ -192,7 +192,22 @@ const DETTE_SKILLS = {
   'agent-social': 80000, 'webzenon-infra': 75000, 'mcp-doc-hooks': 30000, 'pw-mcp-proxy': 20000,
 };
 
-test('⑤ aucun skill enregistré ne GROSSIT au-delà de sa dette (cliquet)', () => {
+// 🛑 VOLET ⑤ SUSPENDU LE 02/08/2026 — décision de le mainteneur, et elle est FONDÉE.
+// ⚠️ CE VOLET MESURE UN CANAL QUI NE FONCTIONNE PAS. L'injection automatique des SKILLS n'est pas
+// au point : en pratique le skill est chargé À LA MAIN en début de session, donc il est lu EN
+// ENTIER et sa taille n'a aucune conséquence. Le gate rougissait donc pour un effet inexistant —
+// et pire, il POUSSAIT À L'ACTION NUISIBLE : « scinder le skill », c'est-à-dire remplacer un
+// contenu lu intégralement par un pointeur qui ne sera suivi qu'au bon vouloir de l'agent.
+// Un gate qui crie pour rien est un gate qu'on cesse de lire ; un gate qui pousse à casser les
+// projets est pire encore. On le TAIT, on ne le supprime pas.
+// ⚠️ CE QUI N'EST PAS SUSPENDU : les volets ①②③④ (docs injectables, arbo, dependency-cruiser)
+// restent ACTIFS — les docs injectables, elles, arrivent vraiment, et c'est le canal déterministe.
+//
+// 🔓 CONDITION DE RÉACTIVATION, une seule, BINAIRE : le jour où l'injection automatique des skills
+// est PROUVÉE fonctionnelle (un skill enregistré arrive réellement dans le contexte de l'agent,
+// vérifié par spawn réel comme on vérifie les docs), retirer `.skip` — la mesure redevient vraie.
+// NE PAS réactiver « parce que ça a l'air de marcher » : le prouver, comme tout le reste ici.
+test.skip('⑤ aucun skill enregistré ne GROSSIT au-delà de sa dette (cliquet) [SUSPENDU : injection de skill non fonctionnelle]', () => {
   // ⚠️ Volet né du backlog §20/07 : « tout skill/doc dont le rendu dépasse le
   //    seuil ⇒ ROUGE, avec le poids mesuré ». Sans lui, la règle de
   //    progressive disclosure reste une consigne en prose — et une consigne en
