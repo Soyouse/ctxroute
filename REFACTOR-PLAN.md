@@ -669,3 +669,33 @@ cette dette VISIBLE au lieu de la laisser grossir jusqu'au seuil.
 ⚠️ **NE PAS traiter comme un cas particulier d'un skill trop gros.** Le défaut est dans le contrat
 moteur↔harnais : « rendre plus que ce que le harnais accepte » doit être une ERREUR BRUYANTE,
 pour n'importe quelle doc, aujourd'hui et à toute taille future.
+
+---
+
+## 💡 Commentaires NON injectés dans les docs — idée le mainteneur, 03/08/2026 (NON tranchée)
+
+**Le besoin.** Une doc porte DEUX publics : l'agent qui AGIT (rappel court, réinjecté à chaque
+geste) et l'agent qui MAINTIENT la doc (provenance, péremption d'une source tierce, historique de
+scission, date d'élargissement d'un pattern). Le second coûte des tokens à CHAQUE injection sans
+rien apprendre sur le geste en cours.
+
+**Piste.** Une syntaxe strippée à l'injection — le moteur retire déjà le frontmatter, l'endroit
+existe — mais présente dans le fichier quand un agent l'ouvre pour l'éditer.
+
+🛑 **BORNE OBLIGATOIRE SI ON LE FAIT, sinon la feature est NUISIBLE.** Seul le méta SANS valeur au
+moment de l'usage : « re-vérifier cette page éditeur après AAAA-MM », « scindée depuis X ».
+⚠️ **JAMAIS LE POURQUOI D'UNE RÈGLE.** Un invariant privé de sa raison DÉRIVE — le suivant ne voit
+pas ce qu'il casse et le contourne. Le risque n'est pas technique, il est **gravitationnel** : dès
+qu'une zone invisible existe, le « pourquoi » y migre parce qu'il est long et « encombre ».
+
+⚠️ **ALTERNATIVE À ÉPUISER D'ABORD — ZÉRO CODE, DÉJÀ DISPONIBLE.** Une page `*-reference.md` SANS
+`match` n'est jamais auto-injectée : c'est déjà « du texte réservé à qui maintient », à coût nul.
+⇒ **Ne coder ce système QUE si l'usage réel des `*-reference.md` prouve qu'elles ne suffisent pas.**
+Sinon c'est un 2ᵉ mécanisme pour un besoin couvert — la définition d'une dette.
+
+**Piste ÉCARTÉE le même jour, avec sa raison (ne pas la rouvrir).** L'idée de départ était
+« injecter une doc AU MOMENT de l'erreur ». Écartée : le bon déclencheur n'est pas l'erreur mais
+**le geste qui la précède** — une doc qui `match` la commande arrive AVANT la faute, donc l'erreur
+n'a pas lieu du tout. Prévention > runbook. Aucune modification du moteur n'était nécessaire :
+`planificateur-os.md` a été écrit le même jour sur ce principe (vérifié par spawn, positif sur
+`schtasks`, muet sur `systemctl restart nginx`). Seule la question du méta invisible a survécu.
