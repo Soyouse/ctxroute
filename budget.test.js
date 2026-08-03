@@ -20,7 +20,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
-import { planifier, planifierPaquets, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, capacitePaquet, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
 
 // Fixtures = THUNKS (cf. perTest ci-dessus).
 const seg = (id, n, label) => ({ id, text: 'x'.repeat(n), label: label || id + '.md' });
@@ -268,14 +268,37 @@ test('BORNE : aucun paquet ne dépasse le budget', () => {
   }
 });
 
-test('SEGMENT GÉANT : jamais tronqué, jamais bloquant — annoncé, les autres passent', () => {
-  const liste = [seg('enorme', 5000), seg('petit', 100)];
-  const p = planifierPaquets(liste, 1000, 3);
+test('SEGMENT GÉANT : MORCELÉ et LIVRÉ — l\'indélivrabilité est impossible', () => {
+  // ⚠️ CONTRAT INVERSÉ le 03/08/2026 (décision le mainteneur) : AVANT, un segment plus
+  //    lourd qu'une trame était seulement ANNONCÉ — donc jamais livré. Le
+  //    framework LIVRE : il découpe. Ne JAMAIS revenir à « annoncer au lieu de
+  //    livrer », c'est faire porter à l'auteur un défaut du transport.
+  // ⚠️ Contenus DISTINCTS ('x' vs 'y') : sans ça, compter les caractères
+  //    recollés mélangerait les deux docs et le test certifierait à faux.
+  const p = planifierPaquets([seg('enorme', 5000), { id: 'petit', text: 'y'.repeat(100), label: 'petit.md' }], 1200, 9);
   const emis = p.flatMap((x) => x.emis);
-  const differes = p.flatMap((x) => x.differes.map((d) => d.id));
-  assert.deepStrictEqual(differes, ['enorme']);
-  assert.deepStrictEqual(emis, ['petit'], 'le géant ne stérilise AUCUN paquet');
-  assert.ok(!p.some((x) => x.texte.includes('x'.repeat(1500))), 'jamais un géant tronqué');
+  assert.deepStrictEqual(emis.filter((id) => id.startsWith('enorme')),
+    ['enorme#1', 'enorme#2', 'enorme#3', 'enorme#4', 'enorme#5', 'enorme#6', 'enorme#7'],
+    'le géant est découpé en 7 morceaux, TOUS livrés');
+  assert.ok(emis.includes('petit'), 'et il ne stérilise aucun paquet');
+  assert.deepStrictEqual(p.flatMap((x) => x.differes.map((d) => d.id)), [], 'RIEN de différé : tout est passé');
+  // CONSERVATION DU CONTENU : recoller les morceaux redonne le texte d'origine.
+  const recolle = p.flatMap((x) => x.texte.split('⟦').slice(1))
+    .map((m) => m.slice(m.indexOf('⟧\n') + 2))
+    .join('')
+    .replace(/\n\n---\n\n|\n\n###FIN:[0-9a-f]{8}###/g, '');
+  assert.strictEqual(recolle.replace(/[^x]/g, '').length, 5000, 'les 5000 caractères sont tous arrivés');
+});
+
+test('MORCEAUX : chacun s\'ANNONCE comme fragment (jamais un extrait qui a l\'air complet)', () => {
+  // ⚠️ C'est CET en-tête qui autorise la découpe : sans lui on livrerait un
+  //    fragment déguisé en doc entière — le mensonge que le module combat.
+  const p = planifierPaquets([seg('gros', 5000)], 1200, 8);
+  const morceaux = p.filter((x) => x.texte).map((x) => /MORCEAU (\d+)\/(\d+)/.exec(x.texte));
+  assert.ok(morceaux.length >= 2 && morceaux.every(Boolean), 'chaque trame porte son numéro de morceau');
+  const total = Number(morceaux[0][2]);
+  assert.deepStrictEqual(morceaux.map((m) => Number(m[1])), Array.from({ length: total }, (_, i) => i + 1),
+    'les morceaux sont numérotés 1..m, dans l\'ordre, sans trou');
 });
 
 test('DÉTERMINISME : deux calculs indépendants rendent le MÊME découpage', () => {
@@ -320,14 +343,15 @@ test('RÉPARTITION EXACTE : un budget donné produit UN découpage précis', () 
   assert.deepStrictEqual(planifierPaquets(quatre400(), 1146, 2).map((p) => p.emis), [['a', 'b'], ['c', 'd']]);
 });
 
-test('FRONTIÈRE du pré-filtre : à la taille EXACTE ça passe, un caractère de moins ça sort', () => {
-  // 339 (enveloppe) + 400 (segment) = 739. À 739 le segment tient ; à 738, non.
-  // ⚠️ Un segment qui ne rentre dans AUCUN paquet est annoncé d'emblée — il ne
-  //    doit JAMAIS stériliser une trame en la laissant vide.
+test('FRONTIÈRE du morcellement : à la taille EXACTE la doc reste ENTIÈRE, au-delà elle se découpe', () => {
+  // 339 (enveloppe) + 400 (segment) = 739. À 739 chaque doc tient telle quelle…
   assert.deepStrictEqual(planifierPaquets(trois400(), 739, 3).map((p) => p.emis), [['a'], ['b'], ['c']]);
-  const serre = planifierPaquets(trois400(), 738, 3);
-  assert.deepStrictEqual(serre.map((p) => p.emis), [[], [], []]);
-  assert.deepStrictEqual(serre[2].differes.map((d) => d.id), ['a', 'b', 'c']); // rien perdu
+  // …à 738 elle ne tient plus : elle est MORCELÉE, jamais abandonnée.
+  // ⚠️ Un morceau porte un id suffixé `#j` — c'est la trace du découpage.
+  const serre = planifierPaquets(trois400(), 738, 6);
+  const emis = serre.flatMap((p) => p.emis);
+  assert.ok(emis.every((id) => id.includes('#')), 'toutes les docs sont découpées');
+  assert.ok(['a', 'b', 'c'].every((d) => emis.some((id) => id.startsWith(d + '#'))), 'les 3 docs sont livrées');
 });
 
 test('FRONTIÈRE du remplissage : un paquet PLEIN À RAS BORD est valide', () => {
@@ -341,24 +365,30 @@ test('FRONTIÈRE du remplissage : un paquet PLEIN À RAS BORD est valide', () =>
   assert.deepStrictEqual(serre[1].differes.map((d) => d.id), ['c', 'd']);
 });
 
-test('DERNIER paquet : il retient un SOUS-ENSEMBLE strict et annonce le reste', () => {
-  // ⚠️ Cas qui prouve que le dernier paquet ne prend pas « tout ou rien » :
-  //    3 candidats restants, 1 seul retenu, 2 annoncés dans la MÊME trame.
+test('RELIQUAT = « pas assez de TRAMES », jamais « trop gros » (erreur de CONFIG)', () => {
+  // ⚠️ Sémantique NEUVE (03/08/2026) : plus rien n'est « trop gros » — tout est
+  //    morcelable. S'il reste des morceaux, c'est que `--paquets N` est trop
+  //    petit : une erreur d'exploitation, avec sa solution dans le message.
   const p = planifierPaquets(quatre400(), 1145, 2);
-  assert.deepStrictEqual(p[1].emis, ['b']);
-  assert.deepStrictEqual(p[1].differes.map((d) => d.id), ['c', 'd']);
-  assert.strictEqual(p[1].texte.length, 891);
+  const dernier = p[p.length - 1];
+  assert.ok(dernier.differes.length > 0, 'avec 2 trames pour 4 docs, il reste forcément des morceaux');
+  assert.ok(dernier.texte.includes('le nombre de paquets déclarés est TROP PETIT'));
+  assert.ok(dernier.texte.includes('--paquets N'), 'le message dit COMMENT corriger');
+  // …et avec assez de trames, le reliquat disparaît : rien n'était trop gros.
+  const assez = planifierPaquets(quatre400(), 1145, 8);
+  assert.deepStrictEqual(assez.flatMap((x) => x.differes), [], 'assez de trames ⇒ tout passe');
 });
 
-test('BUDGET SOUS L\'ANNONCE NUE : on annonce quand même, on ne se tait JAMAIS', () => {
-  // ⚠️ Même arbitrage que `planifier` : dire « ces docs manquent, va les lire »
-  //    vaut mieux que le silence. Le dépassement est assumé, l'annonce est
-  //    minuscule. Cas TROUVÉ par le property-test le 03/08/2026.
-  const p = planifierPaquets(trois400(), 360, 3);
-  assert.deepStrictEqual(p.map((x) => x.emis), [[], [], []]);
-  assert.deepStrictEqual(p[2].differes.map((d) => d.id), ['a', 'b', 'c']);
-  assert.ok(p[2].texte.includes('3 doc(s) NON injectée(s)'));
-  assert.ok(!p[2].texte.includes('xxx'), 'aucun contenu tronqué émis');
+test('TRAME MINUSCULE : on découpe plus fin, on ne renonce JAMAIS', () => {
+  // ⚠️ Il n'existe AUCUN budget où le framework refuse de livrer : plus la
+  //    trame est petite, plus les morceaux sont petits. C'est le remplacement
+  //    du vieux « rien ne rentre, on annonce » — qui n'a plus lieu d'être.
+  const p = planifierPaquets(trois400(), 500, 24); // trame minuscule ⇒ beaucoup de morceaux ⇒ beaucoup de trames
+  const emis = p.flatMap((x) => x.emis);
+  assert.ok(emis.length > 3, 'la trame est petite ⇒ beaucoup de morceaux');
+  for (const d of ['a', 'b', 'c']) {
+    assert.ok(emis.some((id) => id === d || id.startsWith(d + '#')), 'doc ' + d + ' livrée');
+  }
 });
 
 test('PAQUET VIDE : ni contenu ni annonce ⇒ rendu VIDE (jamais une enveloppe creuse)', () => {
@@ -418,4 +448,80 @@ test('FRONTIÈRE du sceau : à 50 % pile → nominal ; juste au-dessus → scell
   assert.strictEqual(nu.marqueur, '');
   const scelle = planifier([seg('a', 501)], 1000); // 501 > 50 % → scellé
   assert.notStrictEqual(scelle.marqueur, '');
+});
+
+test('capacitePaquet : borne PHYSIQUE dérivée de l\'en-tête réel, jamais une constante', () => {
+  // ⚠️ Valeur EXACTE ancrée (budget 8000, en-tête à 1 chiffre + pied = 339) :
+  //    sans elle, un mutant qui additionne au lieu de soustraire survit et le
+  //    gate de taille laisserait passer des docs jamais livrables.
+  assert.strictEqual(capacitePaquet(8000, 3), 7661);
+  assert.strictEqual(capacitePaquet(), DEFAUT_BUDGET - 339, 'budget absent ⇒ défaut framework');
+  assert.ok(capacitePaquet(8000, 3) < 8000, 'la capacité est TOUJOURS sous le budget (l\'enveloppe coûte)');
+  // ⚠️ Le nombre de paquets ÉLARGIT l'en-tête (« PAQUET 10/10 » > « PAQUET 3/3 »)
+  //    donc RÉDUIT la capacité. Sans ce cas à deux chiffres, tous les mutants
+  //    sur `nbPaquets` sont équivalents (2 à 9 donnent la même largeur) et
+  //    survivent — mesuré 03/08/2026.
+  assert.ok(capacitePaquet(8000, 10) < capacitePaquet(8000, 3), 'plus de paquets ⇒ en-tête plus large ⇒ moins de place');
+  for (const mauvais of [undefined, null, 1, 0, -4, 2.5, 'x']) {
+    assert.strictEqual(capacitePaquet(8000, mauvais), 7661, 'nbPaquets absurde ⇒ largeur minimale (2), jamais un throw');
+  }
+});
+
+test('capacitePaquet : à la capacité EXACTE la doc reste entière, un caractère de plus ⇒ 2 morceaux', () => {
+  // Le lien entre la borne annoncée et le comportement réel — sans lui, la
+  // constante pourrait dériver du moteur sans que rien ne rougisse.
+  const cap = capacitePaquet(8000, 3);
+  const pile = planifierPaquets([seg('a', cap), seg('b', 5000)], 8000, 3);
+  assert.ok(pile.some((p) => p.emis.includes('a')), 'à la capacité exacte : livrée ENTIÈRE, sans découpe');
+  const trop = planifierPaquets([seg('a', cap + 1), seg('b', 5000)], 8000, 3);
+  const emisA = trop.flatMap((p) => p.emis).filter((id) => id.startsWith('a'));
+  assert.deepStrictEqual(emisA, ['a#1', 'a#2'], 'un caractère de plus ⇒ découpée en 2, et LIVRÉE');
+});
+
+test('LIGNE MONSTRE : une seule ligne plus longue qu\'une trame est débitée', () => {
+  // ⚠️ Chemin JAMAIS exercé avant le 03/08/2026 (mutation : 4 mutants sans
+  //    couverture). C'est le SEUL endroit où l'on tranche au milieu d'un mot —
+  //    une ligne de 20 000 caractères n'a aucune frontière où couper proprement.
+  const uneLigne = { id: 'mono', text: 'z'.repeat(9000), label: 'mono.md' };
+  const p = planifierPaquets([uneLigne], 1200, 24);
+  const emis = p.flatMap((x) => x.emis);
+  assert.ok(emis.length > 5, 'la ligne monstre est débitée en morceaux');
+  assert.ok(emis.every((id) => id.startsWith('mono#')));
+  const z = p.map((x) => x.texte).join('').split('').filter((c) => c === 'z').length;
+  assert.strictEqual(z, 9000, 'les 9000 caractères sont TOUS arrivés');
+});
+
+test('LIGNE MONSTRE mêlée à des lignes normales : le tampon en cours est vidé d\'abord', () => {
+  // Garantit l'ORDRE : ce qui précède la ligne monstre sort AVANT elle.
+  const mixte = { id: 'mix', text: 'debut\n' + 'z'.repeat(3000) + '\nfin', label: 'mix.md' };
+  const p = planifierPaquets([mixte], 1200, 24);
+  const textes = p.map((x) => x.texte).join('');
+  assert.ok(textes.indexOf('debut') < textes.indexOf('zzz'), 'le début sort avant la ligne monstre');
+  assert.ok(textes.includes('fin'), 'et la suite arrive quand même');
+});
+
+test('EN-TÊTE DE MORCEAU : texte EXACT (les 3 champs du motif RFC 2046)', () => {
+  // ⚠️ `id` (marqueur commun), `number` à partir de 1, `total` — en retirer un
+  //    supprime une garantie de réassemblage. Ancré au caractère.
+  const p = planifierPaquets([seg('doc', 3000)], 1200, 24);
+  const premier = p.find((x) => x.texte.includes('MORCEAU 1/'));
+  const m = /⟦ (.+?) — MORCEAU (\d+)\/(\d+) : recolle les (\d+) morceaux dans l'ordre avant de lire ⟧\n/.exec(premier.texte);
+  assert.ok(m, 'en-tête au format exact');
+  assert.strictEqual(m[1], 'doc.md', 'le LABEL identifie la doc');
+  assert.strictEqual(m[2], '1', 'la numérotation commence à 1 (RFC 2046)');
+  assert.strictEqual(m[3], m[4], 'le TOTAL est cohérent dans la phrase');
+});
+
+test('RELIQUAT : message EXACT, avec la solution dedans', () => {
+  const p = planifierPaquets(quatre400(), 1145, 2);
+  const t = p[1].texte;
+  assert.ok(t.includes('⚠️ 2 morceau(x) non émis : le nombre de paquets déclarés est TROP PETIT.'));
+  assert.ok(t.includes("   Augmente `--paquets N` dans la configuration des hooks — rien n'est trop gros, il manque des trames."));
+});
+
+test('capacitePaquet : nbPaquets NON entier retombe sur la largeur minimale', () => {
+  // ⚠️ Sans ce cas, le garde `Number.isInteger` est intuable : 10.5 et 2 donnent
+  //    des largeurs d'en-tête différentes, donc des capacités différentes.
+  assert.strictEqual(capacitePaquet(8000, 10.5), capacitePaquet(8000, 2));
+  assert.notStrictEqual(capacitePaquet(8000, 11), capacitePaquet(8000, 2));
 });

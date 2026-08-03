@@ -228,8 +228,10 @@ test('PAQUETS ① CONSERVATION : chaque segment dans EXACTEMENT un paquet, ou an
       // Aucun DOUBLON — l'invariant neuf du multi-trames.
       expect(new Set(emis).size).toBe(emis.length);
       expect(new Set([...emis, ...differes]).size).toBe(emis.length + differes.length);
-      // Aucune PERTE — l'invariant historique, étendu.
-      expect([...emis, ...differes].sort()).toEqual(segments.map((s) => s.id).sort());
+      // Aucune PERTE. ⚠️ Une doc peut sortir en MORCEAUX (`id#j`) : on
+      //    recompose donc l'ensemble des docs VUES, pas la liste brute des ids.
+      const docId = (id) => id.split('#')[0];
+      expect([...new Set([...emis, ...differes].map(docId))].sort()).toEqual(segments.map((s) => s.id).sort());
     }),
     { numRuns: 300 }
   );
@@ -279,5 +281,28 @@ test('PAQUETS ④ PARITÉ : rien à évincer ⇒ paquet 1 = planifier(), les aut
       for (let i = 1; i < n; i++) expect(paquets[i]).toEqual({ texte: '', emis: [], differes: [], marqueur: '' });
     }),
     { numRuns: 100 }
+  );
+});
+
+test('PAQUETS ⑤ CONSERVATION DU CONTENU : rien ne s\'évapore, même sur trame minuscule', () => {
+  // ⚠️ BUG RÉEL trouvé le 03/08/2026 par MESURE, pas par relecture : quand la
+  //    trame est trop petite pour l'en-tête d'un morceau, la boucle de découpe
+  //    ne produisait AUCUN morceau et le contenu DISPARAISSAIT — ni émis, ni
+  //    annoncé. C'est le seul résultat interdit par le module. Cette propriété
+  //    balaie précisément la zone minuscule où le défaut vivait.
+  fc.assert(
+    fc.property(segmentsArb, fc.integer({ min: 2, max: 6 }), fc.integer({ min: 250, max: 2000 }), (segments, n, budget) => {
+      const paquets = planifierPaquets(segments, budget, n);
+      const emis = paquets.flatMap((p) => p.emis);
+      const differes = paquets.flatMap((p) => p.differes.map((d) => d.id));
+      // Chaque doc d'entrée est SOIT livrée (entière ou en morceaux `id#j`),
+      // SOIT annoncée. Jamais absente des deux.
+      for (const s of segments) {
+        const vue = emis.some((id) => id === s.id || id.startsWith(s.id + '#')) ||
+          differes.some((id) => id === s.id || id.startsWith(s.id + '#'));
+        expect(vue, `doc ${s.id} ÉVAPORÉE (budget ${budget}, n ${n})`).toBe(true);
+      }
+    }),
+    { numRuns: 400 }
   );
 });

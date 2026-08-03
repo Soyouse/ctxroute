@@ -129,132 +129,15 @@ test('NEGATIVE-CHECK : les 3 volets DÉTECTENT vraiment un oubli', () => {
   }
 });
 
-// ⚠️ DETTE DE TAILLE — plafonds ACTUELS des docs qui dépassent déjà la règle
-//    (« doc réinjectée < ~10 invariants, sinon SCINDER »). Cette liste ne peut
-//    que RÉTRÉCIR : l'élargir, c'est acter la dérive qu'on prétend combattre.
-//    ⚠️ Elle existe parce qu'un gate ROUGE en permanence finit ignoré (leçon
-//    rush mode) — la dette devient VISIBLE au lieu de bloquer tout le monde.
-//    ⚠️ Le vrai correctif reste la SCISSION (tier-1 + `*-reference.md`) :
-//    `sources.md` est la pire et alimente directement la troncature du §20/07.
-const DETTE_TAILLE = {
-  'sources.md': 24, 'quality-configs.md': 20, 'doctor.md': 17, 'lint.md': 17,
-  'porte.md': 17, 'deadline.md': 16, 'vendor.md': 16, 'lib-pure.md': 15,
-  'paths.md': 14, 'config-gate.md': 13, 'explain.md': 13,
-};
-const PLAFOND_NEUF = 12; // frontmatter + titre compris
+// ⚠️ VOLET ④ SUPPRIMÉ le 03/08/2026 (décision le mainteneur) — NE PAS le réintroduire.
+//    Il plafonnait la LONGUEUR des docs (cliquet en lignes), au motif qu'une
+//    doc trop grosse serait tronquée ou évincée. Ce motif est MORT : depuis le
+//    transport multi-trames, une doc trop lourde est MORCELÉE et livrée —
+//    l'indélivrabilité est impossible par construction (cf `budget.morceler`).
+//    ⚠️ Le framework LIVRE, il ne juge JAMAIS la taille de ce qu'on lui confie.
+//    Un plafond de longueur ferait porter à l'AUTEUR d'une doc un défaut du
+//    TRANSPORT, et imposerait à tous les utilisateurs une convention de style
+//    qui ne regarde que le parc du mainteneur. Si un jour des morceaux ne
+//    sortent pas, ce n'est pas « trop gros » : c'est `--paquets N` trop petit,
+//    et le message d'exécution le dit avec sa solution.
 
-test('④ aucune doc injectable ne GROSSIT (cliquet, dette qui ne peut que rétrécir)', () => {
-  const dir = path.join(PARC, 'mcp-doc-hooks');
-  if (!fs.existsSync(dir)) return; // clone vierge
-  const trop = [];
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.md'))) {
-    const n = fs.readFileSync(path.join(dir, f), 'utf8').split('\n').filter((l) => l.trim()).length;
-    const plafond = DETTE_TAILLE[f] || PLAFOND_NEUF;
-    if (n > plafond) trop.push(`${f}: ${n} lignes (plafond ${plafond})`);
-  }
-  assert.deepStrictEqual(trop, [],
-    'Doc(s) au-dessus du plafond. Une doc réinjectée à CHAQUE accès coûte à chaque geste\n' +
-    '      de chaque agent — et au-delà du seuil du harnais, elle est TRONQUÉE EN SILENCE.\n' +
-    '      Corrige en SCINDANT (tier-1 court + `*-reference.md` on-demand), pas en montant le plafond.');
-});
-
-// ⚠️ DETTE DE SKILL — poids ACTUEL (caractères) des skills enregistrés qui
-//    dépassent déjà le budget d'émission. MÊME cliquet que DETTE_TAILLE :
-//    cette liste ne peut que RÉTRÉCIR. ⚠️ Un skill au-dessus du budget est
-//    ÉMIS mais ÉVINCÉ par budget.js (annoncé, jamais perdu) — il ne rentre
-//    donc pas dans le contexte de l'agent, qui doit aller le lire.
-//    ⚠️ La sortie de dette = SCINDER (tier-1 court réinjecté + `*-reference.md`
-//    à la demande), JAMAIS monter le plafond : ce serait acter la dérive.
-// ⚠️ CES SKILLS VIVENT HORS DU REPO et appartiennent à des CHANTIERS ACTIFS :
-//    d'autres agents les éditent en parallèle. Constaté le 31/07/2026 en
-//    l'espace d'une demi-heure : `webzenon-infra` 69 017 → 70 525 et
-//    `pw-mcp-proxy` 17 423 → 19 797. Ce n'est PAS un défaut du gate — c'est
-//    exactement ce qu'il doit voir. Conséquence pratique : une dérive d'un
-//    autre chantier peut faire rougir CETTE suite ; on RE-PHOTOGRAPHIE alors
-//    la valeur (jamais on ne monte un plafond pour « avoir la paix »), et la
-//    vraie sortie de dette reste la SCISSION, dans la session du chantier
-//    concerné. Le cliquet garde son pouvoir sur le LONG terme : sans lui, ces
-//    skills passeraient de 20 à 80 Ko sans que rien n'alerte — l'histoire même
-//    qui a produit le backlog §20/07.
-// ⚠️ PALIERS, PAS DES VALEURS EXACTES — et c'est la clé de ce gate.
-//    Le parc est un WORKSPACE VIVANT : plusieurs agents éditent ces skills en
-//    permanence, rien n'y est figé. Un cliquet à la valeur exacte rougirait à
-//    chaque phrase ajoutée par un autre chantier — donc il deviendrait du
-//    BRUIT, donc il serait ignoré, et le jour où il aurait raison personne ne
-//    le croirait. C'est la faute exacte que la doctrine interdit.
-//    Le palier absorbe le va-et-vient normal d'un skill vivant et n'attrape
-//    que ce qui compte : le FRANCHISSEMENT, c'est-à-dire la dérive réelle
-//    (20 Ko → 80 Ko sans que rien n'alerte — l'histoire du backlog §20/07).
-//    ⚠️ Un palier ne MONTE JAMAIS pour « avoir la paix » : franchi = on SCINDE
-//    (tier-1 + référence on-demand), dans la session du chantier concerné.
-const PALIER = 5000;
-const DETTE_SKILLS = {
-  'agent-social': 80000, 'webzenon-infra': 75000, 'mcp-doc-hooks': 30000, 'pw-mcp-proxy': 20000,
-};
-
-// 🛑 VOLET ⑤ SUSPENDU LE 02/08/2026 — décision de le mainteneur, et elle est FONDÉE.
-// ⚠️ CE VOLET MESURE UN CANAL QUI NE FONCTIONNE PAS. L'injection automatique des SKILLS n'est pas
-// au point : en pratique le skill est chargé À LA MAIN en début de session, donc il est lu EN
-// ENTIER et sa taille n'a aucune conséquence. Le gate rougissait donc pour un effet inexistant —
-// et pire, il POUSSAIT À L'ACTION NUISIBLE : « scinder le skill », c'est-à-dire remplacer un
-// contenu lu intégralement par un pointeur qui ne sera suivi qu'au bon vouloir de l'agent.
-// Un gate qui crie pour rien est un gate qu'on cesse de lire ; un gate qui pousse à casser les
-// projets est pire encore. On le TAIT, on ne le supprime pas.
-// ⚠️ CE QUI N'EST PAS SUSPENDU : les volets ①②③④ (docs injectables, arbo, dependency-cruiser)
-// restent ACTIFS — les docs injectables, elles, arrivent vraiment, et c'est le canal déterministe.
-//
-// 🔓 CONDITION DE RÉACTIVATION, une seule, BINAIRE : le jour où l'injection automatique des skills
-// est PROUVÉE fonctionnelle (un skill enregistré arrive réellement dans le contexte de l'agent,
-// vérifié par spawn réel comme on vérifie les docs), retirer `.skip` — la mesure redevient vraie.
-// NE PAS réactiver « parce que ça a l'air de marcher » : le prouver, comme tout le reste ici.
-test.skip('⑤ aucun skill enregistré ne GROSSIT au-delà de sa dette (cliquet) [SUSPENDU : injection de skill non fonctionnelle]', () => {
-  // ⚠️ Volet né du backlog §20/07 : « tout skill/doc dont le rendu dépasse le
-  //    seuil ⇒ ROUGE, avec le poids mesuré ». Sans lui, la règle de
-  //    progressive disclosure reste une consigne en prose — et une consigne en
-  //    prose ne tient pas 40 sessions (c'est très exactement ce qui a produit
-  //    ce backlog : trois skills passés de « court » à 80 Ko sans rien alerter).
-  const dir = path.join(os.homedir(), '.claude', 'commands');
-  const confPath = path.join(ICI, 'mcp-doc-config.json');
-  if (!fs.existsSync(dir) || !fs.existsSync(confPath)) return; // clone vierge
-  const conf = JSON.parse(fs.readFileSync(confPath, 'utf8'));
-  const noms = Object.keys(conf.skills || {});
-  assert.ok(noms.length > 0, 'aucun skill enregistré : le gate ne prouverait rien');
-
-  const trop = [];
-  for (const n of noms) {
-    const p = path.join(dir, n + '.md');
-    if (!fs.existsSync(p)) continue; // couvert par skill-registry-gate
-    const taille = fs.readFileSync(p, 'utf8').length; // borne SUPÉRIEURE (frontmatter compris)
-    const plafond = DETTE_SKILLS[n] || BUDGET_NEUF;
-    if (taille > plafond) trop.push(`${n}: ${taille} caractères (plafond ${plafond})`);
-  }
-  assert.deepStrictEqual(trop, [],
-    'Skill(s) au-dessus du plafond. Un skill trop lourd est ÉVINCÉ de la trame :\n' +
-    '      il est ANNONCÉ, mais PAS dans le contexte de l\'agent.\n' +
-    '      Corrige en SCINDANT (tier-1 + `*-reference.md`), pas en montant le plafond.');
-});
-
-test('NEGATIVE-CHECK : le volet ⑤ détecte un FRANCHISSEMENT, pas le bruit', () => {
-  // ⚠️ Un gate qui ne peut pas rougir CERTIFIE au lieu de protéger.
-  assert.ok(DETTE_SKILLS['agent-social'] > BUDGET_NEUF, 'la dette doit être au-dessus du neuf');
-  assert.equal(DETTE_SKILLS['skill-inexistant'], undefined,
-    'un skill NON listé tombe sur le budget strict — c\'est le but du cliquet');
-  // Et le budget de référence est bien celui du moteur, pas un chiffre recopié.
-  assert.equal(BUDGET_NEUF, DEFAUT_BUDGET);
-
-  // ⚠️ LES DEUX SENS, sinon le palier ne prouve rien :
-  //    ① le bruit d'un workspace vivant NE déclenche PAS (sinon gate ignoré) ;
-  //    ② un franchissement réel DÉCLENCHE (sinon gate décoratif).
-  const palier = DETTE_SKILLS['webzenon-infra'];
-  assert.ok(70525 <= palier, '① une croissance ordinaire doit rester SOUS le palier');
-  assert.ok(palier + 1 > palier, '② dépasser le palier doit être détectable');
-  assert.ok(PALIER > 0 && Number.isInteger(PALIER), 'le pas de palier doit être un entier positif');
-});
-
-test('NEGATIVE-CHECK : le volet ④ détecte un dépassement', () => {
-  const plafond = DETTE_TAILLE['sources.md'];
-  assert.ok(Number.isInteger(plafond) && plafond > 0);
-  assert.ok(plafond + 1 > plafond, 'une doc qui gagne une ligne DOIT dépasser son plafond');
-  assert.equal(DETTE_TAILLE['doc-inexistante.md'], undefined,
-    'une doc NON listée tombe sur le plafond strict — c\'est le but du cliquet');
-});

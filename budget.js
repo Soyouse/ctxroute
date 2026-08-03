@@ -24,10 +24,18 @@
 //    Claude Code) et varie d'un harnais à l'autre. Compter en tokens
 //    introduirait une imprécision là où le mur est exact.
 //
-// ⚠️ UN SEGMENT EST INDIVISIBLE : il passe ENTIER ou il est ANNONCÉ. Ne JAMAIS
-//    couper une doc en son milieu — une doc amputée a l'air complète, donc elle
-//    ment ; une doc annoncée est lisible sur disque. C'est tout l'écart entre
-//    « dégrader le livrable » et « le transporter correctement ».
+// ⚠️ LE FRAMEWORK LIVRE — IL NE JUGE JAMAIS LA TAILLE (décision le mainteneur,
+//    03/08/2026). Une doc plus lourde qu'une trame est MORCELÉE et livrée ;
+//    l'indélivrabilité est IMPOSSIBLE PAR CONSTRUCTION. Refuser de livrer, ou
+//    exiger que l'auteur raccourcisse, ce serait lui faire porter un défaut du
+//    TRANSPORT.
+//    ⚠️ HISTORIQUE, à ne pas restaurer : la règle était « un segment est
+//    INDIVISIBLE, il passe entier ou il est annoncé », justifiée par « une doc
+//    amputée a l'air complète, donc elle ment ». Cette justification est MORTE
+//    avec les paquets : chaque morceau porte `MORCEAU j/m` et voyage dans une
+//    trame numérotée `k/N` au marqueur commun — il s'annonce comme fragment et
+//    le recollage est vérifiable. Ce qui reste interdit, c'est de couper SANS
+//    le dire.
 //
 // ⚠️ LE SCEAU EST LA GARANTIE DE DERNIER RECOURS, et il ne suppose AUCUN seuil.
 //    L'en-tête annonce un marqueur de fin ; le marqueur ferme le bloc. Marqueur
@@ -229,10 +237,94 @@ function enTetePaquet(marqueur, k, n) {
   );
 }
 
-// Rendu d'UN paquet. `differes` n'est jamais non-vide que sur le DERNIER.
-function composerPaquet(retenus, differes, k, n, marqueur) {
+// Reliquat = il manque des TRAMES, pas de la place. ⚠️ Sémantique DIFFÉRENTE de
+// `annonce()` : ici rien n'est « trop gros » (tout est morcelable) — c'est le
+// nombre de paquets DÉCLARÉS en configuration qui est insuffisant. C'est une
+// erreur d'EXPLOITATION avec sa solution, pas une fatalité de transport.
+function annonceConfig(reliquat) {
+  if (reliquat.length === 0) return '';
+  return (
+    '\n\n⚠️ ' + reliquat.length + ' morceau(x) non émis : le nombre de paquets déclarés est TROP PETIT.\n' +
+    "   Augmente `--paquets N` dans la configuration des hooks — rien n'est trop gros, il manque des trames."
+  );
+}
+
+// Rendu d'UN paquet. `reliquat` n'est jamais non-vide que sur le DERNIER.
+function composerPaquet(retenus, reliquat, k, n, marqueur) {
   const corps = retenus.map((s) => s.text).join(SEPARATEUR);
-  return enTetePaquet(marqueur, k, n) + corps + annonce(differes) + pied(marqueur);
+  return enTetePaquet(marqueur, k, n) + corps + annonceConfig(reliquat) + pied(marqueur);
+}
+
+// En-tête d'un MORCEAU de doc (uniquement quand une doc est répartie sur
+// plusieurs trames). ⚠️ Sans lui, un agent recevrait un fragment qui a l'air
+// d'être la doc entière — le mensonge exact que tout ce module empêche.
+// ⚠️ LES 3 CHAMPS DU MOTIF STANDARD (RFC 2046 `message/partial` : `id`,
+//    `number` qui commence à 1, `total` ; RFC 6455 : marqueur de fin). Ce sont
+//    EXACTEMENT les informations dont un récepteur a besoin pour recoller sans
+//    ambiguïté : à qui ça appartient, où ça va, quand c'est complet.
+//    N'en retirer AUCUN — chacun supprime une garantie de réassemblage.
+function enTeteMorceau(label, j, m) {
+  return '⟦ ' + label + ' — MORCEAU ' + j + '/' + m + ' : recolle les ' + m + ' morceaux dans l\'ordre avant de lire ⟧\n';
+}
+
+/**
+ * Découpe les segments trop lourds en MORCEAUX livrables.
+ *
+ * ⚠️ RAISON D'ÊTRE (03/08/2026, décision le mainteneur) : **le framework LIVRE, point.**
+ *    Il n'a pas à décréter qu'un contenu est trop gros — ce serait faire porter
+ *    à l'auteur un défaut du transport. Avant, un segment était INDIVISIBLE et
+ *    une doc plus lourde qu'une trame n'arrivait JAMAIS. Ce n'est plus le cas :
+ *    l'indélivrabilité est désormais IMPOSSIBLE PAR CONSTRUCTION.
+ *
+ * ⚠️ CE QUI RENDAIT L'INDIVISIBILITÉ NÉCESSAIRE A DISPARU. La règle disait :
+ *    « une doc amputée a l'air complète, donc elle ment ». C'était vrai AVANT
+ *    les paquets. Maintenant chaque morceau porte `MORCEAU j/m` et voyage dans
+ *    un paquet numéroté `k/N` au marqueur commun : le fragment s'ANNONCE comme
+ *    fragment et le recollage est vérifiable. Plus de mensonge possible.
+ *    ⚠️ NE JAMAIS retirer l'en-tête de morceau — c'est LUI qui fait la
+ *    différence entre « découpé » et « amputé ».
+ *
+ * ⚠️ Découpe par CARACTÈRES (l'unité que le harnais compte), pas par lignes :
+ *    une seule ligne peut à elle seule dépasser une trame.
+ */
+function morceler(segments, capacite) {
+  const morceaux = [];
+  for (const s of segments) {
+    // ── CHEMIN 1 : ça rentre ⇒ on n'y touche pas. Aucun en-tête, aucune boucle.
+    if (s.text.length <= capacite) { morceaux.push(s); continue; }
+
+    // ── CHEMIN 2 : ça ne rentre pas ⇒ on découpe. Il n'y a pas de chemin 3.
+    // ⚠️ La place de l'en-tête est retirée de la capacité (largeur au PIRE cas,
+    //    3 chiffres) : sinon le morceau composé dépasserait la trame et la
+    //    borne serait fausse. `Math.max(1, …)` garantit une progression stricte
+    //    quelle que soit la trame — sans lui, une capacité minuscule ferait une
+    //    boucle infinie ou ferait DISPARAÎTRE le contenu (bug réel, 03/08/2026).
+    const utile = Math.max(1, capacite - enTeteMorceau(s.label, 999, 999).length);
+
+    // Découpe sur FRONTIÈRES DE LIGNES (RFC 2046 § message/partial) : couper au
+    // milieu d'une ligne casse la lisibilité pour rien. Une ligne plus longue
+    // qu'une trame est coupée net — c'est le seul cas où on tranche dans le mot.
+    const tranches = [];
+    let courante = '';
+    for (const ligne of s.text.split('\n')) {
+      let l = ligne;
+      while (l.length > utile) { // ligne monstre : on la débite
+        if (courante) { tranches.push(courante); courante = ''; }
+        tranches.push(l.slice(0, utile));
+        l = l.slice(utile);
+      }
+      const candidate = courante ? courante + '\n' + l : l;
+      if (candidate.length > utile) { tranches.push(courante); courante = l; }
+      else courante = candidate;
+    }
+    if (courante) tranches.push(courante);
+
+    const m = tranches.length;
+    tranches.forEach((t, j) => {
+      morceaux.push({ id: s.id + '#' + (j + 1), label: s.label, text: enTeteMorceau(s.label, j + 1, m) + t });
+    });
+  }
+  return morceaux;
 }
 
 function paquetVide() {
@@ -282,16 +374,11 @@ function planifierPaquets(segments, budget, nbPaquets) {
   // évite qu'il bloque une trame entière en la laissant vide.
   // Overhead calculé au PIRE cas (`n/n`, le plus large en chiffres) : borne
   // sûre, jamais optimiste.
-  // ⚠️ On remplit `reste` DIRECTEMENT (et non une liste intermédiaire copiée
-  //    ensuite) : une copie sans lecteur ultérieur produit un mutant ÉQUIVALENT,
-  //    donc un survivant éternel. Doctrine du repo : éviter par CONSTRUCTION,
-  //    jamais neutraliser après coup.
-  const reste = [];
-  const impossibles = [];
-  for (const s of liste) {
-    if (composerPaquet([s], [], n, n, marqueur).length > max) impossibles.push(s);
-    else reste.push(s);
-  }
+  // ⚠️ IL N'Y A PLUS D'« IMPOSSIBLES » (03/08/2026). Avant, un segment plus
+  //    lourd qu'une trame était mis de côté et seulement ANNONCÉ : il
+  //    n'arrivait JAMAIS. Désormais il est MORCELÉ et livré. Le framework
+  //    LIVRE — il ne juge pas la taille de ce qu'on lui confie.
+  const reste = morceler(liste, capacitePaquet(max, n));
 
   const groupes = [];
   // Paquets 1..N-1 : remplissage glouton, ordre de priorité PRÉSERVÉ (l'ordre
@@ -314,10 +401,10 @@ function planifierPaquets(segments, budget, nbPaquets) {
   //    dépasse : on émet quand même l'annonce (dire « il manque ça » vaut mieux
   //    que le silence — même arbitrage que `planifier`).
   let dernier = [];
-  let differesFinaux = reste.concat(impossibles);
+  let differesFinaux = reste.slice();
   for (let k = reste.length; k >= 1; k--) {
     const essai = reste.slice(0, k);
-    const laisses = reste.slice(k).concat(impossibles);
+    const laisses = reste.slice(k);
     if (composerPaquet(essai, laisses, n, n, marqueur).length <= max) {
       dernier = essai;
       differesFinaux = laisses;
@@ -341,6 +428,28 @@ function planifierPaquets(segments, budget, nbPaquets) {
   });
 }
 
+/**
+ * Capacité de CONTENU d'un paquet — ce qu'un segment peut peser AU MAXIMUM
+ * pour être livrable un jour.
+ *
+ * ⚠️ C'est la SEULE borne physique qui vaille sur la taille d'une doc : au-delà,
+ *    elle ne rentre dans AUCUNE trame et ne sera JAMAIS injectée, quel que soit
+ *    le nombre de paquets (un segment est indivisible). En deçà, la taille
+ *    n'est plus qu'une question de goût — et le goût n'est pas l'affaire du
+ *    framework. Un gate de taille DOIT s'appuyer là-dessus, jamais sur un
+ *    nombre de lignes conventionnel.
+ * ⚠️ DÉRIVÉE de l'en-tête RÉEL (jamais une constante recopiée) : reformuler
+ *    l'en-tête change la capacité, et le gate suit automatiquement.
+ */
+function capacitePaquet(budget, nbPaquets) {
+  // ⚠️ `Math.max(2, …)` et non `… >= 2 ? … : 2` : à nbPaquets = 2 les deux
+  //    branches du ternaire rendent la même chose ⇒ comparateur INTUABLE.
+  //    Même leçon que `parsePaquetArgs` — écrire la forme testable, toujours.
+  const n = Number.isInteger(nbPaquets) ? Math.max(2, nbPaquets) : 2;
+  const m = '0'.repeat(TAILLE_MARQUEUR);
+  return budgetEffectif(budget) - (enTetePaquet(m, n, n).length + pied(m).length);
+}
+
 // Coût FIXE du scellement (en-tête + pied), hors contenu et hors annonce.
 // ⚠️ DÉRIVÉ, jamais une constante recopiée : l'en-tête est du texte qui peut
 //    être reformulé, et une valeur en dur divergerait en silence — le budget
@@ -351,4 +460,4 @@ function tailleEnveloppe() {
   return enTete(m).length + pied(m).length;
 }
 
-module.exports = { planifier, planifierPaquets, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };
+module.exports = { planifier, planifierPaquets, capacitePaquet, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };
