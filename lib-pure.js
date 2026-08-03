@@ -240,7 +240,45 @@ function docCandidatePaths(config, server, toolName, toolInput) {
   return candidates;
 }
 
+/**
+ * Lit `--paquet k` / `--paquets N` dans une ligne de commande.
+ *
+ * ⚠️ PUR et PARTAGÉ par les coquilles : le multi-trames se DÉCLARE en
+ *    configuration (le même script déclaré N fois avec un indice différent),
+ *    jamais en code. Tous les harnais savent faire ça — c'est ce qui garde le
+ *    mécanisme portable. Dupliquer ce parsing dans chaque coquille rouvrirait
+ *    la dérive que le repo combat (et jscpd le dirait).
+ * ⚠️ Valeur absente/absurde ⇒ `{ paquet: 1, nbPaquets: 1 }` = trame unique =
+ *    comportement d'aujourd'hui. Une déclaration mal écrite DÉGRADE, elle ne
+ *    casse jamais l'injection.
+ */
+function parsePaquetArgs(argv) {
+  // ⚠️ Repli IMMÉDIAT sur entrée non-tableau (et non un `: []` de secours) :
+  //    un tableau de secours ne sert qu'à `indexOf`, qui rendrait -1 de toute
+  //    façon ⇒ la branche serait INDISTINGUABLE, donc un mutant équivalent.
+  if (!Array.isArray(argv)) return { paquet: 1, nbPaquets: 1 };
+  const nombre = (nom) => {
+    const i = argv.indexOf(nom);
+    // ⚠️ Drapeau ABSENT ⇒ 1. Sans cette sortie, `argv[i + 1]` lirait `argv[0]`
+    //    (i = -1) : une ligne de commande contenant un nombre nu serait prise
+    //    pour une déclaration de paquets. Bug réel, trouvé par mutation.
+    if (i < 0) return 1;
+    const v = Number(argv[i + 1]);
+    // ⚠️ `Math.max` et NON `v >= 1 ? v : 1` : à v = 1 les deux branches du
+    //    ternaire rendent la même chose, ce qui rend le comparateur INTUABLE
+    //    (mutant équivalent). Le clamp exprime la même règle, testable.
+    return Number.isInteger(v) ? Math.max(1, v) : 1;
+  };
+  const nbPaquets = nombre('--paquets');
+  const paquet = nombre('--paquet');
+  // ⚠️ Un indice hors bornes ne doit JAMAIS émettre le paquet d'un autre :
+  //    on retombe sur la trame unique, jamais sur un contenu faux.
+  if (paquet > nbPaquets) return { paquet: 1, nbPaquets: 1 };
+  return { paquet, nbPaquets };
+}
+
 module.exports = {
+  parsePaquetArgs,
   sanitizeSessionId,
   scopeId,
   serverName,

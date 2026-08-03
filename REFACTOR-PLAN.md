@@ -89,6 +89,65 @@
   webzenon-infra 69 017, mcp-doc-hooks 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
   ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.
 
+## ✅ PAQUETS — CONSTRUIT ET PROUVÉ (03/08/2026) · ⏸️ EN ATTENTE DE GO POUR LA BASCULE
+
+**État : le code est FINI et scellé, le câblage n'est PAS fait** (règle n°1 du skill : la bascule
+exige un GO EXPLICITE, à un moment où aucun agent ne tourne). `master` est intact, les autres
+agents tournent dessus sans rien voir.
+
+**Preuves** : 816 tests verts · **mutation 100,00 % (0 survivant)** · 0 clone jscpd · doctor vert ·
+différentiels (`porte-differential` à l'octet, `mcp-differential`) VERTS ⇒ parité confirmée.
+Cas fondateur prouvé par SPAWN RÉEL : *3 docs trop grosses pour une trame → livrées en 3 paquets,
+zéro éviction*, numéros `k/N` et marqueur commun vérifiés.
+
+**Ce qui a été construit** — aucun fichier nouveau :
+`budget.planifierPaquets` (pur) · `porte-core` (plan mémoïsé par invocation + émission du paquet k)
+· `lib.parsePaquetArgs` (pur) · coquille `doc-inject.js` (dialecte : `tool_use_id` + argv) ·
+`mcp-doc-reset` purge le 4ᵉ store (`plan-`).
+
+**3 défauts RÉELS trouvés par les gates, pas par relecture** (à ne pas réintroduire) :
+1. **Découpage sans mémoïsation** — la porte fragmentait même sans identifiant d'invocation ⇒ les N
+   paquets décidaient séparément ⇒ docs `once` consommées par le premier, trames suivantes VIDES.
+   Corrigé : `fragmente` exige les DEUX (déclaration ET identifiant), sinon trame unique intégrale.
+2. **`argv[i + 1]` avec i = -1** (drapeau absent) lisait `argv[0]` ⇒ un nombre nu dans la ligne de
+   commande passait pour une déclaration de paquets. Trouvé par MUTATION.
+3. **Budget sous l'annonce nue** (property-test) : on émet quand même l'annonce — dire vaut mieux
+   que se taire, même arbitrage que `planifier`.
+
+**⚠️ 3 mutants ÉQUIVALENTS éliminés PAR CONSTRUCTION** (jamais un `// Stryker disable`) : cascade du
+budget dupliquée → `budgetEffectif()` SOURCE UNIQUE · `utiles.slice()` sans lecteur → on remplit
+`reste` directement · `k >= 0` dont le cas 0 recalculait l'initialisation → boucle jusqu'à 1.
+Et deux formes réécrites pour être TESTABLES : `nbPaquets >= 2` (et non `> 1`), `Math.max(1, v)`
+(et non `v >= 1 ? v : 1`) — à `1`, les deux branches coïncidaient donc le comparateur était intuable.
+
+### 📏 DIMENSIONNEMENT DE N — mesuré sur le corpus réel (03/08/2026)
+375 docs injectables · **médiane 1 548 caractères** · capacité utile par paquet = 8 000 − 339 = **7 661**.
+⇒ **N = 3 retenu** (capacité ~23 Ko par geste, soit ~15 docs médianes). CLIQUET : raisable en
+configuration seule, jamais baissé. ⚠️ Le coût est RÉEL — N processus spawnés à CHAQUE appel
+d'outil, sur un poste déjà sujet à la saturation (875 zombies le 15/07, 502 le 27/07). Ne PAS
+gonfler N « au cas où » : chaque unité se paie à chaque geste, pour un bénéfice rare.
+
+### 🛑 CE QUE LES PAQUETS NE RÉSOLVENT **PAS** — à ne pas se raconter d'histoire
+**Un segment est INDIVISIBLE. Une doc plus grosse qu'UN paquet ne sera JAMAIS livrée, quel que soit N.**
+Mesuré : **7 docs sur 375 dépassent 7 661 caractères** (`netium-social-reference.md` 18 131,
+`agent-social-testing-reference.md` 12 530, `agent-social-video-hf-reference.md` 11 206,
+`infra-mcp-handlers-tests.md` 10 731, `memory-hooks.md` 9 049…), et **TOUS les skills** le dépassent
+largement (agent-social 83 160, webzenon-infra 77 670, mcp-doc-hooks 28 402).
+⇒ Les paquets règlent le cas « PLUSIEURS docs qui, ensemble, débordent » — c'est-à-dire l'éviction
+constatée le 03/08 (`stryker-runner-choice.md` poussée dehors par ses voisines). Ils ne règlent PAS
+le cas « UNE doc trop grosse ». Celui-là n'a qu'une réponse : **le déclencheur au niveau du SEGMENT**
+(une doc devient un ensemble de sections portant chacune son `match`/`scope`/`exclude`) — chantier
+TOUJOURS OUVERT, cf. « INJECTION INTÉGRALE » ci-dessous.
+
+### Reste à faire AVANT de déclarer le chantier fini
+1. **GO du mainteneur** puis câblage `settings.json` (3 déclarations `--paquet k --paquets 3`).
+2. **Doc injectable + miroir `docs/framework/`** — à poser DANS LE MÊME GESTE que la bascule
+   (les écrire avant décrirait un moteur qui n'est pas en prod, et `parc-sync-gate` rougirait
+   à raison — même règle qu'au 31/07).
+3. **Codex** : `additionalContextLimit: 0` (documenté, débrayable) ⇒ aucune fragmentation nécessaire
+   là-bas. Codex n'expose pas d'identifiant d'invocation documenté ⇒ il reste en trame unique,
+   dégradation EXPLICITE, jamais silencieuse.
+
 ## 📐 CONCEPTION ARRÊTÉE — PAQUETS (03/08/2026, branche `chantier-paquets`)
 
 **Faits DOC OFFICIELLE, relevés le 03/08/2026 — ne PAS les re-chercher, les corriger sur place si un jour ils changent :**

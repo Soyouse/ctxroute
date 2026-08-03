@@ -45,11 +45,13 @@ deadline.arm();
 readStdinJson(
   (data) => {
     try {
-      // ⚠️ TROIS stores à vider : 'doc-seen-' (porte unifiée, dédup par DOC)
+      // ⚠️ QUATRE stores à vider : 'doc-seen-' (porte unifiée, dédup par DOC)
       //    + 'mcp-doc-seen-' (legacy mcp-doc-inject.js, gardé le temps du
       //    rollback) + 'turn-count-' (compteur de tours, driftUnit 18/07/2026 —
       //    la compaction ouvre un nouveau contexte : les tours repartent de 0
-      //    comme les compteurs d'outils). Oublier l'un = docs jamais
+      //    comme les compteurs d'outils) + 'plan-' (plan mémoïsé par invocation
+      //    du transport multi-trames, 03/08/2026 — clé PRÉFIXÉE par la session
+      //    précisément pour être balayée ici). Oublier l'un = docs jamais
       //    réinjectées après compaction, en silence.
       // ⚠️ SCOPE PAR AGENT (19/07/2026) : les stores sont keyés par
       //    lib.scopeId(session_id, agent_id) — `<session>` (maître) et
@@ -58,8 +60,11 @@ readStdinJson(
       //    purge par PRÉFIXE session : le maître ET tous ses sous-agents
       //    (pire cas fail-open = une réinjection, jamais un état gelé).
       const scoped = lib.scopeId(data.session_id, data.agent_id);
-      for (const prefix of ['doc-seen-', 'mcp-doc-seen-', 'turn-count-']) {
-        if (data.agent_id) {
+      for (const prefix of ['doc-seen-', 'mcp-doc-seen-', 'turn-count-', 'plan-']) {
+        // ⚠️ 'plan-' se balaie TOUJOURS par préfixe : sa clé porte un suffixe
+        //    d'invocation (`--inv-…`), donc la suppression ciblée d'un chemin
+        //    exact ne le trouverait jamais.
+        if (data.agent_id && prefix !== 'plan-') {
           fs.rmSync(path.join(paths.stateDir(), `${prefix}${scoped}.json`), { force: true });
         } else {
           for (const f of fs.readdirSync(paths.stateDir())) {

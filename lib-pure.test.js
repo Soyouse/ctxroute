@@ -243,3 +243,52 @@ ok('docCandidatePaths: serveur sûr → candidat serveur présent', () => lib.do
 //    deviendrait actif. Contrat : filterList invalide + whitelist = AUCUN serveur
 //    actif, quel que soit son nom — y compris celui que Stryker fabrique.
 ok('isServerActive: whitelist + filterList invalide → inactif même pour "Stryker was here"', () => lib.isServerActive({ filterMode: 'whitelist', filterList: 'pas-un-tableau' }, 'Stryker was here') === false);
+
+// ═══════════════════════════════════════════════════════════════════════
+// parsePaquetArgs — déclaration du transport multi-trames (config, pas code)
+// ═══════════════════════════════════════════════════════════════════════
+
+test('parsePaquetArgs : lit --paquet / --paquets', () => {
+  assert.deepStrictEqual(lib.parsePaquetArgs(['node', 'h.js', '--paquet', '2', '--paquets', '4']), { paquet: 2, nbPaquets: 4 });
+  assert.deepStrictEqual(lib.parsePaquetArgs(['node', 'h.js', '--paquets', '3', '--paquet', '3']), { paquet: 3, nbPaquets: 3 });
+});
+
+test('parsePaquetArgs : rien de déclaré → trame unique (comportement d\'aujourd\'hui)', () => {
+  assert.deepStrictEqual(lib.parsePaquetArgs(['node', 'h.js']), { paquet: 1, nbPaquets: 1 });
+  assert.deepStrictEqual(lib.parsePaquetArgs([]), { paquet: 1, nbPaquets: 1 });
+});
+
+test('parsePaquetArgs : entrée absurde → trame unique, JAMAIS un throw', () => {
+  // ⚠️ Une déclaration mal écrite DÉGRADE, elle ne casse jamais l'injection.
+  for (const mauvais of [undefined, null, 'texte', 42, {}]) {
+    assert.deepStrictEqual(lib.parsePaquetArgs(mauvais), { paquet: 1, nbPaquets: 1 });
+  }
+  for (const v of ['0', '-2', '2.5', 'x', '', undefined]) {
+    assert.deepStrictEqual(lib.parsePaquetArgs(['--paquet', v, '--paquets', v]), { paquet: 1, nbPaquets: 1 });
+  }
+});
+
+test('parsePaquetArgs : valeur manquante après le drapeau → trame unique', () => {
+  assert.deepStrictEqual(lib.parsePaquetArgs(['node', 'h.js', '--paquets']), { paquet: 1, nbPaquets: 1 });
+});
+
+test('parsePaquetArgs : un NOMBRE NU dans la ligne de commande n\'est PAS une déclaration', () => {
+  // ⚠️ Trouvé par mutation le 03/08/2026 : sans la sortie « drapeau absent »,
+  //    `argv[i + 1]` avec i = -1 lit `argv[0]` — un argument numérique
+  //    quelconque serait alors pris pour un nombre de paquets, et la porte
+  //    découperait une injection que personne n'a demandé de fragmenter.
+  assert.deepStrictEqual(lib.parsePaquetArgs(['3', '5']), { paquet: 1, nbPaquets: 1 });
+  assert.deepStrictEqual(lib.parsePaquetArgs(['2']), { paquet: 1, nbPaquets: 1 });
+});
+
+test('parsePaquetArgs : valeur PLANCHER — 0 et négatifs sont ramenés à 1, jamais en dessous', () => {
+  assert.deepStrictEqual(lib.parsePaquetArgs(['--paquets', '0']), { paquet: 1, nbPaquets: 1 });
+  assert.deepStrictEqual(lib.parsePaquetArgs(['--paquets', '-7']), { paquet: 1, nbPaquets: 1 });
+  assert.deepStrictEqual(lib.parsePaquetArgs(['--paquet', '2', '--paquets', '6']), { paquet: 2, nbPaquets: 6 });
+});
+
+test('parsePaquetArgs : indice HORS BORNES → repli sûr, jamais le paquet d\'un autre', () => {
+  // ⚠️ Émettre le paquet 1 quand on demande le 9e sur 3 mentirait sur le contenu.
+  assert.deepStrictEqual(lib.parsePaquetArgs(['--paquet', '9', '--paquets', '3']), { paquet: 1, nbPaquets: 1 });
+  assert.deepStrictEqual(lib.parsePaquetArgs(['--paquet', '4', '--paquets', '4']), { paquet: 4, nbPaquets: 4 });
+});

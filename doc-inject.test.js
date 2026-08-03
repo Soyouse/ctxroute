@@ -22,9 +22,9 @@ function writeDoc(rel, text) {
   fs.writeFileSync(full, text);
 }
 
-function run(payload, { raw, env } = {}) {
+function run(payload, { raw, env, args = [] } = {}) {
   return new Promise((resolve) => {
-    const child = execFile(process.execPath, [HOOK], {
+    const child = execFile(process.execPath, [HOOK, ...args], {
       encoding: 'utf8',
       env: {
         ...process.env,
@@ -304,4 +304,90 @@ test('SOUS-AGENT : PreCompact maître purge le store du maître ET ceux des sous
   assert.strictEqual(await reset({ hook_event_name: 'PreCompact', session_id: 'sreset' }), 0);
   assert.ok(parseOut((await run(base)).stdout).hookSpecificOutput.additionalContext.includes('CONTENU_ONCE'));
   assert.ok(parseOut((await run(sub)).stdout).hookSpecificOutput.additionalContext.includes('CONTENU_ONCE'));
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// TRANSPORT MULTI-TRAMES (paquets) — spawn RÉEL, comme en production.
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ Ces cas rejouent la configuration de prod : le MÊME script déclaré N fois
+//    avec `--paquet k --paquets N`. Claude Code déduplique par commande + args
+//    (doc officielle 03/08/2026) ⇒ des indices différents ne sont PAS fusionnés.
+
+function troisDocs() {
+  writeDoc('un.md', '---\nmatch: cible.js\nmode: dumb\n---\n' + 'A'.repeat(400) + '\n');
+  writeDoc('deux.md', '---\nmatch: cible.js\nmode: dumb\n---\n' + 'B'.repeat(400) + '\n');
+  writeDoc('trois.md', '---\nmatch: cible.js\nmode: dumb\n---\n' + 'C'.repeat(400) + '\n');
+  fs.writeFileSync(CONFIG, JSON.stringify({ budgetInjection: 1000 }));
+}
+const geste = (extra) => ({
+  tool_name: 'Read',
+  tool_input: { file_path: 'C:/proj/cible.js' },
+  session_id: 'sP',
+  tool_use_id: 'toolu_01PAQUET',
+  ...extra,
+});
+
+test('PAQUETS : 3 docs trop grosses pour une trame → livrées en 3 paquets, RIEN d\'évincé', async () => {
+  troisDocs();
+  const sorties = [];
+  for (let k = 1; k <= 3; k++) {
+    const { code, stdout } = await run(geste(), { args: ['--paquet', String(k), '--paquets', '3'] });
+    assert.strictEqual(code, 0);
+    sorties.push(parseOut(stdout).hookSpecificOutput.additionalContext);
+  }
+  // Chaque doc arrive une fois et une seule — l'invariant de conservation, vu de bout en bout.
+  for (const [lettre, nom] of [['A', 'un'], ['B', 'deux'], ['C', 'trois']]) {
+    const porteuses = sorties.filter((s) => s.includes(lettre.repeat(400)));
+    assert.strictEqual(porteuses.length, 1, 'doc ' + nom + ' livrée exactement une fois');
+  }
+  // ⚠️ Zéro annonce d'éviction : c'est TOUT le point du chantier.
+  for (const s of sorties) assert.ok(!s.includes('NON injectée'), 'aucune éviction résiduelle');
+  // Numéros de séquence + marqueur COMMUN (recollage vérifiable malgré le parallélisme).
+  sorties.forEach((s, i) => assert.ok(s.includes('PAQUET ' + (i + 1) + '/3'), 'paquet ' + (i + 1) + ' numéroté'));
+  const marqueurs = sorties.map((s) => /###FIN:([0-9a-f]{8})###/.exec(s)[1]);
+  assert.strictEqual(new Set(marqueurs).size, 1, 'un seul marqueur pour toute l’émission');
+});
+
+test('PAQUETS : une doc `once` N\'EST PAS consommée par le premier paquet', async () => {
+  // ⚠️ LE défaut que la mémoïsation par invocation existe pour empêcher : sans
+  //    elle, le paquet 1 marque la doc « vue » et les paquets 2..N, décidant à
+  //    nouveau, ne trouvent plus RIEN à injecter — trames vides, doc perdue.
+  writeDoc('un.md', '---\nmatch: cible.js\nmode: once\n---\n' + 'A'.repeat(400) + '\n');
+  writeDoc('deux.md', '---\nmatch: cible.js\nmode: once\n---\n' + 'B'.repeat(400) + '\n');
+  fs.writeFileSync(CONFIG, JSON.stringify({ budgetInjection: 1000 }));
+  const p1 = parseOut((await run(geste(), { args: ['--paquet', '1', '--paquets', '2'] })).stdout);
+  const p2 = parseOut((await run(geste(), { args: ['--paquet', '2', '--paquets', '2'] })).stdout);
+  assert.ok(p1 && p2, 'les DEUX paquets portent du contenu');
+  const tout = p1.hookSpecificOutput.additionalContext + p2.hookSpecificOutput.additionalContext;
+  assert.ok(tout.includes('A'.repeat(400)) && tout.includes('B'.repeat(400)), 'les 2 docs `once` sont livrées');
+});
+
+test('PAQUETS : sans identifiant d\'invocation → trame UNIQUE (dégradation, jamais casse)', async () => {
+  // Un harnais qui n'expose pas d'identifiant d'invocation retombe sur le
+  // comportement d'aujourd'hui : une trame, et l'éviction est ANNONCÉE.
+  troisDocs();
+  const { code, stdout } = await run(
+    { tool_name: 'Read', tool_input: { file_path: 'C:/proj/cible.js' }, session_id: 'sQ' },
+    { args: ['--paquet', '1', '--paquets', '3'] }
+  );
+  assert.strictEqual(code, 0);
+  const ctx = parseOut(stdout).hookSpecificOutput.additionalContext;
+  assert.ok(!ctx.includes('PAQUET '), 'aucun en-tête de paquet');
+  assert.ok(ctx.includes('NON injectée'), 'éviction annoncée, comme avant le chantier');
+});
+
+test('PAQUETS : un paquet sans contenu sort en SILENCE (exit 0, stdout vide)', async () => {
+  // Une seule petite doc, 4 paquets déclarés : les 3 derniers n'ont rien à dire.
+  writeDoc('un.md', '---\nmatch: cible.js\nmode: dumb\n---\npetit\n');
+  const { code, stdout } = await run(geste(), { args: ['--paquet', '4', '--paquets', '4'] });
+  assert.strictEqual(code, 0);
+  assert.strictEqual(stdout.trim(), '', 'aucune enveloppe vide émise');
+});
+
+test('PAQUETS : indice hors bornes → trame unique, JAMAIS le contenu d\'un autre paquet', async () => {
+  troisDocs();
+  const { stdout } = await run(geste(), { args: ['--paquet', '9', '--paquets', '3'] });
+  const ctx = parseOut(stdout).hookSpecificOutput.additionalContext;
+  assert.ok(!ctx.includes('PAQUET '), 'déclaration incohérente ⇒ repli sûr sur la trame unique');
 });

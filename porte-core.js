@@ -42,6 +42,14 @@ const store = require('./session-store');
 
 // State par session, préfixe 'doc-seen-' (dédup par DOC) — cf session-store.js.
 const STORE_PREFIX = 'doc-seen-';
+// ⚠️ PLAN MÉMOÏSÉ PAR INVOCATION (03/08/2026) — préfixe DISTINCT obligatoire.
+//    Sans lui, le mode multi-paquets serait FAUX : les N processus appellent
+//    chacun `gate.decide`, qui ÉCRIT l'état. Le premier consomme les docs
+//    `once` ⇒ les suivants décident « rien à injecter » ⇒ paquets 2..N VIDES.
+//    Ici, le premier arrivé décide et range sa décision ; les autres la
+//    RELISENT. Le découpage, lui, est pur et déterministe : chacun le
+//    recalcule et n'émet que son indice. Purgé par mcp-doc-reset.js.
+const PLAN_PREFIX = 'plan-';
 // Compteur de TOURS (porte turn-count.js, UserPromptSubmit) — préfixe distinct.
 const TURN_PREFIX = 'turn-count-';
 
@@ -122,13 +130,43 @@ function run(data, emit, options) {
       }));
     const budgetMax = budgetPour(config, options);
 
+    // ── TRANSPORT MULTI-TRAMES (fourni par la COQUILLE, jamais lu ici) ──
+    // ⚠️ CONTRAT D'EXTENSION §7 : le noyau ne lit AUCUN champ de harnais.
+    //    `invocationId` (Claude Code : `tool_use_id`) est passé par la coquille
+    //    comme le budget. Un harnais qui n'en a pas ⇒ `fragmente` faux ⇒
+    //    UNE trame, comportement d'aujourd'hui à l'octet. Dégradation, pas casse.
+    const nbDeclare = options && Number.isInteger(options.nbPaquets) && options.nbPaquets >= 2 ? options.nbPaquets : 1;
+    const invocationId = options && typeof options.invocationId === 'string' ? options.invocationId : '';
+    // ⚠️ La fragmentation exige les DEUX : une déclaration multi-trames ET un
+    //    identifiant d'invocation pour partager la décision. Il en manque un ⇒
+    //    on retombe INTÉGRALEMENT sur la trame unique — découpage compris.
+    //    Découper sans mémoïser produirait des paquets décidés séparément :
+    //    docs `once` consommées par le premier, trames suivantes vides.
+    const fragmente = nbDeclare >= 2 && invocationId !== '';
+    const nbPaquets = fragmente ? nbDeclare : 1;
+    const indice = fragmente && Number.isInteger(options.paquet) && options.paquet >= 1 ? options.paquet : 1;
+
     // Section critique sous lock (état par session, dédup par doc). Un corpus
     // 100% dumb ne produit aucune écriture (changed=false) — parité perf.
     const lockDir = path.join(paths.stateDir(), `.lock-doc-${lib.sanitizeSessionId(sessionId)}`);
+    const decouper = (inject) => budget.planifierPaquets(segmentsPour(inject), budgetMax, nbPaquets);
     let res = withLock(lockDir, () => {
+      // ⚠️ RELECTURE DU PLAN — le cœur du multi-paquets. Les N processus sont
+      //    PARALLÈLES et ne peuvent pas se parler : un seul décide (et écrit
+      //    l'état), tous recalculent le MÊME découpage par déterminisme pur.
+      //    N'importe lequel peut être le premier — c'est sans importance.
+      // ⚠️ Clé PRÉFIXÉE PAR LA SESSION (et non l'invocation seule) : c'est ce
+      //    qui rend le plan purgeable par `mcp-doc-reset.js`, qui balaie par
+      //    préfixe de session. Une clé orpheline ne serait nettoyée que par le
+      //    GC de TTL — un déchet silencieux, exactement ce qu'on refuse.
+      const clePlan = sessionId + '--inv-' + invocationId;
+      const cache = fragmente ? store.loadState(PLAN_PREFIX, clePlan) : {};
+      if (Array.isArray(cache.inject)) {
+        return { r: { inject: cache.inject, decision: cache.decision }, paquets: decouper(cache.inject) };
+      }
       const state = store.loadState(STORE_PREFIX, sessionId);
       const r = gate.decide(config, decls, matched, toolName, state, turnCount);
-      const plan = budget.planifier(segmentsPour(r.inject), budgetMax);
+      const paquets = decouper(r.inject);
       // ⚠️ UNE DOC DIFFÉRÉE NE DOIT JAMAIS ÊTRE MARQUÉE « VUE ».
       //    `gate.decide` écrit `{seen:true, sinceLastCall:0}` pour TOUT ce qu'il
       //    décide d'injecter — il ignore (et doit ignorer) le budget, qui est
@@ -137,22 +175,31 @@ function run(data, emit, options) {
       //    sans jamais avoir été livrée : PERDUE POUR TOUTE LA SESSION, en
       //    silence. C'est très exactement le défaut que ce chantier corrige —
       //    le réintroduire ici serait le comble. NE PAS SUPPRIMER.
-      for (const d of plan.differes) {
+      //    ⚠️ Les différés vivent dans le DERNIER paquet (c'est lui qui porte
+      //    l'annonce) — en trame unique, c'est le seul, donc parité exacte.
+      for (const d of paquets[paquets.length - 1].differes) {
         if (Object.prototype.hasOwnProperty.call(state, d.id)) r.state[d.id] = state[d.id];
         else delete r.state[d.id];
       }
       if (r.changed) store.saveState(STORE_PREFIX, sessionId, r.state);
-      return { r, plan };
+      if (fragmente) store.saveState(PLAN_PREFIX, clePlan, { inject: r.inject, decision: r.decision });
+      return { r, paquets };
     }, { fallback: null });
     // Lock indisponible → décider SANS état (jamais se taire, cf en-tête).
     if (!res) {
       const r = gate.decide(config, decls, matched, toolName, {}, turnCount);
-      res = { r, plan: budget.planifier(segmentsPour(r.inject), budgetMax) };
+      res = { r, paquets: decouper(r.inject) };
     }
 
     if (res.r.inject.length === 0) process.exit(0);
 
-    const fullDoc = res.plan.texte;
+    // ⚠️ Un paquet VIDE sort en SILENCE (exit 0) : il n'a ni contenu ni annonce.
+    //    En trame unique ce cas est impossible dès que `inject` est non vide —
+    //    la parité est donc intacte.
+    const plan = res.paquets[indice - 1];
+    if (!plan || plan.texte === '') process.exit(0);
+
+    const fullDoc = plan.texte;
 
     // systemMessage : chaque source compose LE SIEN sur SES docs injectées
     // (contrat message()), joints ' · ' — avant la fusion, deux hooks
@@ -162,7 +209,9 @@ function run(data, emit, options) {
       // ⚠️ `plan.emis`, PAS `r.inject` : le marqueur (« 🧩 skill: … ») annonce ce
       //    qui est RÉELLEMENT dans le contexte. Annoncer une doc différée
       //    ferait croire à l'agent qu'il l'a reçue — le « vert qui ment ».
-      const injected = res.plan.emis.filter((d) => acc.owner[d] === a.id);
+      //    ⚠️ En multi-paquets, c'est le contenu de CE paquet — chaque trame
+      //    annonce ce qu'ELLE porte, jamais ce que les autres transportent.
+      const injected = plan.emis.filter((d) => acc.owner[d] === a.id);
       if (injected.length === 0) continue;
       const m = a.message(injected, { fullDoc, config, acc });
       if (m) msgs.push(m);

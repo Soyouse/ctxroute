@@ -40,6 +40,7 @@ require('./deadline').arm();
 //    cette coquille ne garde que le dialecte Claude Code — stdin + emit.
 //    Toute évolution d'orchestration se fait DANS porte-core.js, jamais ici.
 const { run } = require('./porte-core');
+const { parsePaquetArgs } = require('./lib-pure');
 const { readStdinJson } = require('./stdin-json');
 
 // Sortie hook — FORMAT protect-files À L'IDENTIQUE (parité de bascule).
@@ -70,7 +71,21 @@ function emit(decision, fullDoc, systemMessage) {
   process.exit(0);
 }
 
+// ⚠️ DIALECTE CLAUDE CODE — c'est ICI, et NULLE PART ailleurs, que le noyau
+//    apprend qu'un transport multi-trames est possible (CONTRAT D'EXTENSION §7 :
+//    le moteur ne lit JAMAIS un champ de harnais).
+//    · `tool_use_id` = identifiant d'invocation, présent sur PreToolUse (doc
+//      officielle, vérifiée le 03/08/2026). Il permet aux N processus PARALLÈLES
+//      de partager UNE décision : sans lui, chacun consommerait les docs `once`
+//      et les paquets 2..N seraient vides.
+//    · `--paquet k --paquets N` viennent de settings.json (le MÊME script
+//      déclaré N fois — Claude Code déduplique par commande + args, donc des
+//      indices différents ne sont PAS fusionnés : doc officielle 03/08/2026).
+//    · Rien de déclaré ⇒ trame unique ⇒ comportement d'aujourd'hui à l'octet.
 readStdinJson(
-  (data) => run(data, emit),
+  (data) => run(data, emit, {
+    ...parsePaquetArgs(process.argv),
+    invocationId: typeof data.tool_use_id === 'string' ? data.tool_use_id : '',
+  }),
   () => process.exit(0)
 );
