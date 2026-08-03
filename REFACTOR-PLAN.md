@@ -727,3 +727,15 @@ Piste : un **drift-test doc↔code** (une doc qui cite un littéral de code — 
 `ONSTART`, un nom de fonction — doit pouvoir prouver que ce littéral EXISTE encore dans le fichier
 qu'elle documente). ⚠️ Ne couvre que les affirmations CITABLES, jamais la prose — mais c'est déjà
 ce qui a menti trois fois sur trois.
+
+**CHIFFRES DE ① (mesurés 03/08/2026) — la cause n'est PAS « un peu juste » :**
+budget `DEFAUT_BUDGET` = **8000**. En face : skill `agent-social` **83 160** · `webzenon-infra`
+**77 670** · `mcp-doc-hooks` **28 402** · doc `pw-mcp-tests.md` **6 808** (85 % du budget à elle
+seule).
+🛑 **Un skill fait 3,5 à 10× le budget ENTIER : il ne peut JAMAIS être livré**, et comme les
+segments non livrés sont réessayés indéfiniment, il est **annoncé à chaque tour, pour toujours**.
+C'est le pire des deux mondes : jamais délivré ET bruit permanent. Même symptôme que le skill
+`pw-mcp-proxy` (23 Ko), sorti du périmètre le 03/08 pour cette raison exacte.
+⇒ Deux problèmes DISTINCTS, à ne pas confondre : (a) les skills sont hors-jeu par conception —
+soit on les découpe en sections déclenchables, soit on cesse de prétendre les injecter ; (b) des
+docs dépassent le format « <10 lignes » du parc et mangent le budget des voisines.
