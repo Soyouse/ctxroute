@@ -24,6 +24,20 @@
       }
     },
     {
+      "name": "canari-must-stay-pure",
+      "comment": "⚠️ canari.js NE DOIT JAMAIS importer fs/path/child_process. Il TRANCHE (vivant/mort/indecidable), il ne mesure pas : la mesure vit dans canari-check.js. Melanger les deux rendrait le verdict intestable et le mutant equivalent — or ce module est le SEUL temoin de la mort du canal.",
+      "severity": "error",
+      "from": {
+        "path": "^canari\\.js$"
+      },
+      "to": {
+        "path": "^(fs|path|child_process)$",
+        "dependencyTypes": [
+          "core"
+        ]
+      }
+    },
+    {
       "name": "lock-stays-io-only",
       "comment": "lock.js est un module I/O (fs.mkdirSync) — ne doit dépendre d'aucune logique métier (lib-pure.js), pour rester réutilisable indépendamment.",
       "severity": "error",
@@ -200,7 +214,7 @@
       "severity": "error",
       "comment": "⚠️ explain.js est un outil de DIAGNOSTIC (fail-LOUD, lecture seule, hors chemin critique). Aucune porte/garde ne doit l'importer : un hook est spawné à CHAQUE appel d'outil de CHAQUE agent, et un outil qui hurle n'a rien à faire dans un chemin fail-open. Le sens inverse est la règle : explain consomme collect-core, jamais l'inverse.",
       "from": {
-        "path": "^(doc-inject|porte-core|guard-core|doc-write-guard|session-inject|turn-count|mcp-doc-reset|mcp-doc-inject|codex-doc-inject|codex-doc-write-guard)\\.js$"
+        "path": "^(doc-inject|porte-core|guard-core|doc-write-guard|session-inject|turn-count|mcp-doc-reset|mcp-doc-inject|codex-doc-inject|canari|canari-check)\\.js$"
       },
       "to": {
         "path": "^explain\\.js$"
@@ -236,7 +250,7 @@
     "doNotFollow": {
       "path": "node_modules"
     },
-    "includeOnly": "^(mcp-doc-inject|mcp-doc-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure|explain|collect-core|budget|porte-core|guard-core|codex-doc-inject|codex-doc-write-guard)\\.js$",
+    "includeOnly": "(^(mcp-doc-inject|mcp-doc-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure|explain|collect-core|budget|porte-core|guard-core|codex-doc-inject|codex-doc-write-guard|canari|canari-check)\\.js$|^(fs|path|child_process|os|crypto)$)",
     "tsPreCompilationDeps": false
   }
 }

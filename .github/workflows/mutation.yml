@@ -26,6 +26,7 @@ on:
     paths:
       # ── modules mutés (miroir de stryker.conf.json `mutate`) ──
       - 'lib-pure.js'
+      - 'canari.js'
       - 'sources/file.js'
       - 'sources/tool.js'
       - 'sources/mcp.js'
@@ -41,6 +42,7 @@ on:
       - 'budget.js'
       # ── suites déterministes couvrant les modules mutés (runner vitest perTest) ──
       - 'lib-pure.test.js'
+      - 'canari.test.js'
       - 'sources-file.test.js'
       - 'sources-tool.test.js'
       - 'sources-mcp.test.js'
