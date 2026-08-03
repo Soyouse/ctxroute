@@ -291,6 +291,127 @@ test('ORDRE DE PRIORITÉ conservé : le mieux classé est dans le premier paquet
   assert.strictEqual(p[0].emis[0], 'd0');
 });
 
+// ── Fixtures de PAQUETS, calibrées au caractère (mesurées 03/08/2026) ──
+// Enveloppe d'un paquet (en-tête k/n à 1 chiffre + pied) = 339 · SEPARATEUR = 7.
+// ⚠️ Ces nombres sont ÉCRITS EN DUR, jamais dérivés du module à l'exécution :
+//    un attendu calculé par le code muté mute AVEC lui et ne prouve rien.
+const trois400 = () => [seg('a', 400), seg('b', 400), seg('c', 400)];
+const quatre400 = () => [seg('a', 400), seg('b', 400), seg('c', 400), seg('d', 400)];
+
+test('EN-TÊTE de paquet : texte EXACT, ancré au caractère', () => {
+  // ⚠️ Ancre les libellés : sans ça, un mutant qui vide une ligne de l'en-tête
+  //    survit — et l'agent perdrait la consigne de recollage sans que rien ne
+  //    rougisse. Le numéro de séquence est la garantie anti-perte silencieuse.
+  const p = planifierPaquets(trois400(), 739, 3);
+  const m = p[0].marqueur;
+  const attendu =
+    '⚠️ INJECTION SCELLÉE — PAQUET 1/3, fin marquée ###FIN:' + m + '###\n' +
+    '   Les 3 paquets portent le MÊME marqueur et arrivent DANS LE DÉSORDRE : recolle-les par leur numéro.\n' +
+    '   Un numéro qui manque, ou un marqueur absent = contenu tronqué par le harnais :\n' +
+    '   lis alors toi-même les fichiers cités ci-dessous. Ne devine pas.\n\n';
+  assert.strictEqual(p[0].texte, attendu + 'x'.repeat(400) + '\n\n###FIN:' + m + '###');
+  assert.strictEqual(p[0].texte.length, 739);
+});
+
+test('RÉPARTITION EXACTE : un budget donné produit UN découpage précis', () => {
+  // Trois cas mesurés — ils ancrent les bornes des DEUX boucles de remplissage.
+  assert.deepStrictEqual(planifierPaquets(trois400(), 739, 3).map((p) => p.emis), [['a'], ['b'], ['c']]);
+  assert.deepStrictEqual(planifierPaquets(trois400(), 1200, 3).map((p) => p.emis), [['a', 'b'], ['c'], []]);
+  assert.deepStrictEqual(planifierPaquets(quatre400(), 1146, 2).map((p) => p.emis), [['a', 'b'], ['c', 'd']]);
+});
+
+test('FRONTIÈRE du pré-filtre : à la taille EXACTE ça passe, un caractère de moins ça sort', () => {
+  // 339 (enveloppe) + 400 (segment) = 739. À 739 le segment tient ; à 738, non.
+  // ⚠️ Un segment qui ne rentre dans AUCUN paquet est annoncé d'emblée — il ne
+  //    doit JAMAIS stériliser une trame en la laissant vide.
+  assert.deepStrictEqual(planifierPaquets(trois400(), 739, 3).map((p) => p.emis), [['a'], ['b'], ['c']]);
+  const serre = planifierPaquets(trois400(), 738, 3);
+  assert.deepStrictEqual(serre.map((p) => p.emis), [[], [], []]);
+  assert.deepStrictEqual(serre[2].differes.map((d) => d.id), ['a', 'b', 'c']); // rien perdu
+});
+
+test('FRONTIÈRE du remplissage : un paquet PLEIN À RAS BORD est valide', () => {
+  // 339 + 400 + 7 (séparateur) + 400 = 1146. À 1146 les deux tiennent.
+  const pile = planifierPaquets(quatre400(), 1146, 2);
+  assert.deepStrictEqual(pile.map((p) => p.emis), [['a', 'b'], ['c', 'd']]);
+  assert.deepStrictEqual(pile.map((p) => p.texte.length), [1146, 1146]);
+  // Un caractère de moins : le 2e segment ne tient plus, le reste est annoncé.
+  const serre = planifierPaquets(quatre400(), 1145, 2);
+  assert.deepStrictEqual(serre.map((p) => p.emis), [['a'], ['b']]);
+  assert.deepStrictEqual(serre[1].differes.map((d) => d.id), ['c', 'd']);
+});
+
+test('DERNIER paquet : il retient un SOUS-ENSEMBLE strict et annonce le reste', () => {
+  // ⚠️ Cas qui prouve que le dernier paquet ne prend pas « tout ou rien » :
+  //    3 candidats restants, 1 seul retenu, 2 annoncés dans la MÊME trame.
+  const p = planifierPaquets(quatre400(), 1145, 2);
+  assert.deepStrictEqual(p[1].emis, ['b']);
+  assert.deepStrictEqual(p[1].differes.map((d) => d.id), ['c', 'd']);
+  assert.strictEqual(p[1].texte.length, 891);
+});
+
+test('BUDGET SOUS L\'ANNONCE NUE : on annonce quand même, on ne se tait JAMAIS', () => {
+  // ⚠️ Même arbitrage que `planifier` : dire « ces docs manquent, va les lire »
+  //    vaut mieux que le silence. Le dépassement est assumé, l'annonce est
+  //    minuscule. Cas TROUVÉ par le property-test le 03/08/2026.
+  const p = planifierPaquets(trois400(), 360, 3);
+  assert.deepStrictEqual(p.map((x) => x.emis), [[], [], []]);
+  assert.deepStrictEqual(p[2].differes.map((d) => d.id), ['a', 'b', 'c']);
+  assert.ok(p[2].texte.includes('3 doc(s) NON injectée(s)'));
+  assert.ok(!p[2].texte.includes('xxx'), 'aucun contenu tronqué émis');
+});
+
+test('PAQUET VIDE : ni contenu ni annonce ⇒ rendu VIDE (jamais une enveloppe creuse)', () => {
+  // Émettre une enveloppe pour annoncer du néant coûterait des tokens à chaque geste.
+  const p = planifierPaquets(trois400(), 1200, 3);
+  assert.deepStrictEqual(p[2], { texte: '', emis: [], differes: [], marqueur: '' });
+  assert.notStrictEqual(p[1].texte, '', 'le paquet qui porte du contenu, lui, est bien rendu');
+});
+
+test('MARQUEUR : sensible au CONTENU et au NOMBRE de paquets', () => {
+  // ⚠️ Deux émissions distinctes ne doivent pas partager de marqueur, sinon un
+  //    recollage croisé passerait pour valide.
+  const m3 = planifierPaquets(trois400(), 739, 3)[0].marqueur;
+  const m4 = planifierPaquets(trois400(), 739, 4)[0].marqueur;
+  assert.notStrictEqual(m3, m4, 'le nombre de paquets entre dans le marqueur');
+  const autreTexte = [{ id: 'a', text: 'y'.repeat(400), label: 'a.md' }, seg('b', 400), seg('c', 400)];
+  assert.notStrictEqual(planifierPaquets(autreTexte, 739, 3)[0].marqueur, m3, 'le contenu aussi');
+});
+
+test('PAQUETS — nbPaquets invalide ⇒ trame UNIQUE (cascade, jamais un découpage bancal)', () => {
+  const l = () => segs(6, 300);
+  for (const mauvais of [undefined, null, 0, 1, -3, 2.5, NaN, 'x']) {
+    const p = planifierPaquets(l(), 1200, mauvais);
+    assert.strictEqual(p.length, 1, 'nbPaquets=' + String(mauvais));
+    assert.deepStrictEqual(p, [planifier(l(), 1200)]);
+  }
+  assert.strictEqual(planifierPaquets(l(), 1200, 2).length, 2, 'le premier nombre VALIDE est 2');
+});
+
+test('PAQUETS — n=1 AVEC éviction : strictement le rendu de planifier()', () => {
+  // ⚠️ Le chemin de parité doit tenir MÊME quand il y a des différés — sinon un
+  //    harnais mono-paquet recevrait un format de paquet sans raison.
+  const l = () => segs(6, 300);
+  assert.deepStrictEqual(planifierPaquets(l(), 1200, 1), [planifier(l(), 1200)]);
+});
+
+test('PAQUETS — budget absurde ⇒ défaut FRAMEWORK (cascade autorité ①)', () => {
+  for (const mauvais of [undefined, null, 0, -1, NaN, Infinity, 'x']) {
+    const p = planifierPaquets(trois400(), mauvais, 3);
+    assert.deepStrictEqual(p[0].emis, ['a', 'b', 'c'], 'budget ' + String(mauvais));
+    assert.deepStrictEqual(p[1], { texte: '', emis: [], differes: [], marqueur: '' });
+  }
+});
+
+test('PAQUETS — entrée non-tableau ⇒ traitée comme vide (fail-soft, jamais un throw)', () => {
+  // La porte est fail-open : un budget qui lèverait ferait TAIRE l'injection.
+  for (const mauvais of [undefined, null, 'texte', 42, {}]) {
+    const p = planifierPaquets(mauvais, 1000, 3);
+    assert.strictEqual(p.length, 3);
+    for (const x of p) assert.deepStrictEqual(x, { texte: '', emis: [], differes: [], marqueur: '' });
+  }
+});
+
 test('FRONTIÈRE du sceau : à 50 % pile → nominal ; juste au-dessus → scellé', () => {
   // Ancre la constante SEUIL_SCEAU_RATIO : un mutant qui la déplace est tué.
   const nu = planifier([seg('a', 500)], 1000);   // 500 = 50 % de 1000 → nominal

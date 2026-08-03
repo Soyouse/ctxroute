@@ -133,9 +133,18 @@ function composer(segments, k) {
  *    dupliqué. C'est LA promesse du framework — un segment qui disparaîtrait
  *    ici serait la régression silencieuse que tout le reste combat.
  */
+// Normalisation du budget — SOURCE UNIQUE (autorité ① de la cascade).
+// ⚠️ NE JAMAIS la recopier chez un appelant : `planifier` la ré-appliquant en
+//    interne, une 2ᵉ copie devient une garde REDONDANTE — donc un mutant
+//    ÉQUIVALENT, donc un survivant éternel (mesuré 03/08/2026 : 4 survivants
+//    dus exactement à ça). Un seul endroit décide, un seul endroit se teste.
+function budgetEffectif(budget) {
+  return Number.isFinite(budget) && budget > 0 ? budget : DEFAUT_BUDGET;
+}
+
 function planifier(segments, budget) {
   const liste = Array.isArray(segments) ? segments : [];
-  const max = Number.isFinite(budget) && budget > 0 ? budget : DEFAUT_BUDGET;
+  const max = budgetEffectif(budget);
 
   // ⚠️ Pas de court-circuit « liste vide » : le chemin nominal ci-dessous rend
   //    déjà exactement `{texte:'', emis:[], differes:[], marqueur:''}` pour une
@@ -249,8 +258,12 @@ function paquetVide() {
  */
 function planifierPaquets(segments, budget, nbPaquets) {
   const liste = Array.isArray(segments) ? segments : [];
-  const max = Number.isFinite(budget) && budget > 0 ? budget : DEFAUT_BUDGET;
-  const n = Number.isInteger(nbPaquets) && nbPaquets > 1 ? nbPaquets : 1;
+  const max = budgetEffectif(budget); // cf. SOURCE UNIQUE — ne jamais recopier la cascade ici
+  // ⚠️ `>= 2` et NON `> 1` : les deux sont sémantiquement identiques, mais
+  //    `> 1` rend le mutant `>= 1` ÉQUIVALENT (à `nbPaquets = 1` les deux
+  //    branches rendent 1) donc INTUABLE. Avec `>= 2`, le mutant `> 2` change
+  //    le résultat dès 2 paquets et meurt. Écrire la forme TESTABLE, toujours.
+  const n = Number.isInteger(nbPaquets) && nbPaquets >= 2 ? nbPaquets : 1;
 
   // ── CHEMIN DE PARITÉ ── tient en une trame ⇒ comportement d'avant, à l'octet.
   const solo = planifier(liste, max);
@@ -269,15 +282,18 @@ function planifierPaquets(segments, budget, nbPaquets) {
   // évite qu'il bloque une trame entière en la laissant vide.
   // Overhead calculé au PIRE cas (`n/n`, le plus large en chiffres) : borne
   // sûre, jamais optimiste.
-  const utiles = [];
+  // ⚠️ On remplit `reste` DIRECTEMENT (et non une liste intermédiaire copiée
+  //    ensuite) : une copie sans lecteur ultérieur produit un mutant ÉQUIVALENT,
+  //    donc un survivant éternel. Doctrine du repo : éviter par CONSTRUCTION,
+  //    jamais neutraliser après coup.
+  const reste = [];
   const impossibles = [];
   for (const s of liste) {
     if (composerPaquet([s], [], n, n, marqueur).length > max) impossibles.push(s);
-    else utiles.push(s);
+    else reste.push(s);
   }
 
   const groupes = [];
-  let reste = utiles.slice();
   // Paquets 1..N-1 : remplissage glouton, ordre de priorité PRÉSERVÉ (l'ordre
   // d'entrée PORTE le rank — ne jamais retrier ici).
   for (let i = 0; i < n - 1; i++) {
@@ -291,9 +307,15 @@ function planifierPaquets(segments, budget, nbPaquets) {
   // DERNIER paquet : il porte l'annonce de tout ce qui n'a pas trouvé de place.
   // ⚠️ Décroissant, même raison que `planifier` : l'annonce GROSSIT quand on
   //    retire, la taille finale n'est donc pas monotone.
+  // ⚠️ L'initialisation EST le cas « k = 0 » (rien de retenu, tout annoncé) :
+  //    c'est pourquoi la boucle s'arrête à 1. La faire descendre jusqu'à 0
+  //    recalculerait à l'identique ces deux valeurs ⇒ mutant ÉQUIVALENT.
+  //    ⚠️ C'est AUSSI le filet quand le budget est si petit que l'annonce nue le
+  //    dépasse : on émet quand même l'annonce (dire « il manque ça » vaut mieux
+  //    que le silence — même arbitrage que `planifier`).
   let dernier = [];
   let differesFinaux = reste.concat(impossibles);
-  for (let k = reste.length; k >= 0; k--) {
+  for (let k = reste.length; k >= 1; k--) {
     const essai = reste.slice(0, k);
     const laisses = reste.slice(k).concat(impossibles);
     if (composerPaquet(essai, laisses, n, n, marqueur).length <= max) {
