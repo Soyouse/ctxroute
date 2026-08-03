@@ -127,17 +127,19 @@ configuration seule, jamais baissé. ⚠️ Le coût est RÉEL — N processus s
 d'outil, sur un poste déjà sujet à la saturation (875 zombies le 15/07, 502 le 27/07). Ne PAS
 gonfler N « au cas où » : chaque unité se paie à chaque geste, pour un bénéfice rare.
 
-### 🛑 CE QUE LES PAQUETS NE RÉSOLVENT **PAS** — à ne pas se raconter d'histoire
-**Un segment est INDIVISIBLE. Une doc plus grosse qu'UN paquet ne sera JAMAIS livrée, quel que soit N.**
-Mesuré : **7 docs sur 375 dépassent 7 661 caractères** (`netium-social-reference.md` 18 131,
-`agent-social-testing-reference.md` 12 530, `agent-social-video-hf-reference.md` 11 206,
-`infra-mcp-handlers-tests.md` 10 731, `memory-hooks.md` 9 049…), et **TOUS les skills** le dépassent
-largement (agent-social 83 160, webzenon-infra 77 670, mcp-doc-hooks 28 402).
-⇒ Les paquets règlent le cas « PLUSIEURS docs qui, ensemble, débordent » — c'est-à-dire l'éviction
-constatée le 03/08 (`stryker-runner-choice.md` poussée dehors par ses voisines). Ils ne règlent PAS
-le cas « UNE doc trop grosse ». Celui-là n'a qu'une réponse : **le déclencheur au niveau du SEGMENT**
-(une doc devient un ensemble de sections portant chacune son `match`/`scope`/`exclude`) — chantier
-TOUJOURS OUVERT, cf. « INJECTION INTÉGRALE » ci-dessous.
+### ✅ CE QUI EST VRAI DEPUIS LE 03/08/2026 (remplace le paragraphe « ce que les paquets ne resolvent pas »)
+**JUGEMENT RENVERSE, reecrit et non empile.** La version precedente disait « un segment est
+INDIVISIBLE, donc 7 docs du parc et tous les skills ne seront JAMAIS livres ». **C'EST FAUX
+DESORMAIS.** La regle d'indivisibilite a ete SUPPRIMEE : une doc trop lourde est MORCELEE et livree.
+L'indelivrabilite est impossible par construction.
+- Regle finale, DEUX chemins : ca rentre -> on emet tel quel · ca ne rentre pas -> on decoupe.
+- Protocole = RFC 2046 `message/partial` (id / numero des 1 / total) + RFC 6455 (ordre strict,
+  jamais entrelace), coupe sur FRONTIERES DE LIGNES. Detail : `budget-paquets-reference.md`.
+- Un reliquat ne signifie PLUS « trop gros » mais `--paquets N` TROP PETIT — erreur de config,
+  message qui porte sa solution.
+- Le gate qui plafonnait la LONGUEUR des docs (volet ④) est SUPPRIME : le framework livre, il ne
+  juge pas la taille de ce qu'on lui confie. Raison gravee dans `couverture-gate.test.js`.
+- Mesure : skill `agent-social` 79 516 c -> 11 trames, zero reliquat. **N = 12 declare.**
 
 ### Reste à faire AVANT de déclarer le chantier fini
 1. **GO du mainteneur** puis câblage `settings.json` (3 déclarations `--paquet k --paquets 3`).
