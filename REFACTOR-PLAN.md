@@ -89,6 +89,62 @@
   webzenon-infra 69 017, mcp-doc-hooks 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
   ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.
 
+## 📐 CONCEPTION ARRÊTÉE — PAQUETS (03/08/2026, branche `chantier-paquets`)
+
+**Faits DOC OFFICIELLE, relevés le 03/08/2026 — ne PAS les re-chercher, les corriger sur place si un jour ils changent :**
+| Harnais | Plafond de sortie hook | Débrayable ? | `additionalContext` sur PreToolUse |
+|---|---|---|---|
+| Claude Code | **10 000 caractères** par chaîne (`additionalContext`, `systemMessage`, stdout) | ❌ « no setting to configure or disable » | ✅ |
+| Codex | ~2 500 **tokens** | ✅ **`additionalContextLimit`**, `0` = illimité | ✅ |
+| Gemini CLI | aucun plafond documenté | — | ❌ **canal ABSENT** (`BeforeAgent`/`AfterTool`/`SessionStart` seulement) |
+⚠️ **CORRIGE le §20/07 « CODEX — aucun plafond trouvé »** : il concluait sur un `strings` du binaire Rust
+alors que la limite est DOCUMENTÉE et CONFIGURABLE. Rétro-ingénierie d'un comportement documenté =
+exactement ce que la méthode interdit. Le fait tient, la méthode qui l'a produit était fausse.
+⚠️ **UN SEUL harnais sur trois nous oblige à fragmenter.** ⇒ la fragmentation est un CONTOURNEMENT
+de Claude Code, PAS une vérité du domaine : elle vit dans la COQUILLE, jamais dans le noyau. Le jour
+où le réglage existe côté Anthropic, on supprime la coquille et le noyau n'aura jamais su.
+
+**Prior art = RFC, pas la littérature « context engineering ».**
+- [RFC 8900] « Developers SHOULD NOT develop new protocols that rely on IP fragmentation » — mais ses
+  9 causes de fragilité sont TOUTES des équipements intermédiaires (NAT, pare-feu, ECMP, collisions
+  d'ID). **On n'en a aucun** : hook → harnais → contexte, zéro middlebox. Et sa recommandation de
+  fond — *« push fragmentation responsibilities upward to layers that understand application
+  semantics »* — nous décrit : on ne coupe JAMAIS au milieu d'une doc. **C'est de la segmentation
+  TCP/MSS, pas de la fragmentation IP.** On est du bon côté de la RFC.
+- [RFC 8899 / PLPMTUD] ⇒ **la « découverte du plafond » est ABANDONNÉE.** Le PMTUD classique casse
+  parce qu'il dépend d'un signal de retour (ICMP) filtré ⇒ trou noir. Le fichier de spill du harnais
+  est NOTRE ICMP, en pire : aucun canal de retour, l'unique récepteur est l'agent. Réponse de la RFC :
+  **plancher conservateur** (`BASE_PLPMTU` = notre `DEFAUT_BUDGET` 8000, déjà juste) + **négociation
+  quand elle existe** (= `additionalContextLimit: 0`), jamais de sondage à l'aveugle.
+- [RFC 8899] exige la robustesse au **réordonnancement** ⇒ les N hooks tournent EN PARALLÈLE, l'ordre
+  d'arrivée n'est PAS garanti ⇒ **chaque paquet est AUTO-DESCRIPTIF (`k/N` + marqueur commun)**. Sans
+  numéro de séquence, un paquet manquant est indétectable = la perte silencieuse qu'on combat.
+
+**Le PIÈGE DE CONCURRENCE, trouvé en lisant `porte-core.js` (à ne surtout pas réintroduire).**
+Les N processus appellent CHACUN `gate.decide`, qui ÉCRIT l'état. Le premier marque les docs `once`
+« vues » ⇒ les suivants décident « rien à injecter » ⇒ **paquets 2..N vides**. Le découpage n'est
+déterministe que si les N voient le MÊME état.
+⇒ **Plan MÉMOÏSÉ par invocation**, sous le lock qui existe DÉJÀ : premier arrivé décide + écrit
+l'état + range le plan ; les autres LISENT le plan. Idempotent, reprenable, zéro nouveau verrou.
+⚠️ **L'`invocationId` est fourni par la COQUILLE** (Claude Code : `tool_use_id`, présent sur
+PreToolUse, doc 03/08/2026), JAMAIS lu par le noyau — sinon violation du CONTRAT D'EXTENSION §7
+(ne fonder le moteur QUE sur ce que TOUT harnais expose par nécessité). Harnais sans identifiant
+d'invocation ⇒ `nbPaquets = 1` ⇒ comportement d'aujourd'hui, à l'octet. **Dégradation, jamais casse.**
+
+**Architecture — AUCUN fichier nouveau** (un `fragmenter.js` créerait 2 endroits qui décident « ce
+qui tient dans une trame » = la double vérité que tout le repo combat) :
+- `budget.js` (PUR) : `planifierPaquets(segments, budget, nbPaquets)` → N plans. Invariant de
+  CONSERVATION RENFORCÉ : tout segment est dans EXACTEMENT un paquet (ou dans l'annonce du dernier).
+- `porte-core.js` : mémoïsation par invocation + n'émet que le paquet `k`. La remise d'état des
+  différés (déjà là) DOIT couvrir les paquets.
+- Coquilles : lisent `--paquet k`, déclarent budget + invocationId. **Seul endroit avec un chiffre.**
+- `settings.json` : N déclarations du même script. Config, pas code ⇒ Codex a le même mécanisme.
+⚠️ **PARITÉ (contrat §6) : le multi-paquets ne s'ENGAGE QUE si une éviction aurait eu lieu.** Tout ce
+qui tient aujourd'hui sort exactement comme aujourd'hui, à l'octet — médiane du parc 1 367 car.
+Le risque de bascule est donc borné aux cas qui, sans ça, étaient DÉJÀ cassés.
+⚠️ **N est un cliquet, DÉRIVÉ d'une mesure sur le plus gros contenu réel — jamais deviné.** Trop
+petit = l'éviction revient ; trop grand = des spawns pour rien sur un poste sujet à la saturation.
+
 ## 🔴 OUVERT — INJECTION INTÉGRALE D'UN SKILL (la VRAIE cible du §20/07, ouvert 31/07/2026)
 
 **Le problème, sans détour** : un skill fait des CENTAINES DE LIGNES **par conception** — c'est le

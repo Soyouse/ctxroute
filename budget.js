@@ -174,6 +174,151 @@ function planifier(segments, budget) {
   return { texte: r.texte, emis: [], differes: r.differes, marqueur: r.marqueur };
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// PAQUETS — quand une trame ne suffit pas, on en utilise PLUSIEURS.
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ CE N'EST PAS DE LA FRAGMENTATION IP, C'EST DE LA SEGMENTATION TCP/MSS.
+//    RFC 8900 déconseille de bâtir sur la fragmentation IP, mais ses 9 causes
+//    de fragilité sont TOUTES des équipements intermédiaires (NAT, pare-feu
+//    sans état, ECMP, collisions d'ID de réassemblage) — il n'y en a AUCUN
+//    ici : hook → harnais → contexte. Sa recommandation de fond (« push
+//    fragmentation responsibilities upward to layers that understand
+//    application semantics ») est précisément ce qu'on fait : on répartit des
+//    SEGMENTS ENTIERS (une doc), on ne coupe JAMAIS au milieu.
+//
+// ⚠️ AUCUNE DÉCOUVERTE DE PLAFOND, JAMAIS (RFC 8899 / PLPMTUD). Le PMTUD
+//    classique casse parce qu'il dépend d'un signal de retour filtré ⇒ trou
+//    noir. Le fichier de spill du harnais serait NOTRE ICMP, en pire : aucun
+//    canal de retour, l'unique récepteur est l'agent. La réponse de la RFC est
+//    un PLANCHER conservateur (`DEFAUT_BUDGET`) + la NÉGOCIATION là où elle
+//    existe (Codex : `additionalContextLimit: 0`) — jamais du sondage aveugle.
+//
+// ⚠️ PAQUET AUTO-DESCRIPTIF, OBLIGATOIRE. Les N hooks tournent EN PARALLÈLE :
+//    l'ordre d'arrivée dans le contexte n'est PAS garanti (RFC 8899 exige la
+//    robustesse au réordonnancement). Sans `k/N` + marqueur COMMUN, un paquet
+//    manquant est indétectable — c'est-à-dire la perte SILENCIEUSE que tout ce
+//    module existe pour rendre impossible. NE JAMAIS retirer le numéro.
+//
+// ⚠️ DÉTERMINISME = LA CONDITION DE VIE DU MÉCANISME. Les N processus ne
+//    peuvent pas se parler ; chacun recalcule le découpage ENTIER et n'émet que
+//    son indice. Toute source de non-déterminisme ici (horloge, aléa, ordre
+//    d'itération instable, lecture d'état) ferait diverger les paquets entre
+//    processus. C'est pourquoi cette fonction est PURE et le restera.
+//    ⚠️ Corollaire côté appelant : les N processus DOIVENT recevoir les MÊMES
+//    segments. `gate.decide` écrivant l'état, `porte-core` MÉMOÏSE le plan par
+//    invocation — sans quoi le 1er consomme les `once` et les suivants ne
+//    décident plus rien. Voir REFACTOR-PLAN §PAQUETS.
+// ═══════════════════════════════════════════════════════════════════════
+
+function enTetePaquet(marqueur, k, n) {
+  return (
+    '⚠️ INJECTION SCELLÉE — PAQUET ' + k + '/' + n + ', fin marquée ###FIN:' + marqueur + '###\n' +
+    '   Les ' + n + ' paquets portent le MÊME marqueur et arrivent DANS LE DÉSORDRE : recolle-les par leur numéro.\n' +
+    '   Un numéro qui manque, ou un marqueur absent = contenu tronqué par le harnais :\n' +
+    '   lis alors toi-même les fichiers cités ci-dessous. Ne devine pas.\n\n'
+  );
+}
+
+// Rendu d'UN paquet. `differes` n'est jamais non-vide que sur le DERNIER.
+function composerPaquet(retenus, differes, k, n, marqueur) {
+  const corps = retenus.map((s) => s.text).join(SEPARATEUR);
+  return enTetePaquet(marqueur, k, n) + corps + annonce(differes) + pied(marqueur);
+}
+
+function paquetVide() {
+  return { texte: '', emis: [], differes: [], marqueur: '' };
+}
+
+/**
+ * Découpe en `nbPaquets` trames. Chaque appelant (processus) prend SON indice.
+ *
+ * @returns {{texte:string, emis:string[], differes:{id,label}[], marqueur:string}[]}
+ *          Tableau de longueur `nbPaquets` (indice 0 = paquet 1/N).
+ *
+ * ⚠️ INVARIANT DE CONSERVATION, RENFORCÉ : tout segment entré est dans
+ *    EXACTEMENT UN paquet, ou dans l'annonce du dernier. Jamais perdu, jamais
+ *    DUPLIQUÉ entre deux paquets (un doublon coûterait deux fois les tokens et
+ *    ferait douter l'agent de l'intégrité du recollage).
+ *
+ * ⚠️ PARITÉ (contrat d'extension §6) : le mode multi-paquets ne s'engage QUE si
+ *    une éviction aurait eu lieu en trame unique. Tout ce qui passe aujourd'hui
+ *    sort EXACTEMENT comme aujourd'hui, à l'octet — la bascule ne peut donc
+ *    modifier que des cas qui étaient DÉJÀ cassés. Ne PAS « simplifier » en
+ *    passant systématiquement par le chemin paquets.
+ */
+function planifierPaquets(segments, budget, nbPaquets) {
+  const liste = Array.isArray(segments) ? segments : [];
+  const max = Number.isFinite(budget) && budget > 0 ? budget : DEFAUT_BUDGET;
+  const n = Number.isInteger(nbPaquets) && nbPaquets > 1 ? nbPaquets : 1;
+
+  // ── CHEMIN DE PARITÉ ── tient en une trame ⇒ comportement d'avant, à l'octet.
+  const solo = planifier(liste, max);
+  if (n === 1 || solo.differes.length === 0) {
+    const out = [solo];
+    for (let i = 1; i < n; i++) out.push(paquetVide());
+    return out;
+  }
+
+  // Marqueur COMMUN aux N paquets : il identifie l'ÉMISSION, pas le bloc.
+  // Dérivé du contenu entier ⇒ identique dans les N processus (déterminisme).
+  const marqueur = empreinte(liste.map((s) => s.text).join(SEPARATEUR) + n);
+
+  // Un segment qui ne rentre seul dans AUCUN paquet ne rentrera jamais : il
+  // part en annonce d'emblée. ⚠️ Le sortir ICI (et non pendant le remplissage)
+  // évite qu'il bloque une trame entière en la laissant vide.
+  // Overhead calculé au PIRE cas (`n/n`, le plus large en chiffres) : borne
+  // sûre, jamais optimiste.
+  const utiles = [];
+  const impossibles = [];
+  for (const s of liste) {
+    if (composerPaquet([s], [], n, n, marqueur).length > max) impossibles.push(s);
+    else utiles.push(s);
+  }
+
+  const groupes = [];
+  let reste = utiles.slice();
+  // Paquets 1..N-1 : remplissage glouton, ordre de priorité PRÉSERVÉ (l'ordre
+  // d'entrée PORTE le rank — ne jamais retrier ici).
+  for (let i = 0; i < n - 1; i++) {
+    const retenus = [];
+    while (reste.length > 0 && composerPaquet(retenus.concat([reste[0]]), [], i + 1, n, marqueur).length <= max) {
+      retenus.push(reste.shift());
+    }
+    groupes.push(retenus);
+  }
+
+  // DERNIER paquet : il porte l'annonce de tout ce qui n'a pas trouvé de place.
+  // ⚠️ Décroissant, même raison que `planifier` : l'annonce GROSSIT quand on
+  //    retire, la taille finale n'est donc pas monotone.
+  let dernier = [];
+  let differesFinaux = reste.concat(impossibles);
+  for (let k = reste.length; k >= 0; k--) {
+    const essai = reste.slice(0, k);
+    const laisses = reste.slice(k).concat(impossibles);
+    if (composerPaquet(essai, laisses, n, n, marqueur).length <= max) {
+      dernier = essai;
+      differesFinaux = laisses;
+      break;
+    }
+  }
+  groupes.push(dernier);
+
+  return groupes.map((retenus, i) => {
+    const differes = i === n - 1 ? differesFinaux : [];
+    // ⚠️ Un paquet SANS contenu ET SANS annonce n'est PAS émis (texte vide ⇒ la
+    //    coquille sort en silence). Émettre une enveloppe vide coûterait des
+    //    tokens pour annoncer du néant, à chaque geste.
+    if (retenus.length === 0 && differes.length === 0) return paquetVide();
+    return {
+      texte: composerPaquet(retenus, differes, i + 1, n, marqueur),
+      emis: retenus.map((s) => s.id),
+      differes,
+      marqueur,
+    };
+  });
+}
+
 // Coût FIXE du scellement (en-tête + pied), hors contenu et hors annonce.
 // ⚠️ DÉRIVÉ, jamais une constante recopiée : l'en-tête est du texte qui peut
 //    être reformulé, et une valeur en dur divergerait en silence — le budget
@@ -184,4 +329,4 @@ function tailleEnveloppe() {
   return enTete(m).length + pied(m).length;
 }
 
-module.exports = { planifier, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };
+module.exports = { planifier, planifierPaquets, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };

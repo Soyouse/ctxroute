@@ -15,7 +15,7 @@
 
 import { test, expect } from 'vitest';
 import fc from 'fast-check';
-import { planifier, DEFAUT_BUDGET, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, DEFAUT_BUDGET, tailleEnveloppe } from './budget.js';
 
 // Coût approx. du séparateur inter-segments, pour calibrer les tirages.
 const SEPARATEUR_APPROX = 8;
@@ -201,4 +201,83 @@ test('budget absent/absurde ⇒ défaut framework (autorité ① de la cascade)'
     { numRuns: 20 }
   );
   expect(DEFAUT_BUDGET).toBeGreaterThan(0);
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// PAQUETS — la conservation, sur entrées GÉNÉRÉES, à travers N trames.
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ L'invariant se RENFORCE par rapport à `planifier` : il ne suffit plus que
+//    rien ne se perde, il faut aussi que rien ne se DUPLIQUE entre deux
+//    paquets. Un doublon coûterait deux fois les tokens ET ferait douter
+//    l'agent du recollage — donc de tout le mécanisme.
+// ⚠️ Générateur calibré comme les autres (cf. le trou prouvé le 31/07/2026) :
+//    le budget est une FRACTION du total, jamais une plage absolue, sinon la
+//    zone MIXTE — la seule où la conservation peut casser — n'est pas visitée.
+
+test('PAQUETS ① CONSERVATION : chaque segment dans EXACTEMENT un paquet, ou annoncé', () => {
+  fc.assert(
+    fc.property(segmentsArb, fc.integer({ min: 2, max: 6 }), fc.integer({ min: 15, max: 60 }), (segments, n, pct) => {
+      const total = segments.reduce((a, s) => a + s.text.length + SEPARATEUR_APPROX, 0);
+      const budget = Math.max(tailleEnveloppe() + 50, Math.floor((total * pct) / 100));
+      const paquets = planifierPaquets(segments, budget, n);
+
+      expect(paquets.length).toBe(n);
+      const emis = paquets.flatMap((p) => p.emis);
+      const differes = paquets.flatMap((p) => p.differes.map((d) => d.id));
+      // Aucun DOUBLON — l'invariant neuf du multi-trames.
+      expect(new Set(emis).size).toBe(emis.length);
+      expect(new Set([...emis, ...differes]).size).toBe(emis.length + differes.length);
+      // Aucune PERTE — l'invariant historique, étendu.
+      expect([...emis, ...differes].sort()).toEqual(segments.map((s) => s.id).sort());
+    }),
+    { numRuns: 300 }
+  );
+});
+
+test('PAQUETS ② BORNE : un paquet qui PORTE DU CONTENU ne dépasse jamais le budget', () => {
+  // ⚠️ « qui porte du contenu » n'est PAS un adoucissement de complaisance :
+  //    c'est la même sémantique que `planifier` (cf. « le rendu tient dans le
+  //    budget dès qu'il porte du contenu »). Quand le budget est si petit que
+  //    l'ANNONCE NUE le dépasse déjà, on l'émet quand même — dire « ces docs
+  //    manquent, va les lire » vaut mieux que le silence, et l'annonce est
+  //    minuscule. Ce cas a été TROUVÉ par ce property-test le 03/08/2026 (budget
+  //    273, annonce 519) : la propriété a fait son travail.
+  fc.assert(
+    fc.property(segmentsArb, fc.integer({ min: 2, max: 6 }), fc.integer({ min: 15, max: 60 }), (segments, n, pct) => {
+      const total = segments.reduce((a, s) => a + s.text.length + SEPARATEUR_APPROX, 0);
+      const budget = Math.max(tailleEnveloppe() + 50, Math.floor((total * pct) / 100));
+      for (const p of planifierPaquets(segments, budget, n)) {
+        if (p.emis.length > 0) expect(p.texte.length).toBeLessThanOrEqual(budget);
+      }
+    }),
+    { numRuns: 300 }
+  );
+});
+
+test('PAQUETS ③ DÉTERMINISME : deux calculs indépendants coïncident', () => {
+  // ⚠️ Sans ça, les N processus PARALLÈLES émettraient des découpages
+  //    différents et le recollage serait incohérent. C'est la propriété qui
+  //    remplace toute coordination inter-processus.
+  fc.assert(
+    fc.property(segmentsArb, fc.integer({ min: 2, max: 6 }), fc.integer({ min: 15, max: 60 }), (segments, n, pct) => {
+      const total = segments.reduce((a, s) => a + s.text.length + SEPARATEUR_APPROX, 0);
+      const budget = Math.max(tailleEnveloppe() + 50, Math.floor((total * pct) / 100));
+      expect(planifierPaquets(segments, budget, n)).toEqual(planifierPaquets(segments, budget, n));
+    }),
+    { numRuns: 200 }
+  );
+});
+
+test('PAQUETS ④ PARITÉ : rien à évincer ⇒ paquet 1 = planifier(), les autres vides', () => {
+  // ⚠️ LA garantie de bascule : le multi-paquets ne s'engage QUE sur éviction.
+  fc.assert(
+    fc.property(segmentsArb, fc.integer({ min: 2, max: 6 }), (segments, n) => {
+      const budget = 1000000; // tout tient largement
+      const paquets = planifierPaquets(segments, budget, n);
+      expect(paquets[0]).toEqual(planifier(segments, budget));
+      for (let i = 1; i < n; i++) expect(paquets[i]).toEqual({ texte: '', emis: [], differes: [], marqueur: '' });
+    }),
+    { numRuns: 100 }
+  );
 });

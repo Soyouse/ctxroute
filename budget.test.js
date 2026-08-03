@@ -20,7 +20,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
-import { planifier, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
 
 // Fixtures = THUNKS (cf. perTest ci-dessus).
 const seg = (id, n, label) => ({ id, text: 'x'.repeat(n), label: label || id + '.md' });
@@ -218,6 +218,77 @@ test('SCELLÉ SANS différé : aucune annonce parasite', () => {
   assert.deepStrictEqual(r.differes, []);
   assert.ok(!r.texte.includes('NON injectée'));
   assert.ok(!r.texte.includes('Stryker'));
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// PAQUETS — cas déterministes (cf. property-based pour la conservation générée)
+// ═══════════════════════════════════════════════════════════════════════
+
+test('PARITÉ : nbPaquets absent/1 → strictement identique à planifier()', () => {
+  const s = () => [seg('a', 300), seg('b', 300)];
+  assert.deepStrictEqual(planifierPaquets(s(), 1000, 1), [planifier(s(), 1000)]);
+  assert.deepStrictEqual(planifierPaquets(s(), 1000), [planifier(s(), 1000)]);
+});
+
+test('PARITÉ : tout tient en une trame → paquet 1 identique à planifier, les autres VIDES', () => {
+  // ⚠️ LA garantie de bascule : le multi-paquets ne s'engage QUE sur une
+  //    éviction. Un mutant qui passerait toujours par le chemin paquets casse ici.
+  const s = () => [seg('a', 300)];
+  const p = planifierPaquets(s(), 1000, 4);
+  assert.strictEqual(p.length, 4);
+  assert.deepStrictEqual(p[0], planifier(s(), 1000));
+  for (let i = 1; i < 4; i++) assert.deepStrictEqual(p[i], { texte: '', emis: [], differes: [], marqueur: '' });
+});
+
+test('CONSERVATION : chaque segment est dans EXACTEMENT un paquet, ou annoncé', () => {
+  const liste = segs(8, 400);
+  const p = planifierPaquets(liste, 1200, 4);
+  const emis = p.flatMap((x) => x.emis);
+  const differes = p.flatMap((x) => x.differes.map((d) => d.id));
+  assert.strictEqual(new Set(emis).size, emis.length, 'aucun DOUBLON entre paquets');
+  assert.deepStrictEqual([...emis, ...differes].sort(), liste.map((s) => s.id).sort());
+});
+
+test('SÉQUENCE : chaque paquet non vide porte son numéro k/N et le marqueur COMMUN', () => {
+  // ⚠️ Sans numéro, un paquet manquant est indétectable (hooks parallèles,
+  //    ordre non garanti) — c'est la perte silencieuse qu'on rend impossible.
+  const p = planifierPaquets(segs(8, 400), 1200, 4).filter((x) => x.texte !== '');
+  assert.ok(p.length >= 2, 'le cas doit bien engager plusieurs paquets');
+  const marqueurs = new Set(p.map((x) => x.marqueur));
+  assert.strictEqual(marqueurs.size, 1, 'UN seul marqueur pour toute l’émission');
+  p.forEach((x, i) => {
+    assert.ok(x.texte.includes('PAQUET ' + (i + 1) + '/4'), 'numéro de séquence présent');
+    assert.ok(x.texte.includes('###FIN:' + x.marqueur + '###'), 'sceau fermé');
+  });
+});
+
+test('BORNE : aucun paquet ne dépasse le budget', () => {
+  for (const p of planifierPaquets(segs(10, 500), 1500, 5)) {
+    assert.ok(p.texte.length <= 1500, 'paquet de ' + p.texte.length + ' > 1500');
+  }
+});
+
+test('SEGMENT GÉANT : jamais tronqué, jamais bloquant — annoncé, les autres passent', () => {
+  const liste = [seg('enorme', 5000), seg('petit', 100)];
+  const p = planifierPaquets(liste, 1000, 3);
+  const emis = p.flatMap((x) => x.emis);
+  const differes = p.flatMap((x) => x.differes.map((d) => d.id));
+  assert.deepStrictEqual(differes, ['enorme']);
+  assert.deepStrictEqual(emis, ['petit'], 'le géant ne stérilise AUCUN paquet');
+  assert.ok(!p.some((x) => x.texte.includes('x'.repeat(1500))), 'jamais un géant tronqué');
+});
+
+test('DÉTERMINISME : deux calculs indépendants rendent le MÊME découpage', () => {
+  // ⚠️ C'EST LA CONDITION DE VIE DU MÉCANISME : les N processus parallèles ne
+  //    peuvent pas se parler, ils ne s'accordent que par déterminisme pur.
+  const a = planifierPaquets(segs(9, 450), 1300, 4);
+  const b = planifierPaquets(segs(9, 450), 1300, 4);
+  assert.deepStrictEqual(a, b);
+});
+
+test('ORDRE DE PRIORITÉ conservé : le mieux classé est dans le premier paquet', () => {
+  const p = planifierPaquets(segs(8, 400), 1200, 4);
+  assert.strictEqual(p[0].emis[0], 'd0');
 });
 
 test('FRONTIÈRE du sceau : à 50 % pile → nominal ; juste au-dessus → scellé', () => {
