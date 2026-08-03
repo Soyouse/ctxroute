@@ -25,7 +25,7 @@
 //    Claude Code) et varie d'un harnais à l'autre. Compter en tokens
 //    introduirait une imprécision là où le mur est exact.
 //
-// ⚠️ LE FRAMEWORK LIVRE — IL NE JUGE JAMAIS LA TAILLE (décision le mainteneur,
+// ⚠️ LE FRAMEWORK LIVRE — IL NE JUGE JAMAIS LA TAILLE (décision du mainteneur,
 //    03/08/2026). Une doc plus lourde qu'une trame est MORCELÉE et livrée ;
 //    l'indélivrabilité est IMPOSSIBLE PAR CONSTRUCTION. Refuser de livrer, ou
 //    exiger que l'auteur raccourcisse, ce serait lui faire porter un défaut du
@@ -279,7 +279,7 @@ function enTeteMorceau(label, j, m) {
 /**
  * Découpe les segments trop lourds en MORCEAUX livrables.
  *
- * ⚠️ RAISON D'ÊTRE (03/08/2026, décision le mainteneur) : **le framework LIVRE, point.**
+ * ⚠️ RAISON D'ÊTRE (03/08/2026, décision du mainteneur) : **le framework LIVRE, point.**
  *    Il n'a pas à décréter qu'un contenu est trop gros — ce serait faire porter
  *    à l'auteur un défaut du transport. Avant, un segment était INDIVISIBLE et
  *    une doc plus lourde qu'une trame n'arrivait JAMAIS. Ce n'est plus le cas :

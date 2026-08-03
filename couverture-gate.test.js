@@ -129,7 +129,7 @@ test('NEGATIVE-CHECK : les 3 volets DÉTECTENT vraiment un oubli', () => {
   }
 });
 
-// ⚠️ VOLET ④ SUPPRIMÉ le 03/08/2026 (décision le mainteneur) — NE PAS le réintroduire.
+// ⚠️ VOLET ④ SUPPRIMÉ le 03/08/2026 (décision du mainteneur) — NE PAS le réintroduire.
 //    Il plafonnait la LONGUEUR des docs (cliquet en lignes), au motif qu'une
 //    doc trop grosse serait tronquée ou évincée. Ce motif est MORT : depuis le
 //    transport multi-trames, une doc trop lourde est MORCELÉE et livrée —

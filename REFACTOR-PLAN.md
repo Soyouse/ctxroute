@@ -291,7 +291,16 @@ identifiant de code qui n'existe plus = ROUGE, dérivé, jamais une liste).
 
 ---
 
-## 🔴 OUVERT — INJECTION INTÉGRALE D'UN SKILL (la VRAIE cible du §20/07, ouvert 31/07/2026)
+## ✅ LIVRÉ — INJECTION INTÉGRALE D'UN SKILL (ouvert 31/07/2026, **FERMÉ le 03/08/2026**)
+
+> ⚠️ **Cible ATTEINTE, ne pas relire ce qui suit comme un chantier à faire.** Le transport
+> multi-trames est LIVE (`settings.json`, 12 déclarations `--paquet k --paquets 12`), et le cas
+> « budget si petit qu'il ne porte pas le sceau » a été fermé le 03/08 (l'enveloppe cède, jamais
+> le contenu). Mesure de recette : 6 docs / 28 800 c ⇒ **6/6 livrées** (1/6 avant). Il n'existe
+> plus AUCUN contenu indélivrable — ni trop gros, ni trop petit.
+> Le texte ci-dessous est conservé pour sa MESURE (concurrence illimitée des hooks), qui est la
+> raison pour laquelle le multi-hooks a été retenu. Section laissée marquée 🔴 OUVERT jusqu'au
+> 04/08 : c'est exactement la péremption de doc que dénonce le chantier DOC-FIRST.
 
 **Le problème, sans détour** : un skill fait des CENTAINES DE LIGNES **par conception** — c'est le
 contrat du projet, pas une dérive. ⚠️ La convention d'usage « doc réinjectée < ~10 lignes » (règle
@@ -874,7 +883,7 @@ pour n'importe quelle doc, aujourd'hui et à toute taille future.
 
 ---
 
-## 💡 Commentaires NON injectés dans les docs — idée le mainteneur, 03/08/2026 (NON tranchée)
+## 💡 Commentaires NON injectés dans les docs — idée du mainteneur, 03/08/2026 (NON tranchée)
 
 **Le besoin.** Une doc porte DEUX publics : l'agent qui AGIT (rappel court, réinjecté à chaque
 geste) et l'agent qui MAINTIENT la doc (provenance, péremption d'une source tierce, historique de

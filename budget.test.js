@@ -269,7 +269,7 @@ test('BORNE : aucun paquet ne dépasse le budget', () => {
 });
 
 test('SEGMENT GÉANT : MORCELÉ et LIVRÉ — l\'indélivrabilité est impossible', () => {
-  // ⚠️ CONTRAT INVERSÉ le 03/08/2026 (décision le mainteneur) : AVANT, un segment plus
+  // ⚠️ CONTRAT INVERSÉ le 03/08/2026 (décision du mainteneur) : AVANT, un segment plus
   //    lourd qu'une trame était seulement ANNONCÉ — donc jamais livré. Le
   //    framework LIVRE : il découpe. Ne JAMAIS revenir à « annoncer au lieu de
   //    livrer », c'est faire porter à l'auteur un défaut du transport.
