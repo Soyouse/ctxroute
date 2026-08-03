@@ -976,3 +976,41 @@ au mauvais endroit.
 ⚠️ Reste VRAI et non contesté : **ne PAS « régler » le problème en gonflant `DEFAUT_BUDGET`** (le
 contexte est fini ; un budget qui enfle dilue tout le reste). La solution est le TRANSPORT, cf. le
 chantier « INJECTION INTÉGRALE » — découverte du plafond, fragmentation, déclencheur par segment.
+
+---
+
+## 🔴 OUVERT — RENOMMAGE `mcp-doc-hooks` → `ctxroute` (décidé 04/08/2026, GO en attente)
+
+**Pourquoi le nom actuel est FAUX** (deux mensonges, pas un) : ① le framework n'injecte plus
+seulement des docs **MCP** — fichier, session, skill, outil natif sont des sources de plein droit ;
+② « **hooks** » nomme la plomberie d'UN harnais, alors que l'ambition écrite (§2bis) est d'être un
+standard **multi-harnais**. Un nom qui décrit l'implémentation d'un seul consommateur interdit le
+standard qu'on vise.
+
+**Pourquoi `ctxroute` et pas autre chose.** L'idée directrice est **l'ACHEMINEMENT** : livrer le bon
+savoir au bon geste. C'est l'analogie déjà écrite dans le skill (« SQL / CSS / **table de
+routage** »). ⚠️ **`ctxlang` a été ÉCARTÉ, ne pas le rouvrir** : `lang` promet une SYNTAXE, or on
+n'écrit ici que du frontmatter YAML et du JSON — personne n'apprend un langage. Le nom aurait menti
+sur ce qu'est le produit, exactement le défaut que ce repo combat. (Écartés aussi : `Trame`, qui ne
+nomme que le transport, soit la moitié basse ; `Aiguillage`, juste mais non exportable ; `Relais`,
+passe-partout.)
+
+**AMPLEUR MESURÉE avant de décider** : **1 081 occurrences dans 175 fichiers**, plus le chemin
+ABSOLU du dossier câblé dans `settings.json` (12 déclarations), `requirements.toml` (Codex) et la
+config Gemini. ⇒ **prod vivante : GO explicite requis, à un moment où aucun autre agent ne tourne.**
+
+**MÉTHODE OBLIGATOIRE = expand/contract, fenêtre de casse NULLE** (renommer le dossier d'abord
+casserait les 12 hooks jusqu'à la mise à jour des configs) :
+1. **EXPAND** — copier/déplacer vers `~/Desktop/ctxroute`, puis poser une **jonction Windows**
+   `mklink /J ~/Desktop/mcp-doc-hooks ~/Desktop/ctxroute` : **les deux chemins fonctionnent**, aucun
+   agent en cours ne voit la différence.
+2. **MIGRER LES CONSOMMATEURS** — `settings.json`, `requirements.toml`, config Gemini, puis les
+   1 081 occurrences par codemod (jamais à la main), puis les docs injectables + le skill (renommé
+   `.claude/commands/ctxroute.md`) + `mcp-doc-config.json` (clé du skill) + `ARBORESCENCE.md`.
+3. **CONTRACT** — retirer la jonction **seulement** après `npm test` + `doctor` + injection réelle
+   vérifiée par spawn. Le retrait est l'étape qui exige un second GO.
+⚠️ **Filet déjà en place** : `skill-registry-gate` rougit si le skill nommé n'existe pas, le doctor
+vérifie le câblage réel, et le **canari** dirait que le canal est mort. Le renommage est donc
+l'opération la mieux surveillée du repo — à condition de ne pas sauter l'étape 1.
+⚠️ **Ne PAS renommer l'opérateur `match`** au passage (~532 règles le portent) : décision maintenue,
+cf. §C. Un renommage à la fois.
