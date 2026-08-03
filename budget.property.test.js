@@ -15,7 +15,7 @@
 
 import { test, expect } from 'vitest';
 import fc from 'fast-check';
-import { planifier, planifierPaquets, DEFAUT_BUDGET, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, morceler, DEFAUT_BUDGET, tailleEnveloppe } from './budget.js';
 
 // Coût approx. du séparateur inter-segments, pour calibrer les tirages.
 const SEPARATEUR_APPROX = 8;
@@ -305,4 +305,61 @@ test('PAQUETS ⑤ CONSERVATION DU CONTENU : rien ne s\'évapore, même sur trame
     }),
     { numRuns: 400 }
   );
+});
+
+// ── SCANNER `morceler` — PROPERTY-BASED (doctrine du parc) ─────────────────
+// ⚠️ POURQUOI DES PROPRIÉTÉS ICI : `morceler` INTERPRÈTE un format (des lignes)
+//    pour produire des tranches — c'est un SCANNER, et la règle du parc impose
+//    le property-based sur tout scanner (invariants type totalité / conservation
+//    / sous-suite). Les cas exacts de `budget.test.js` verrouillent le CONNU ;
+//    ceux-ci cherchent l'INCONNU. Les deux, jamais l'un à la place de l'autre.
+const H_MAX = () => "⟦ A — MORCEAU 999/999 : recolle les 999 morceaux dans l'ordre avant de lire ⟧\n".length;
+// ⚠️ `fc.string({ unit })` et NON `fc.stringOf` : retiré en fast-check 4 (le
+//    parc est en 4.9.0). Vérifier l'API de la version INSTALLÉE, jamais de
+//    mémoire — l'erreur a coûté deux allers-retours ici.
+const texteQuelconque = () => fc.string({ unit: fc.constantFrom('a', 'b', ' ', '\n', 'é', 'x'), maxLength: 400 });
+
+test('SCANNER ① TOTALITÉ : ne throw JAMAIS, quelles que soient les entrées', () => {
+  // ⚠️ Un throw ici tuerait la porte ENTIÈRE (fail-open ⇒ plus AUCUNE doc
+  //    injectée nulle part). La totalité n'est pas un confort, c'est vital.
+  fc.assert(fc.property(texteQuelconque(), fc.integer({ min: -500, max: 5000 }), (t, cap) => {
+    const r = morceler([{ id: 'a', label: 'A', text: t }], cap);
+    expect(Array.isArray(r)).toBe(true);
+  }), { numRuns: 500 });
+});
+
+test('SCANNER ② CONSERVATION : aucun caractère de contenu perdu ni dupliqué', () => {
+  // ⚠️ LA propriété du framework. Les sauts de ligne peuvent se déplacer aux
+  //    frontières de coupe (c'est le principe même du découpage par lignes) —
+  //    tout le RESTE doit ressortir à l'identique, dans l'ordre.
+  fc.assert(fc.property(texteQuelconque(), fc.integer({ min: 1, max: 300 }), (t, extra) => {
+    const cap = H_MAX() + extra;
+    const r = morceler([{ id: 'a', label: 'A', text: t }], cap);
+    const recolle = r.map((m) => m.text.replace(/^⟦[^⟧]*⟧\n/, '')).join('');
+    expect(recolle.replace(/\n/g, '')).toBe(t.replace(/\n/g, ''));
+  }), { numRuns: 500 });
+});
+
+test('SCANNER ③ ORDRE : les morceaux sont numérotés 1..m, sans trou ni doublon', () => {
+  // ⚠️ Sans numérotation stricte, le recollage est ambigu (RFC 2046 : `number`
+  //    commence à 1 ; RFC 6455 : ordre strict, jamais entrelacé).
+  fc.assert(fc.property(fc.string({ minLength: 200, maxLength: 600 }), (t) => {
+    const cap = H_MAX() + 20;
+    const r = morceler([{ id: 'a', label: 'A', text: t }], cap);
+    if (r.length === 1) return; // chemin 1 : rien à numéroter
+    const nums = r.map((m) => Number(/MORCEAU (\d+)\//.exec(m.text)[1]));
+    expect(nums).toEqual(nums.map((_, i) => i + 1));
+    expect(new Set(r.map((m) => m.id)).size).toBe(r.length);
+  }), { numRuns: 300 });
+});
+
+test('SCANNER ④ NEGATIVE-CHECK : les propriétés SAVENT tomber (sinon elles certifient)', () => {
+  // ⚠️ Sabotage RÉEL : un découpeur qui PERD la dernière tranche doit faire
+  //    rougir ② — sans ce contrôle, une propriété toujours vraie ne prouve rien.
+  const sabote = (segments, capacite) => morceler(segments, capacite).slice(0, -1);
+  const t = 'x'.repeat(400);
+  const cap = H_MAX() + 20;
+  const recolle = sabote([{ id: 'a', label: 'A', text: t }], cap)
+    .map((m) => m.text.replace(/^⟦[^⟧]*⟧\n/, '')).join('');
+  expect(recolle.replace(/\n/g, '')).not.toBe(t);
 });

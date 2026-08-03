@@ -98,6 +98,29 @@ Plus : coupe sur **frontières de lignes** (RFC 2046) et **ordre strict, jamais 
 
 Détail complet, sources datées et mesures : `budget-paquets-reference.md` (on-demand).
 
+## CANARI — le seul témoin qui regarde l'AUTRE BOUT du tuyau (03/08/2026, LIVE)
+
+⚠️ **TOUT LE RESTE DU FRAMEWORK SE TESTE LUI-MÊME.** Le doctor spawne NOTRE hook avec NOTRE payload et vérifie NOTRE sortie. C'est nécessaire — et parfaitement aveugle au seul risque qui reste : **que le HARNAIS change d'avis** (champs renommés, `additionalContext` plus consommé). Alors les hooks fail-open en silence, le doctor reste VERT, et plus rien n'atteint l'agent. Aucun test ne peut voir ça : on se testerait soi-même.
+
+**Ce que couvre déjà le reste, ne pas le refaire** : limite abaissée → le SCEAU la rend bruyante · paquet perdu → le NUMÉRO manquant · notre code cassé → le DOCTOR.
+
+**Le canari** (`canari.js` PUR + `canari-check.js` coquille, UserPromptSubmit) lit le TRANSCRIPT réel du harnais et tranche `vivant`/`mort`/`indecidable`. ⚠️ **DÉCIDABLE** : une injection qui a ATTERRI laisse `[source: …]` ; UNE seule trace prouve que le canal vit. On ne compare JAMAIS reçu vs attendu.
+
+⚠️ **L'ALARME NE PASSE JAMAIS PAR LE TUYAU TESTÉ** — hurler par une injection mourrait avec ce qu'elle signale. Sortie = `state/canari.json`, lu par un afficheur HORS framework (chez le mainteneur : la statusline). **Le framework ne fournit ni ne dépend d'aucun afficheur** — il publie un verdict, point. C'est ce qui le garde installable tel quel par n'importe qui.
+
+⚠️ **MUET quand tout va bien** : une alarme permanente devient un décor. **Lecture bornée à 2 Mo depuis la fin** (transcript réel du parc mesuré à **104 Mo** : 524 ms l'intégrale, 5 ms la queue). **Seuil 25 appels** = taille d'ÉCHANTILLON, pas un délai.
+
+⚠️ **Le dialecte du harnais vit dans la COQUILLE** (`MARQUE_APPEL_CLAUDE`), jamais dans `canari.js` — porter le canari = changer cette ligne, rien d'autre. Même contrat que `porte-core` ⟷ `doc-inject`/`codex-doc-inject`.
+
+⚠️ **JAMAIS ENCORE DÉCLENCHÉ EN RÉEL** (par construction : il ne tire que si le canal meurt). Sa preuve est en laboratoire — spawn réel sur transcript fabriqué.
+
+## LES GATES DE PURETÉ ÉTAIENT INERTES (bug RÉEL, 03/08/2026)
+
+⚠️ `lib-pure-must-stay-pure` — le plus ancien gate d'architecture du repo, documenté partout comme LA garantie — **ne pouvait pas rougir**. Un `require('fs')` en tête de `lib-pure.js` passait VERT. **Toutes** les règles `*-must-stay-pure` étaient décoratives.
+**Cause (doc officielle dependency-cruiser 18.1.0)** : `includeOnly` **filtre AUSSI les dépendances** ⇒ `fs`/`path`/`child_process` n'entraient jamais dans le graphe. Mesure : 41 modules/99 deps avant, **47/143** après avoir laissé entrer les modules cœur.
+⚠️ **Scellé par `deps-purete-gate.test.js`** (statique DÉRIVÉ des règles + sabotage réel SUR COPIE). **Nouvelle règle de pureté ⇒ son module cœur DOIT être dans `includeOnly`**, sinon elle naît inerte.
+⚠️ **Un sabotage de test ne touche JAMAIS un fichier réel** : la 1re version a fait tomber 38 tests d'autres suites qui importaient `lib-pure.js` EN PARALLÈLE. Et **jamais `npx` depuis un tmpdir** — il va chercher le paquet sur le RÉSEAU (placeholder anti-dependency-confusion ramené, mesuré) : pointer le binaire local.
+
 ## Ajouter un MCP au standard
 1. Créer `Desktop/mcp-doc-hooks/docs/mcp/{server}.md`. ⚠️ **Le framework n'impose NI taille NI format** : il DOIT livrer une doc de n'importe quelle taille — si elle ne passe pas, le défaut est dans le TRANSPORT, jamais dans la doc. « <10 lignes, 1 ligne = 1 invariant/piège, ton impératif » est la convention D'USAGE de ce parc (anti-dilution) — la suivre ici, ne JAMAIS la présenter comme une règle du moteur ni la faire appliquer par un gate du framework.
 2. C'est tout. Aucun code à écrire — le hook générique lit tous les `.md` du dossier à la volée.
