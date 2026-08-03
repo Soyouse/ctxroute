@@ -206,6 +206,91 @@ Le risque de bascule est donc borné aux cas qui, sans ça, étaient DÉJÀ cass
 ⚠️ **N est un cliquet, DÉRIVÉ d'une mesure sur le plus gros contenu réel — jamais deviné.** Trop
 petit = l'éviction revient ; trop grand = des spawns pour rien sur un poste sujet à la saturation.
 
+## 🔴 OUVERT — 4 manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
+
+> ⚠️ Les 3 premiers sont des trous que J'AI CRÉÉS la nuit du 03→04/08 en posant le canari, et que
+> l'audit de session a d'abord RATÉS. Ils sont classés par gravité, pas par facilité.
+
+### ① Le CANARI n'est pas surveillé par le doctor — VIOLATION du contrat du framework
+**Constat mesuré** : `grep -c canari doctor.js` = **0**. Or le contrat (skill, §Porter sur un nouveau
+harnais, point 4) dit : « Preuves OBLIGATOIRES avant de câbler : extension du doctor (probe de
+chaque nouvelle porte + check câblage + negative-check) ». `canari-check.js` a été câblé en PROD
+dans `settings.json` (UserPromptSubmit) **sans sonde**.
+**Pourquoi c'est le plus grave** : le canari est un dead-man switch. S'il meurt, plus rien ne
+signale la mort du canal d'injection — ET on croit être surveillé. **Le veilleur sans veilleur =
+fausse confiance**, exactement ce que `doctor.md` interdit.
+**Cible** : sonde doctor qui prouve un EFFET RÉEL (poser un transcript de test → lancer la coquille
+→ exiger le fichier `canari.json` avec le bon verdict), + check du câblage `--settings`, + un
+negative-check dans `doctor.test.js` qui SABOTE une copie et exige le hurlement.
+
+### ② Codex n'a AUCUN canari — le trou n'est fermé QUE pour Claude Code
+**Constat mesuré** : `0` mention de `canari` dans le câblage Codex (`requirements.toml`).
+L'injection, elle, reste bien compatible Codex (coquilles + probes 7-8). Mais le filet posé le
+03/08 est mono-harnais : si OpenAI change son contrat de hooks, ça meurt en SILENCE comme avant.
+**Cible** : coquille `codex-canari-check.js` (le noyau `canari.js` ne bouge PAS — il ne connaît
+aucun dialecte depuis le 03/08). Seule inconnue à MESURER : le format du transcript Codex et le
+marqueur d'appel d'outil équivalent à `"type":"tool_use"`. ⚠️ **Mesurer sur un payload/transcript
+RÉEL, jamais sur parole** (règle du portage).
+
+### ③ `additionalContextLimit` (Codex) n'est qu'un COMMENTAIRE
+**Constat mesuré** : la seule occurrence dans le code est `budget.js:213`, en commentaire. La doc
+injectable ET le skill affirment pourtant « Codex expose une autorité déclarée ⇒ on la LIT ».
+**Ce n'est pas cassé** (le plancher 8 000 est conservateur donc sûr) **mais la doc décrit une
+intention comme un fait** — c'est une doc qui ment, la classe d'erreur que ce repo combat.
+**Cible** : la coquille Codex lit le réglage et le passe en `options.budget` (`0` = illimité).
+Tant que ce n'est pas fait, **corriger la doc** pour dire « plancher conservateur, lecture du
+réglage = BACKLOG », jamais l'inverse.
+
+### ④ Contrat de frontière canari ⟷ afficheur non scellé
+La frontière est le fichier `state/canari.json`. Vérifiée À LA MAIN le 03/08 (statusline), jamais
+par un test. La doctrine exige un test de contrat de CHAQUE frontière entre composants.
+**Cible** : test de contrat sur la forme du fichier (clés + valeurs admises du verdict), côté
+producteur ; l'afficheur vit hors framework et n'a pas à être testé ici.
+
+### Contexte à ne pas perdre
+Le canari **n'a jamais tiré en conditions réelles** (par construction : il ne tire que si le canal
+meurt). Sa seule preuve est en laboratoire — spawn réel sur transcript fabriqué. Ne pas le
+présenter comme éprouvé en prod.
+
+---
+
+## 🔴 OUVERT — DOC-FIRST : le réflexe inverse a coûté 2 fois dans la MÊME session (04/08/2026)
+
+**Fait, deux fois la même nuit** :
+1. `includeOnly` de dependency-cruiser : j'ai sondé par SABOTAGE (3 essais) avant de lire la doc.
+   La doc officielle 18.1.0 donnait la réponse en une phrase — « includeOnly will discard all files
+   not matching the pattern » — et donc l'explication complète du gate inerte.
+2. `fc.stringOf` : supprimé en fast-check 4 (le parc est en **4.9.0**). Deux allers-retours pour
+   une API qu'une lecture de la doc de la version INSTALLÉE aurait donnée immédiatement.
+
+⚠️ **CE N'EST PAS UN OUBLI ISOLÉ, c'est le biais natif du modèle**, déjà écrit dans CLAUDE.md
+(« l'expérimentation arrive TOUJOURS trop tôt »). Il s'est reproduit malgré la règle écrite ⇒ selon
+la doctrine des garde-fous, **une consigne en prose qui ne tient pas doit devenir un déclencheur
+mécanique**.
+
+**Pourquoi la doc injectable existante n'a PAS suffi** : `web-recherche.md` se déclenche sur
+`WebFetch`/`WebSearch` — c'est-à-dire **une fois qu'on a DÉJÀ décidé de chercher**. Elle ne peut
+structurellement pas se déclencher quand on décide d'expérimenter À LA PLACE de chercher. C'est un
+angle mort RÉEL du périmètre, pas un défaut de rédaction.
+
+**Cible (décidable, donc exprimable)** : déclencher sur le GESTE « je touche la configuration d'un
+outil TIERS » — `.dependency-cruiser.json`, `stryker.conf.json`, `vitest.config.*`, `.jscpd.json`,
+`package.json` — avec le message : *« comportement d'un outil tiers = LIRE SA DOC OFFICIELLE pour
+la version INSTALLÉE d'abord ; rétro-ingénierer un comportement documenté est interdit »*.
+Ce déclencheur AURAIT tiré cette nuit : j'ai édité `.dependency-cruiser.json` avant de sonder.
+⚠️ Vérifier le périmètre par spawn réel (1 cas positif + 1 négatif) avant de le poser — jamais sur
+parole.
+
+**Second volet, même racine — LES DOCS À JOUR** : plusieurs docs de ce repo se sont révélées
+PÉRIMÉES cette nuit (`capacitePaquet` exigeait encore un gate de taille · `couverture.md` décrivait
+un volet supprimé et proposait de RESSUSCITER un cliquet · l'arbo décrivait un segment
+« indivisible » · le skill se disait « rien n'est câblé »). Toutes corrigées, mais **elles avaient
+survécu des jours**. Une doc qui ment oriente vers la mauvaise cause — même dégât qu'un gate inerte.
+**Cible** : trouver le déclencheur mécanique de la péremption (piste : toute doc citant un
+identifiant de code qui n'existe plus = ROUGE, dérivé, jamais une liste).
+
+---
+
 ## 🔴 OUVERT — INJECTION INTÉGRALE D'UN SKILL (la VRAIE cible du §20/07, ouvert 31/07/2026)
 
 **Le problème, sans détour** : un skill fait des CENTAINES DE LIGNES **par conception** — c'est le
