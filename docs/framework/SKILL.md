@@ -3,7 +3,7 @@
 ## ⚠️ PROD VIVANTE — NE RIEN CASSER (règle n°1, avant toute autre)
 ⚠️ **PROJET PUBLIC (open source)** : traiter le repo comme DÉJÀ public, même avant publication. ZÉRO info perso dans les fichiers trackés — jamais de prénom (dire « le mainteneur »), jamais de chemin utilisateur réel (fixtures = `C:/Users/dev/...`), jamais d'IP réelle (utiliser la plage de documentation 203.0.113.x), jamais d'email/secret/nom de client. Les docs perso (`docs/mcp/*.md`, `docs/session/*.md`) restent GITIGNORÉES — seuls les `.md.example` génériques se poussent. Avant publication effective : squasher l'historique (les vieux commits contiennent du perso) ET remplacer `mcp-doc-config.json` par un `.example` générique (la config livrée contient les NOMS des skills/projets du mainteneur — données perso ; l'utilisateur crée la sienne, les gates la valident).
 ⚠️ **`~/.claude/hooks/protect-files.js`, `statusline.js` et les hooks câblés dans `settings.json` sont EN PRODUCTION EN PERMANENCE** : d'AUTRES agents (Claude Code, Codex) tournent en parallèle de toi et s'en servent à chaque appel d'outil. Les modifier casse LEUR travail en cours et brûle les tokens du mainteneur — argent réel.
-⚠️ **Ce framework est du DÉVELOPPEMENT PUR pour l'instant.** Interdit : toucher un fichier vivant de `~/.claude/hooks/`, débrancher l'injection de doc existante, éditer `settings.json`, `protected-paths.json`. Le refactor est en phase EXPAND : on AJOUTE dans `Desktop/mcp-doc-hooks/`, rien n'est câblé, l'ancien tourne intact.
+⚠️ **CE FRAMEWORK EST EN PRODUCTION** (à jour 03/08/2026 — l'ancienne mention « développement pur, rien n'est câblé » était PÉRIMÉE). `settings.json` câble la porte en **12 déclarations** `--paquet k --paquets 12`. Toute modification touche IMMÉDIATEMENT tous les agents en cours. Interdit sans GO : débrancher l'injection, retirer des déclarations de paquets, toucher un fichier vivant de `~/.claude/hooks/`.
 ⚠️ **La bascule (étape 2) et le retrait (étape 3) exigent un GO EXPLICITE du mainteneur, à un moment où aucun agent ne tourne.** Ne jamais les enchaîner « puisque le différentiel est vert » — vert prouve l'équivalence du match, pas que le moment est bon.
 ⚠️ **Zéro `taskkill`/`Stop-Process` à filet large sur `node.exe`** : les serveurs MCP et les agents des autres sessions tournent sous node. Ne viser QUE des process dont le parent est mort (orphelins), jamais « tous les node récents » (erreur commise le 15/07/2026).
 
@@ -58,6 +58,41 @@ Le MOTEUR est portable PAR CONSTRUCTION (gate `sources-must-not-know-the-harness
 4. **Preuves OBLIGATOIRES avant de câbler** (pas d'exception) : suite d'intégration par spawn réel sur corpus tmpdir (modèles : `doc-inject.test.js`, `session-inject.test.js`, `doc-write-guard.test.js`) + extension du doctor (probe de chaque nouvelle porte + check câblage + negative-check dans `doctor.test.js` qui SABOTE une copie et exige le hurlement).
 5. Un harnais SANS un événement (ex. pas de SessionStart) = on saute CETTE voie, on le note dans REFACTOR-PLAN — jamais de contournement bricolé.
 6. Fini = `npm test` vert + mutation verte + doctor vert sur le câblage réel + REFACTOR-PLAN/skill mis à jour. Un portage sans ces 4 preuves N'EST PAS fini.
+
+## TRANSPORT MULTI-TRAMES — le framework LIVRE TOUT (03/08/2026, LIVE en prod)
+
+**LA RÈGLE, DEUX CHEMINS ET PAS TROIS** — c'est tout le mécanisme :
+1. **ça rentre dans la trame** ⇒ on émet tel quel (zéro enveloppe, zéro boucle, coût nul) ;
+2. **ça ne rentre pas** ⇒ on **découpe en morceaux** répartis sur N trames.
+
+⚠️ **Il n'existe AUCUN cas où le framework refuse de livrer.** L'indélivrabilité est impossible par construction : une doc de n'importe quelle taille arrive — 10 Ko, 80 Ko, peu importe. **NE JAMAIS réintroduire un plafond de taille, un « trop gros », un « scinde ta doc ».** Ce serait faire porter à l'AUTEUR d'une doc un défaut du TRANSPORT. Le framework livre, il ne juge pas ce qu'on lui confie. C'est pour ça que le volet ④ du `couverture-gate` (plafond de longueur) a été SUPPRIMÉ, et que la règle « <10 lignes » n'est qu'une convention de parc — jamais une contrainte du moteur.
+
+**POURQUOI ON A FAIT ÇA.** Le harnais borne la taille d'une injection ; au-delà il range le contenu dans un fichier et n'en montre qu'un aperçu, **sans prévenir le producteur**. Résultat vécu : des docs annoncées « non injectées » à chaque tour, et des skills jamais livrés. Une doc qui n'arrive pas est un invariant qui ne protège personne.
+
+**LE PROTOCOLE — repris de l'existant, rien d'inventé.** Deux standards résolvent exactement ce problème (un message trop gros pour son canal) et imposent les MÊMES trois informations :
+| Ce dont le récepteur a besoin | RFC 2046 `message/partial` | RFC 6455 WebSocket | Chez nous |
+|---|---|---|---|
+| à qui ça appartient | `id` | la connexion | marqueur commun `###FIN:xxxx###` |
+| où ça va | `number`, **commence à 1** | frames de continuation | `MORCEAU j/m` |
+| quand c'est complet | `total` | **bit FIN** | le `m` de `j/m` |
+Plus : coupe sur **frontières de lignes** (RFC 2046) et **ordre strict, jamais entrelacé** (RFC 6455). ⚠️ En retirer UN SEUL rend le réassemblage ambigu — chacun supprime une garantie.
+
+⚠️ **C'est de la segmentation TCP/MSS, PAS de la fragmentation IP.** RFC 8900 déconseille la fragmentation IP, mais ses 9 causes de fragilité sont TOUTES des équipements intermédiaires (NAT, pare-feu, ECMP) — il n'y en a aucun ici. Sa recommandation de fond (« découper à la couche qui comprend la sémantique ») décrit exactement ce qu'on fait.
+
+⚠️ **AUCUNE découverte automatique du plafond** (RFC 8899/PLPMTUD) : la détection classique dépend d'un signal de retour, et ici **il n'y en a aucun** — l'unique récepteur est l'agent. Un mécanisme fondé sur un signal absent tombe en trou noir SILENCIEUX. À la place : **plancher conservateur + négociation quand une autorité existe**.
+
+**LES DEUX POSTURES, selon ce que le harnais expose** — même principe, pas une exception :
+- **Claude Code** : plafond interne NON documenté + feature-gate DISTANT ⇒ on ne lit rien, on prend une **marge** (défaut 8 000 sous les 10 000 mesurés).
+- **Codex** : `additionalContextLimit` est **documenté et réglé par l'utilisateur** ⇒ on le **LIT**. C'est l'autorité déclarée, pas un interne deviné.
+- **Gemini** : `PreToolUse` n'expose PAS le canal — trou de capacité, pas de taille ; aucune fragmentation n'y remédie.
+
+⚠️ **SI UN HARNAIS ABAISSE SA LIMITE** : ça ne casse pas en silence (le sceau annonce le marqueur de fin ; s'il manque, l'agent SAIT qu'il a été tronqué). La correction est **UN nombre de config** (`budgetInjection`), zéro ligne de code — tout se re-découpe. C'est ça, résister aux mises à jour.
+
+⚠️ **PIÈGE DE CONCURRENCE, ne jamais le réintroduire** : les N processus sont PARALLÈLES et appellent chacun `gate.decide`, qui ÉCRIT l'état ⇒ le premier consommerait les `once` et les trames suivantes seraient VIDES. D'où le **plan mémoïsé par invocation** : un seul décide, tous recalculent le même découpage **par déterminisme pur**. Aucune coordination, aucun verrou neuf — c'est le déterminisme qui remplace l'autorité. Toute source de non-déterminisme dans `planifierPaquets` (horloge, aléa, lecture d'état) casserait tout.
+
+⚠️ **Un reliquat ne veut PAS dire « trop gros »** — tout est morcelable. Il signifie **`--paquets N` trop petit** : erreur de configuration, et le message porte sa solution. Câblage actuel : **N = 12** (plus gros contenu du parc : 79 516 c ⇒ 11 trames).
+
+Détail complet, sources datées et mesures : `budget-paquets-reference.md` (on-demand).
 
 ## Ajouter un MCP au standard
 1. Créer `Desktop/mcp-doc-hooks/docs/mcp/{server}.md`. ⚠️ **Le framework n'impose NI taille NI format** : il DOIT livrer une doc de n'importe quelle taille — si elle ne passe pas, le défaut est dans le TRANSPORT, jamais dans la doc. « <10 lignes, 1 ligne = 1 invariant/piège, ton impératif » est la convention D'USAGE de ce parc (anti-dilution) — la suivre ici, ne JAMAIS la présenter comme une règle du moteur ni la faire appliquer par un gate du framework.
