@@ -20,7 +20,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
-import { planifier, planifierPaquets, capacitePaquet, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, capacitePaquet, morceler, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
 
 // Fixtures = THUNKS (cf. perTest ci-dessus).
 const seg = (id, n, label) => ({ id, text: 'x'.repeat(n), label: label || id + '.md' });
@@ -388,6 +388,116 @@ test('TRAME MINUSCULE : on découpe plus fin, on ne renonce JAMAIS', () => {
   assert.ok(emis.length > 3, 'la trame est petite ⇒ beaucoup de morceaux');
   for (const d of ['a', 'b', 'c']) {
     assert.ok(emis.some((id) => id === d || id.startsWith(d + '#')), 'doc ' + d + ' livrée');
+  }
+});
+
+// ── SCANNER `morceler` — scellé DIRECTEMENT ────────────────────────────────
+// ⚠️ POURQUOI EN DIRECT : `morceler` interprète un format (des lignes) pour
+//    produire des tranches — c'est un SCANNER, et la doctrine du parc impose de
+//    le sceller à ce titre. Testé seulement à travers `planifierPaquets`, ses
+//    frontières restaient intestables : 6 mutants y survivaient le 03/08/2026
+//    alors que TOUT le reste du module était à 100 %.
+// ⚠️ Les attendus ci-dessous sont MESURÉS sur le code réel, jamais devinés.
+const H_MORCEAU = '⟦ A — MORCEAU 999/999 : recolle les 999 morceaux dans l\'ordre avant de lire ⟧\n'.length;
+const CAP5 = H_MORCEAU + 5; // ⇒ `utile` = 5 caractères de contenu par tranche
+const tranchesDe = (texte, capacite = CAP5) =>
+  morceler([{ id: 'a', label: 'A', text: texte }], capacite).map((m) => m.text.replace(/^⟦[^⟧]*⟧\n/, ''));
+
+test('SCANNER : les lignes courtes sont GROUPÉES tant qu\'elles tiennent, séparateur PRÉSERVÉ', () => {
+  const src = 'ab\ncd\nef\ngh\nij\nkl\nmn\nop\nqr\nst\nuv\nwx\nyz\nAB\nCD\nEF\nGH\nIJ\nKL\nMN\nOP\nQR\nST\nUV\nWX\nYZ\n01\n23\n45';
+  assert.ok(src.length > CAP5, 'prémisse : le texte dépasse la trame, donc il se découpe');
+  assert.deepStrictEqual(tranchesDe(src), [
+    'ab\ncd', 'ef\ngh', 'ij\nkl', 'mn\nop', 'qr\nst', 'uv\nwx', 'yz\nAB', 'CD\nEF',
+    'GH\nIJ', 'KL\nMN', 'OP\nQR', 'ST\nUV', 'WX\nYZ', '01\n23', '45',
+  ]);
+});
+
+test('SCANNER : une LIGNE MONSTRE est débitée, et le tampon en cours est vidé AVANT', () => {
+  // ⚠️ Vider le tampon d'abord est ce qui garde l'ORDRE de lecture : sans ça,
+  //    le début du texte sortirait APRÈS le milieu.
+  assert.deepStrictEqual(tranchesDe('ab\n' + 'x'.repeat(12) + '\ncd\n' + 'y'.repeat(90)).slice(0, 4), [
+    'ab', 'xxxxx', 'xxxxx', 'xx\ncd',
+  ]);
+});
+
+test('SCANNER : tampon VIDE en fin de texte ⇒ AUCUNE tranche vide ajoutée', () => {
+  // ⚠️ CAS PRÉCIS, mesuré : une ligne monstre d'un multiple EXACT de `utile`
+  //    SUIVIE d'une ligne vide (texte terminé par un saut) laisse réellement le
+  //    tampon vide. Pousser quand même produirait une tranche vide — un morceau
+  //    qui n'annonce RIEN, et un total `j/m` faussé pour TOUS les autres.
+  //    ⚠️ Sans le saut final, le tampon n'est PAS vide (il porte la dernière
+  //    tranche) : la variante ci-dessous ne prouverait rien.
+  const vide = tranchesDe('x'.repeat(100) + '\n');
+  assert.strictEqual(vide.length, 20, '100 / 5 = 20 tranches, pas 21');
+  assert.ok(vide.every((x) => x.length > 0), 'aucune tranche vide');
+  // Variante sans saut final : même compte, mais par le chemin « tampon plein ».
+  assert.strictEqual(tranchesDe('x'.repeat(100)).length, 20);
+});
+
+test('SCANNER : un texte finissant par une nouvelle ligne la CONSERVE', () => {
+  const src = 'ab\ncd\nef\ngh\nij\nkl\nmn\nop\nqr\nst\nuv\nwx\nyz\nAB\nCD\nEF\nGH\nIJ\nKL\nMN\nOP\nQR\nST\nUV\nWX\nYZ\n01\n23\n45\n';
+  const t = tranchesDe(src);
+  assert.strictEqual(t[t.length - 1], '45\n', 'le saut final fait partie du contenu, il ne se perd pas');
+});
+
+test('SCANNER : capacité NÉGATIVE ⇒ progression d\'un caractère, jamais un blocage', () => {
+  // ⚠️ Sans le plancher `Math.max(1, …)`, ce cas produisait une boucle infinie
+  //    ou faisait DISPARAÎTRE le contenu (bug réel, 03/08/2026).
+  assert.deepStrictEqual(tranchesDe('abc', -99), ['a', 'b', 'c']);
+});
+
+test('SCANNER : ce qui TIENT n\'est jamais touché (chemin 1 — ni en-tête ni découpe)', () => {
+  const m = morceler([{ id: 'a', label: 'A', text: 'court' }], CAP5);
+  assert.deepStrictEqual(m, [{ id: 'a', label: 'A', text: 'court' }], 'segment rendu tel quel, id inchangé');
+});
+
+test("BUDGET SOUS L'ENVELOPPE : c'est l'ENVELOPPE qui cède, jamais le contenu", () => {
+  // ⚠️ BUG RÉEL du 03/08/2026, scellé ici : quand le budget est plus petit que
+  //    l'enveloppe de scellement, `capacitePaquet` devient NÉGATIVE. Avant ce
+  //    correctif, AUCUNE doc ne sortait (0 émis) et le message accusait
+  //    `--paquets N` — une indélivrabilité par construction, DOUBLÉE d'un
+  //    message qui ment sur sa cause. Le sceau est un confort de détection ;
+  //    LIVRER est le contrat. Quand les deux ne tiennent pas, on livre.
+  assert.ok(capacitePaquet(300, 12) < 0, "prémisse : à ce budget l'enveloppe ne rentre pas");
+  const p = planifierPaquets([{ id: 'a', label: 'A', text: 'x'.repeat(400) }], 300, 12);
+  const emis = p.flatMap((x) => x.emis);
+  assert.ok(emis.length > 0, 'INDÉLIVRABILITÉ INTERDITE : au moins un morceau sort');
+  // ⚠️ Retirer les en-têtes de morceau AVANT de compter : ils contiennent le mot
+  //    « morceaux », donc un « x » — compter naïvement gonfle le total de 1 par
+  //    morceau et rend un faux ROUGE (mesuré en écrivant ce test).
+  const livre = p.map((x) => x.texte).join('').replace(/⟦[^⟧]*⟧\n/g, '').replace(/[^x]/g, '').length;
+  assert.strictEqual(livre, 400, 'tout le contenu est livré, à la lettre près');
+  // Descellé ⇒ on n'ANNONCE pas un sceau qui n'existe pas (« vert qui ment »).
+  for (const x of p) {
+    assert.strictEqual(x.marqueur, '', 'aucun marqueur annoncé quand rien n\'est scellé');
+    assert.ok(!x.texte.includes('###FIN:'), 'aucun sceau dans le texte');
+  }
+  // …et la BORNE tient quand même sur toute trame porteuse de contenu.
+  for (const x of p) {
+    if (x.emis.length > 0) assert.ok(x.texte.length <= 300, 'trame de contenu bornée');
+  }
+});
+
+test('FRONTIÈRE DU DESCELLEMENT : capacité PILE à zéro ⇒ descellé (il ne reste aucune place)', () => {
+  // ⚠️ `capacite > 0` et non `>= 0` : à zéro, l'enveloppe occupe la trame
+  //    ENTIÈRE — la sceller ne laisserait pas UN caractère de contenu. Livrer
+  //    passe avant sceller, donc on descelle. Budget MESURÉ, pas deviné.
+  assert.strictEqual(capacitePaquet(342, 12), 0, 'prémisse : ce budget donne une capacité de zéro');
+  const p = planifierPaquets([{ id: 'a', label: 'A', text: 'x'.repeat(400) }], 342, 12);
+  assert.ok(p.flatMap((x) => x.emis).length > 0, 'du contenu sort quand même');
+  assert.ok(!p.some((x) => x.texte.includes('###FIN:')), 'aucun sceau : il n\'y avait pas la place');
+  // Un caractère de budget en plus et le sceau redevient possible.
+  const q = planifierPaquets([{ id: 'a', label: 'A', text: 'x'.repeat(400) }], 343, 12);
+  assert.ok(q.some((x) => x.texte.includes('###FIN:')), 'à capacité 1, on scelle');
+});
+
+test('DIFFÉRÉS : seul le DERNIER paquet les porte (les autres ont une liste vide)', () => {
+  // ⚠️ C'est le dernier qui porte l'annonce : la lui retirer, ou la donner à
+  //    tous, ferait répéter N fois la même liste — ou la perdrait.
+  const p = planifierPaquets(quatre400(), 1145, 3);
+  assert.ok(p[p.length - 1].differes.length > 0, 'prémisse : il reste des morceaux');
+  for (let i = 0; i < p.length - 1; i++) {
+    assert.deepStrictEqual(p[i].differes, [], 'paquet ' + (i + 1) + ' ne porte aucun différé');
   }
 });
 

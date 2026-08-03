@@ -140,4 +140,16 @@ test('NEGATIVE-CHECK : les 3 volets DÉTECTENT vraiment un oubli', () => {
 //    qui ne regarde que le parc du mainteneur. Si un jour des morceaux ne
 //    sortent pas, ce n'est pas « trop gros » : c'est `--paquets N` trop petit,
 //    et le message d'exécution le dit avec sa solution.
+//
+// ⚠️ VOLET ⑤ SUPPRIMÉ AUSSI (03/08/2026) — et pour une raison DIFFÉRENTE de
+//    celle qui l'avait mis en pause. Il plafonnait le POIDS DES SKILLS. Il
+//    avait été suspendu le 02/08 au motif « l'injection auto des skills n'est
+//    pas au point », avec une condition de réactivation : « injection prouvée
+//    par spawn réel ». ⚠️ CETTE CONDITION EST DÉSORMAIS REMPLIE (le doctor
+//    prouve l'injection du corps du skill, et le skill de 28 Ko arrive en
+//    MORCEAUX numérotés) — la relire telle quelle conduirait à RESSUSCITER un
+//    cliquet de taille. C'est exactement l'inverse de ce qu'il faut faire :
+//    la condition est CADUQUE, pas remplie. Un skill lourd est LIVRÉ, donc son
+//    poids n'est plus un défaut à sanctionner. NE JAMAIS le réintroduire, et
+//    ne JAMAIS conseiller de scinder un skill : il s'injecte EN ENTIER.
 

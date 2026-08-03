@@ -92,6 +92,10 @@ Plus : coupe sur **frontières de lignes** (RFC 2046) et **ordre strict, jamais 
 
 ⚠️ **Un reliquat ne veut PAS dire « trop gros »** — tout est morcelable. Il signifie **`--paquets N` trop petit** : erreur de configuration, et le message porte sa solution. Câblage actuel : **N = 12** (plus gros contenu du parc : 79 516 c ⇒ 11 trames).
 
+⚠️ **RIEN N'EST JAMAIS « TROP PETIT » NON PLUS** (03/08/2026). Un contenu de 2 caractères sort tel quel par le chemin 1 — il n'existe aucun plancher. Et quand le budget est si petit qu'il ne porte même pas le sceau (`capacitePaquet` ≤ 0), **c'est l'ENVELOPPE qui cède, jamais le contenu** : on descelle et on livre (le marqueur rendu est alors vide — ne JAMAIS annoncer un sceau absent du texte). Bug RÉEL corrigé ce jour-là : avant, ce cas sortait ZÉRO doc **et** accusait `--paquets N`, c'est-à-dire une indélivrabilité doublée d'un message faux. **Livrer passe avant sceller, toujours.**
+
+⚠️ **COÛT MESURÉ, à ne pas se tromper de cible** : 12 processus `node` qui ne font RIEN coûtent ~4 s sur le poste de mesure ; la porte complète ~4,2 s. **Le framework pèse 4 % — les 96 % restants sont le démarrage de node.** Optimiser la collecte (mémoïser plus tôt, sauter le corpus) est une FAUSSE piste, mesurée et écartée le 03/08/2026. Le seul levier réel sur le coût est **N**, et le baisser plafonnerait ce qu'on peut livrer. Ne pas rouvrir sans nouvelle mesure.
+
 Détail complet, sources datées et mesures : `budget-paquets-reference.md` (on-demand).
 
 ## Ajouter un MCP au standard

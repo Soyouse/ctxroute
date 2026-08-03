@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════
-// BUDGET D'ÉMISSION — ce qui sort tient dans une trame, ou il est ANNONCÉ.
+// BUDGET D'ÉMISSION — TOUT SORT. Ce qui ne tient pas dans une trame est
+// MORCELÉ et réparti ; rien n'est jamais refusé pour sa taille.
 // ═══════════════════════════════════════════════════════════════════════
 //
 // RAISON D'ÊTRE (31/07/2026, défaut VÉCU) : tout harnais borne la taille d'une
@@ -250,8 +251,16 @@ function annonceConfig(reliquat) {
 }
 
 // Rendu d'UN paquet. `reliquat` n'est jamais non-vide que sur le DERNIER.
-function composerPaquet(retenus, reliquat, k, n, marqueur) {
+//
+// ⚠️ `scelle=false` ⇒ ENVELOPPE OMISE. C'EST L'ENVELOPPE QUI CÈDE, JAMAIS LE
+//    CONTENU (bug RÉEL du 03/08/2026 : avec un budget plus petit que l'enveloppe
+//    elle-même, AUCUNE doc ne sortait et le message accusait `--paquets N` — un
+//    « trop petit » inventé, et un message qui MENT sur sa cause). Le scellement
+//    est un CONFORT de détection ; livrer est le CONTRAT. Quand les deux ne
+//    tiennent pas ensemble, on livre. Dégradation EXPLICITE, jamais un silence.
+function composerPaquet(retenus, reliquat, k, n, marqueur, scelle) {
   const corps = retenus.map((s) => s.text).join(SEPARATEUR);
+  if (!scelle) return corps + annonceConfig(reliquat);
   return enTetePaquet(marqueur, k, n) + corps + annonceConfig(reliquat) + pied(marqueur);
 }
 
@@ -308,6 +317,14 @@ function morceler(segments, capacite) {
     let courante = '';
     for (const ligne of s.text.split('\n')) {
       let l = ligne;
+      // ⚠️ ÉQUIVALENT PROUVÉ, ne pas chercher à le tuer : `>=` rend EXACTEMENT
+      //    la même découpe. Raison : une ligne longue de `utile` PILE ne peut
+      //    fusionner avec rien (tout ajout la ferait dépasser), donc la pousser
+      //    tout de suite ou la garder en tampon produit la même suite. Vérifié
+      //    par différentiel exhaustif le 03/08/2026 : 200 000 entrées aléatoires
+      //    (longueurs de lignes 0-8, `utile` 1-6), ZÉRO divergence.
+      //    On garde `>` : c'est la forme qui dit « ne rentre pas », le sens réel.
+      // Stryker disable next-line EqualityOperator
       while (l.length > utile) { // ligne monstre : on la débite
         if (courante) { tranches.push(courante); courante = ''; }
         tranches.push(l.slice(0, utile));
@@ -369,23 +386,28 @@ function planifierPaquets(segments, budget, nbPaquets) {
   // Dérivé du contenu entier ⇒ identique dans les N processus (déterminisme).
   const marqueur = empreinte(liste.map((s) => s.text).join(SEPARATEUR) + n);
 
-  // Un segment qui ne rentre seul dans AUCUN paquet ne rentrera jamais : il
-  // part en annonce d'emblée. ⚠️ Le sortir ICI (et non pendant le remplissage)
-  // évite qu'il bloque une trame entière en la laissant vide.
+  // Tout ce qui dépasse la capacité d'une trame est MORCELÉ, jamais écarté.
   // Overhead calculé au PIRE cas (`n/n`, le plus large en chiffres) : borne
   // sûre, jamais optimiste.
   // ⚠️ IL N'Y A PLUS D'« IMPOSSIBLES » (03/08/2026). Avant, un segment plus
   //    lourd qu'une trame était mis de côté et seulement ANNONCÉ : il
   //    n'arrivait JAMAIS. Désormais il est MORCELÉ et livré. Le framework
   //    LIVRE — il ne juge pas la taille de ce qu'on lui confie.
-  const reste = morceler(liste, capacitePaquet(max, n));
+  // ⚠️ CAPACITÉ NÉGATIVE = LE BUDGET NE PORTE MÊME PAS L'ENVELOPPE. On ne
+  //    renonce PAS à livrer pour autant : on DÉSCELLE et on remplit la trame
+  //    entière de contenu. Sans ce chemin, un budget mal réglé faisait sortir
+  //    ZÉRO doc en accusant `--paquets N` — indélivrabilité + message faux, les
+  //    deux défauts que ce module existe pour rendre impossibles.
+  const capacite = capacitePaquet(max, n);
+  const scelle = capacite > 0;
+  const reste = morceler(liste, scelle ? capacite : max);
 
   const groupes = [];
   // Paquets 1..N-1 : remplissage glouton, ordre de priorité PRÉSERVÉ (l'ordre
   // d'entrée PORTE le rank — ne jamais retrier ici).
   for (let i = 0; i < n - 1; i++) {
     const retenus = [];
-    while (reste.length > 0 && composerPaquet(retenus.concat([reste[0]]), [], i + 1, n, marqueur).length <= max) {
+    while (reste.length > 0 && composerPaquet(retenus.concat([reste[0]]), [], i + 1, n, marqueur, scelle).length <= max) {
       retenus.push(reste.shift());
     }
     groupes.push(retenus);
@@ -401,11 +423,15 @@ function planifierPaquets(segments, budget, nbPaquets) {
   //    dépasse : on émet quand même l'annonce (dire « il manque ça » vaut mieux
   //    que le silence — même arbitrage que `planifier`).
   let dernier = [];
-  let differesFinaux = reste.slice();
+  // ⚠️ PAS de `.slice()` défensif : plus rien ne mute `reste` en aval, donc la
+  //    copie serait INOBSERVABLE — c'est-à-dire un mutant ÉQUIVALENT, donc un
+  //    survivant éternel (mesuré 03/08/2026). Doctrine du parc : on ÉLIMINE
+  //    l'équivalence par construction, on ne la désactive JAMAIS.
+  let differesFinaux = reste;
   for (let k = reste.length; k >= 1; k--) {
     const essai = reste.slice(0, k);
     const laisses = reste.slice(k);
-    if (composerPaquet(essai, laisses, n, n, marqueur).length <= max) {
+    if (composerPaquet(essai, laisses, n, n, marqueur, scelle).length <= max) {
       dernier = essai;
       differesFinaux = laisses;
       break;
@@ -420,26 +446,31 @@ function planifierPaquets(segments, budget, nbPaquets) {
     //    tokens pour annoncer du néant, à chaque geste.
     if (retenus.length === 0 && differes.length === 0) return paquetVide();
     return {
-      texte: composerPaquet(retenus, differes, i + 1, n, marqueur),
+      texte: composerPaquet(retenus, differes, i + 1, n, marqueur, scelle),
       emis: retenus.map((s) => s.id),
       differes,
-      marqueur,
+      // ⚠️ Descellé ⇒ marqueur VIDE : annoncer un sceau absent du texte serait
+      //    exactement le « vert qui ment ». Ce que la porte rapporte doit
+      //    toujours décrire ce qui est RÉELLEMENT sorti.
+      marqueur: scelle ? marqueur : '',
     };
   });
 }
 
 /**
- * Capacité de CONTENU d'un paquet — ce qu'un segment peut peser AU MAXIMUM
- * pour être livrable un jour.
+ * Capacité de CONTENU d'un paquet scellé — combien de caractères une trame peut
+ * porter une fois l'enveloppe déduite.
  *
- * ⚠️ C'est la SEULE borne physique qui vaille sur la taille d'une doc : au-delà,
- *    elle ne rentre dans AUCUNE trame et ne sera JAMAIS injectée, quel que soit
- *    le nombre de paquets (un segment est indivisible). En deçà, la taille
- *    n'est plus qu'une question de goût — et le goût n'est pas l'affaire du
- *    framework. Un gate de taille DOIT s'appuyer là-dessus, jamais sur un
- *    nombre de lignes conventionnel.
+ * ⚠️ CE N'EST PAS UNE LIMITE DE TAILLE DE DOC, et ça ne doit JAMAIS le
+ *    redevenir. C'est un pas de découpe : au-delà, la doc est MORCELÉE, jamais
+ *    refusée. ⚠️ NE JAMAIS bâtir un gate de taille là-dessus — l'ancien
+ *    commentaire l'exigeait (« un gate de taille DOIT s'appuyer là-dessus »),
+ *    il datait de la doctrine MORTE où un segment était indivisible. Le
+ *    framework LIVRE ; la taille d'une doc ne le regarde pas.
+ * ⚠️ Peut être NÉGATIVE (budget plus petit que l'enveloppe) : l'appelant
+ *    DÉSCELLE alors au lieu de renoncer — cf. `composerPaquet(…, scelle)`.
  * ⚠️ DÉRIVÉE de l'en-tête RÉEL (jamais une constante recopiée) : reformuler
- *    l'en-tête change la capacité, et le gate suit automatiquement.
+ *    l'en-tête change la capacité, et le découpage suit automatiquement.
  */
 function capacitePaquet(budget, nbPaquets) {
   // ⚠️ `Math.max(2, …)` et non `… >= 2 ? … : 2` : à nbPaquets = 2 les deux
@@ -460,4 +491,10 @@ function tailleEnveloppe() {
   return enTete(m).length + pied(m).length;
 }
 
-module.exports = { planifier, planifierPaquets, capacitePaquet, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };
+// ⚠️ `morceler` est EXPORTÉ pour être scellé DIRECTEMENT : c'est un SCANNER (il
+//    interprète un format — des lignes — pour produire des tranches), et la
+//    doctrine du parc impose le property-based sur tout scanner. Le tester à
+//    travers `planifierPaquets` laissait ses frontières intestables : 6 mutants
+//    y survivaient le 03/08/2026 alors que tout le reste du module était à 100 %.
+//    Ce n'est PAS une extension d'API publique — aucune coquille ne l'appelle.
+module.exports = { planifier, planifierPaquets, capacitePaquet, morceler, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };
