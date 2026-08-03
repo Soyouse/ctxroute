@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"explain.js","scope":["mcp-doc-hooks"]},{"pattern":"explain.test.js","scope":["mcp-doc-hooks"]},{"pattern":"collect-core.js","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"explain.js","scope":["ctxroute"]},{"pattern":"explain.test.js","scope":["ctxroute"]},{"pattern":"collect-core.js","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

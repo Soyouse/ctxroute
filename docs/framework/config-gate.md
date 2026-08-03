@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"mcp-doc-config.json","scope":["mcp-doc-hooks"],"rank":359},{"pattern":"config-gate.test.js","scope":["mcp-doc-hooks"],"rank":360},{"pattern":"mcp-doc-inject.test.js","scope":["mcp-doc-hooks"],"rank":361},{"pattern":"mcp-doc-config.schema.json","rank":567}]
+rules: [{"pattern":"mcp-doc-config.json","scope":["ctxroute"],"rank":359},{"pattern":"config-gate.test.js","scope":["ctxroute"],"rank":360},{"pattern":"mcp-doc-inject.test.js","scope":["ctxroute"],"rank":361},{"pattern":"mcp-doc-config.schema.json","rank":567}]
 mode: dumb
 confirm: true
 rank: 359

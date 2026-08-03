@@ -136,7 +136,7 @@ test('différentiel sources/file.js ≡ protect-files.js sur les vraies règles'
 test('différentiel : commandes Bash (reconstruction cd + skip git)', { skip: !available && 'protect-files.js absent (clone vierge)', timeout: 6000000 }, async () => {
   const rules = JSON.parse(fs.readFileSync(RULES_PATH, 'utf8')).rules;
   const cases = [
-    { toolName: 'Bash', toolInput: { command: 'cd C:/Users/dev/Desktop/mcp-doc-hooks && node lib-pure.js' } },
+    { toolName: 'Bash', toolInput: { command: 'cd C:/Users/dev/Desktop/ctxroute && node lib-pure.js' } },
     { toolName: 'Bash', toolInput: { command: 'git commit -m "fix lib-pure.js"' } }, // faux positif connu → doit rester vide
     { toolName: 'Bash', toolInput: { command: 'cat lib-pure.js' } },
     { toolName: 'Bash', toolInput: { command: 'cd /srv && ls' } },

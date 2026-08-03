@@ -53,7 +53,7 @@ async function both(payload) {
 
 // Payloads RÉELS (règles connues du parc) — lecture, écriture, Bash, non-match.
 const HOOK_DIR = path.join(os.homedir(), '.claude', 'hooks');
-const READ_MATCH = { toolName: 'Read', toolInput: { file_path: 'C:/Users/dev/Desktop/mcp-doc-hooks/lib-pure.js' } };
+const READ_MATCH = { toolName: 'Read', toolInput: { file_path: 'C:/Users/dev/Desktop/ctxroute/lib-pure.js' } };
 
 test.skipIf(!parcPresent)('LECTURE : contenu injecté IDENTIQUE à l\'octet près (ctx + systemMessage)', async () => {
   const { vieux, neuf } = await both(READ_MATCH);
@@ -65,7 +65,7 @@ test.skipIf(!parcPresent)('LECTURE : contenu injecté IDENTIQUE à l\'octet prè
 });
 
 test.skipIf(!parcPresent)('ÉCRITURE : décision miroir du rush réel, mêmes docs', async () => {
-  const { vieux, neuf } = await both({ toolName: 'Edit', toolInput: { file_path: 'C:/Users/dev/Desktop/mcp-doc-hooks/lib-pure.js' } });
+  const { vieux, neuf } = await both({ toolName: 'Edit', toolInput: { file_path: 'C:/Users/dev/Desktop/ctxroute/lib-pure.js' } });
   assert.ok(vieux && neuf, 'les deux moteurs doivent réagir sur écriture documentée');
   if (RUSH) {
     assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'allow');
@@ -79,7 +79,7 @@ test.skipIf(!parcPresent)('ÉCRITURE : décision miroir du rush réel, mêmes do
 });
 
 test.skipIf(!parcPresent)('BASH : reconstruction cd && — mêmes docs injectées', async () => {
-  const { vieux, neuf } = await both({ toolName: 'Bash', toolInput: { command: 'cd C:/Users/dev/Desktop/mcp-doc-hooks && node doctor.js' } });
+  const { vieux, neuf } = await both({ toolName: 'Bash', toolInput: { command: 'cd C:/Users/dev/Desktop/ctxroute && node doctor.js' } });
   // Silence des deux OU injection identique — jamais l'un sans l'autre.
   assert.strictEqual(neuf === null, vieux === null, 'un moteur parle, l\'autre se tait');
   if (vieux) assert.strictEqual(neuf.hookSpecificOutput.additionalContext, vieux.hookSpecificOutput.additionalContext);

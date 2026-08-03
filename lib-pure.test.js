@@ -116,12 +116,12 @@ ok('shouldShowNotification: showNotification=0 (falsy mais pas false) → ON (se
 ok('shouldShowNotification: showNotification=null → ON (fail-open)', () => lib.shouldShowNotification({ showNotification: null }) === true);
 
 // ── formatSystemMessage ──
-ok('formatSystemMessage: préfixe explicite [mcp-doc-hooks] pour distinguer des autres sources', () => lib.formatSystemMessage('stripe', ['server']) === '📄 [mcp-doc-hooks] stripe');
+ok('formatSystemMessage: préfixe explicite [ctxroute] pour distinguer des autres sources', () => lib.formatSystemMessage('stripe', ['server']) === '📄 [ctxroute] stripe');
 ok('formatSystemMessage: 1 seul niveau (server) → pas de suffixe', () => lib.formatSystemMessage('stripe', ['server']).includes('(') === false);
-ok('formatSystemMessage: 2 niveaux (server+tool) → suffixe avec le niveau additionnel', () => lib.formatSystemMessage('stripe', ['server', 'tool']) === '📄 [mcp-doc-hooks] stripe (tool)');
-ok('formatSystemMessage: 3 niveaux (server+tool+subTool) → les 2 niveaux additionnels listés', () => lib.formatSystemMessage('odoo', ['server', 'tool', 'subTool']) === '📄 [mcp-doc-hooks] odoo (tool+subTool)');
-ok('formatSystemMessage: levels absent/vide → pas de crash, pas de suffixe', () => lib.formatSystemMessage('stripe', []) === '📄 [mcp-doc-hooks] stripe');
-ok('formatSystemMessage: levels non-array → pas de crash, pas de suffixe', () => lib.formatSystemMessage('stripe', undefined) === '📄 [mcp-doc-hooks] stripe');
+ok('formatSystemMessage: 2 niveaux (server+tool) → suffixe avec le niveau additionnel', () => lib.formatSystemMessage('stripe', ['server', 'tool']) === '📄 [ctxroute] stripe (tool)');
+ok('formatSystemMessage: 3 niveaux (server+tool+subTool) → les 2 niveaux additionnels listés', () => lib.formatSystemMessage('odoo', ['server', 'tool', 'subTool']) === '📄 [ctxroute] odoo (tool+subTool)');
+ok('formatSystemMessage: levels absent/vide → pas de crash, pas de suffixe', () => lib.formatSystemMessage('stripe', []) === '📄 [ctxroute] stripe');
+ok('formatSystemMessage: levels non-array → pas de crash, pas de suffixe', () => lib.formatSystemMessage('stripe', undefined) === '📄 [ctxroute] stripe');
 
 // ── shouldInjectFor ──
 ok('shouldInjectFor: mode dumb → toujours true', () => lib.shouldInjectFor('dumb', true, 999, 1) === true);

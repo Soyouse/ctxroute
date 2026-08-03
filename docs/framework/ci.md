@@ -1,6 +1,6 @@
 ---
 match: test.yml
-scope: [mcp-doc-hooks]
+scope: [ctxroute]
 mode: dumb
 confirm: true
 rank: 373

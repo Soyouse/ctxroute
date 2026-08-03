@@ -8,7 +8,7 @@
 //    devient invisible (erreur déjà commise sur `for (const m of MODES)`).
 // ═══════════════════════════════════════════════════════════════════════
 
-// ⚠️ STACK = vitest · SCOPE = mcp-doc-hooks UNIQUEMENT.
+// ⚠️ STACK = vitest · SCOPE = ctxroute UNIQUEMENT.
 //    Dette node:test SOLDÉE le 16/07/2026 (port tout-ou-rien des 21 suites,
 //    mutation 12 min → ~30 s). Retour au mode dégradé rendu impossible par le
 //    gate anti-commandRunner de mutation-workflow-gate.test.js.

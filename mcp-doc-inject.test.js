@@ -281,7 +281,7 @@ function setConfig(obj) {
   ok('enabled:true explicite → réactive normalement', wasInjected(callMcp(s2, TEST_SERVER)));
 }
 
-// ── Test 7i — systemMessage porte le préfixe [mcp-doc-hooks] + la granularité réelle ──
+// ── Test 7i — systemMessage porte le préfixe [ctxroute] + la granularité réelle ──
 {
   setConfig({ mode: 'dumb', defaultThreshold: 4, servers: {} });
   const s = 'test-systemmessage-7i';
@@ -290,9 +290,9 @@ function setConfig(obj) {
   fs.writeFileSync(path.join(toolDir, 'act.md'), '# doc outil\n');
   const serverOnly = callMcp(s, TEST_SERVER, 'other_tool_no_doc');
   const withTool = callMcp(s, TEST_SERVER, 'act');
-  ok('systemMessage porte le préfixe "[mcp-doc-hooks]" (distingue des autres sources de doc injectable)', serverOnly.stdout.includes('[mcp-doc-hooks]'));
-  ok('systemMessage niveau serveur seul → pas de suffixe de granularité', serverOnly.stdout.includes(`[mcp-doc-hooks] ${TEST_SERVER}"`) || serverOnly.stdout.includes(`[mcp-doc-hooks] ${TEST_SERVER}\\"`));
-  ok('systemMessage niveau serveur+outil → suffixe "(tool)" visible', withTool.stdout.includes(`[mcp-doc-hooks] ${TEST_SERVER} (tool)`));
+  ok('systemMessage porte le préfixe "[ctxroute]" (distingue des autres sources de doc injectable)', serverOnly.stdout.includes('[ctxroute]'));
+  ok('systemMessage niveau serveur seul → pas de suffixe de granularité', serverOnly.stdout.includes(`[ctxroute] ${TEST_SERVER}"`) || serverOnly.stdout.includes(`[ctxroute] ${TEST_SERVER}\\"`));
+  ok('systemMessage niveau serveur+outil → suffixe "(tool)" visible', withTool.stdout.includes(`[ctxroute] ${TEST_SERVER} (tool)`));
   fs.rmSync(toolDir, { recursive: true, force: true });
 }
 

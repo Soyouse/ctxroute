@@ -4,7 +4,7 @@
 //
 // ⚠️ POURQUOI UNE COPIE PLUTÔT QU'UN require() :
 //    Les hooks de `~/.claude/hooks/` ne DOIVENT PAS dépendre de ce repo.
-//    Un `require('C:/Users/dev/Desktop/mcp-doc-hooks/deadline.js')` marcherait
+//    Un `require('C:/Users/dev/Desktop/ctxroute/deadline.js')` marcherait
 //    aujourd'hui et mourrait le jour où le dossier bouge/disparaît — l'environnement
 //    perso deviendrait OTAGE d'un repo public. `deadline.js` est autonome
 //    (gate `deadline-stays-standalone`) EXPRÈS POUR ÇA : il est copiable tel quel.
@@ -49,7 +49,7 @@ test(
     assert.strictEqual(
       b,
       a,
-      'DÉRIVE : ~/.claude/hooks/deadline.js ≠ mcp-doc-hooks/deadline.js.\n' +
+      'DÉRIVE : ~/.claude/hooks/deadline.js ≠ ctxroute/deadline.js.\n' +
         'Les 7 hooks du parc tournent donc sur une version différente de celle testée ici.\n' +
         'Corriger en recopiant l\'original :\n' +
         `  cp "${ORIGINAL}" "${VENDOR}"`

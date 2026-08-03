@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"canari.js","scope":["mcp-doc-hooks"]},{"pattern":"canari-check.js","scope":["mcp-doc-hooks"]},{"pattern":"canari.test.js","scope":["mcp-doc-hooks"]},{"pattern":"canari-check.test.js","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"canari.js","scope":["ctxroute"]},{"pattern":"canari-check.js","scope":["ctxroute"]},{"pattern":"canari.test.js","scope":["ctxroute"]},{"pattern":"canari-check.test.js","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

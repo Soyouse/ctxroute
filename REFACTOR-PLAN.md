@@ -86,7 +86,7 @@
   possible plus tard (payload réel capturé), pas bloquante.
 
   **Reste (CONTENU, pas moteur)** : scinder les 3 skills > budget (agent-social 79 516,
-  webzenon-infra 69 017, mcp-doc-hooks 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
+  webzenon-infra 69 017, ctxroute 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
   ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.
 
 ## ✅ PAQUETS — CONSTRUIT ET PROUVÉ (03/08/2026) · ⏸️ EN ATTENTE DE GO POUR LA BASCULE
@@ -519,7 +519,7 @@ qu'un fichier critique » et que le défaut est « documenter ». Zéro code : u
 Casser un de ces fichiers = casser leur travail en cours = tokens brûlés = argent réel.
 
 - **Ce framework est du DÉVELOPPEMENT PUR.** Il n'a AUCUN droit sur la prod aujourd'hui.
-- **Phase EXPAND uniquement** : on AJOUTE dans `Desktop/mcp-doc-hooks/`. On ne débranche
+- **Phase EXPAND uniquement** : on AJOUTE dans `Desktop/ctxroute/`. On ne débranche
   rien, on n'édite ni `settings.json`, ni `protected-paths.json`, ni les hooks vivants.
 - **Étapes 2 (bascule) et 3 (retrait) = GO EXPLICITE du mainteneur obligatoire**, à un moment
   où aucun agent ne tourne. Un différentiel vert prouve l'équivalence du match —
@@ -533,7 +533,7 @@ Deux systèmes font le MÊME travail sans le savoir :
 
 | | Déclencheur | Dédup | Coût mesuré |
 |---|---|---|---|
-| `mcp-doc-hooks` (ce repo) | serveur/outil MCP | oui (`smart`/`once`/seuils) | 36 ms |
+| `ctxroute` (ce repo) | serveur/outil MCP | oui (`smart`/`once`/seuils) | 36 ms |
 | `~/.claude/hooks/protect-files.js` | chemin de fichier | **aucun** | 4 ms |
 
 Conséquence réelle : `protect-files.js` réinjecte la même doc à CHAQUE appel d'outil (`pointer.md` livré ~15× dans une seule session). Ses 4 ms sont "moins chers" **parce qu'il ne se souvient de rien** — les 36 ms de l'autre, c'est le prix du dédup, et l'échange est très favorable (tokens ≫ ms).
@@ -568,7 +568,7 @@ Conséquence réelle : `protect-files.js` réinjecte la même doc à CHAQUE appe
    ```markdown
    ---
    match: lib-pure.js
-   scope: [mcp-doc-hooks]
+   scope: [ctxroute]
    mode: dumb        # optionnel — défaut proposé par l'AUTEUR du doc
    ---
    ⚠️ invariant...
@@ -674,7 +674,7 @@ Documentés : `stripe`, `odoo`. Non documentés : **`ssh` (VPS prod)**, **`infra
 
 **`rank` → parent/enfant : IDÉE MESURÉE PUIS ABANDONNÉE (16/07/2026).** Mesuré sur **75 374 vrais fichiers × 568 règles** : 36 séquences co-injectées, 39 paires ordonnées, **0 conflit** (jamais A→B et B→A). MAIS les paires mélangent de vrais parent→enfant (`pointer.md → config-gate.md`) et des **voisins accidentels** (`ssh-async → tests-protocol`) dont l'ordre ne vient que de l'index JSON. Nommer ces 39 contraintes = les relire et les juger À LA MAIN — exactement ce que le refactor interdit (« personne ne relit les règles »). → **`rank` reste** (dérivé de l'index, comportement identique). Règle pour les FUTURES docs sans `rank` (à implémenter dans le loader) : injectées APRÈS les docs rankées, ordre alphabétique (déterministe). Le passage à un ordre sémantique = chantier séparé, humain, post-bascule (même doctrine que `smart` et le tri `confirm`).
 
-**⚠️ DIVERGENCE scope/exclude INTRA-DOC — trou du format frontmatter, MESURÉ (16/07/2026).** Sur 103 docs multi-règles, **31 ont des scopes/excludes DIFFÉRENTS entre leurs règles** (ex. `pointer.md` : `lib-pure.js` scopé `[mcp-doc-hooks]` mais `mcp-doc-inject.js` sans scope). Le format `match: [a, b]` + UN `scope:` par doc ne peut PAS les représenter — `declaration()` prenait `entries[0]` et aurait perdu/écrasé des scopes EN SILENCE (sur-injection ou doc morte). Fix : clé **`rules:`** = liste JSON inline d'objets `{pattern, scope?, exclude?}` (JSON.parse : total via try/catch, zéro mini-langage, format d'origine des règles). Docs homogènes → `match:` simple (lisible) ; divergentes → `rules:`. `rules` + (`match`/`scope`/`exclude`) = CONTRADICTION rouge. Le parser reste un sous-ensemble plat — JSON inline ≠ YAML.
+**⚠️ DIVERGENCE scope/exclude INTRA-DOC — trou du format frontmatter, MESURÉ (16/07/2026).** Sur 103 docs multi-règles, **31 ont des scopes/excludes DIFFÉRENTS entre leurs règles** (ex. `pointer.md` : `lib-pure.js` scopé `[ctxroute]` mais `mcp-doc-inject.js` sans scope). Le format `match: [a, b]` + UN `scope:` par doc ne peut PAS les représenter — `declaration()` prenait `entries[0]` et aurait perdu/écrasé des scopes EN SILENCE (sur-injection ou doc morte). Fix : clé **`rules:`** = liste JSON inline d'objets `{pattern, scope?, exclude?}` (JSON.parse : total via try/catch, zéro mini-langage, format d'origine des règles). Docs homogènes → `match:` simple (lisible) ; divergentes → `rules:`. `rules` + (`match`/`scope`/`exclude`) = CONTRADICTION rouge. Le parser reste un sous-ensemble plat — JSON inline ≠ YAML.
 
 ## Latence — déjà mesuré, ne pas re-débattre
 
@@ -840,7 +840,7 @@ Contrat = skill §« Porter le framework sur un NOUVEAU HARNAIS » (moteur INTOU
 - [x] Phase 1 — FAIT 19/07/2026, MIEUX que prévu (zéro copie) : cœurs partagés extraits (`porte-core.js`, `guard-core.js`) ; 2 coquilles Codex seulement (`codex-doc-inject.js` = ask dégradé sans permissionDecision · `codex-doc-write-guard.js` = chemins via extractFilePaths) ; reset/turn-count/session-inject SE CÂBLENT TELS QUELS (dialecte identique). Fix contrat : extractFilePaths accepte `command` (shape réel Codex ≥ 0.144).
 - [x] Phase 2 — FAIT 19/07/2026 : suites spawn codex-doc-inject.test.js + codex-doc-write-guard.test.js ; doctor probes 7-8 + `--codex-hooks` (câblage 5 voies, fichiers = CE repo, anti-double injection protect-files) ; negative-checks 3g/3h/7 (sabotage copie → hurlement prouvé). npm test + mutation 100% + check:all verts.
 - [x] Phase 3 — FAIT 19/07/2026, câblé + PROUVÉ END-TO-END dans un run Codex VIVANT (`codex exec --dangerously-bypass-hook-trust` : doc porte.md retrouvée dans le transcript du run). **Faits de TERRAIN (contre la doc)** : ① Codex 0.144 IGNORE `~/.codex/hooks.json` quand config.toml existe → câblage = `config.toml` [[hooks.*]] UNIQUEMENT (hooks.json renommé .ignored-by-codex-0144.bak) ; ② payload hook réel : `tool_name: "Bash"` MÊME quand le function_call du modèle s'appelle shell_command → le Bash-scan du moteur marche tel quel ; ③ pas d'agent_id (confirmé live). protect-files retiré du câblage même geste ; doctor --codex-hooks config.toml = 37/37 ; doctor auto à chaque SessionStart Codex. TRUST RÉSOLU 0-HUMAN (19/07/2026 soir) : câblage déplacé en politique machine `C:\ProgramData\OpenAI\Codex\requirements.toml` (hooks MANAGÉS, doc officielle : « trusted by policy ») — PROUVÉ par run `codex exec` SANS bypass (PreToolUse/PostToolUse exécutés + doc dans le transcript). Aucun /hooks requis, ni pour le mainteneur ni pour le cousin (Phase 4 : poser le même requirements.toml chez lui). Piège annexe corrigé : config.toml avait 9 clés mcp_servers DUPLIQUÉES (manuel vs bloc sync) = Codex REFUSAIT de démarrer ; + model gpt-5-codex MORT avec compte ChatGPT (à changer, cf modèles cache gpt-5.5/5.6).
-- [ ] Phase 4 — distribution cousin : repo de parc en git pull (JAMAIS de copie manuelle) + doctor comme gate d'installation sur sa machine. ACCÈS GITHUB POSÉ 19/07/2026 : l'associé invité en READ ONLY sur Soyouse/mcp-doc-hooks — il FORK et propose des PR, SEUL le propriétaire merge (master intouchable par construction ; branch protection impossible en privé gratuit — GitHub Pro si un jour accès write direct voulu)
+- [ ] Phase 4 — distribution cousin : repo de parc en git pull (JAMAIS de copie manuelle) + doctor comme gate d'installation sur sa machine. ACCÈS GITHUB POSÉ 19/07/2026 : l'associé invité en READ ONLY sur Soyouse/ctxroute — il FORK et propose des PR, SEUL le propriétaire merge (master intouchable par construction ; branch protection impossible en privé gratuit — GitHub Pro si un jour accès write direct voulu)
 
 ## 20/07/2026 — 🔴 BACKLOG : INJECTION TRONQUÉE EN SILENCE (défaut VÉCU, prioritaire)
 
@@ -941,7 +941,7 @@ ce qui a menti trois fois sur trois.
 
 **CHIFFRES DE ① (mesurés 03/08/2026) — la cause n'est PAS « un peu juste » :**
 budget `DEFAUT_BUDGET` = **8000**. En face : skill `agent-social` **83 160** · `webzenon-infra`
-**77 670** · `mcp-doc-hooks` **28 402** · doc `pw-mcp-tests.md` **6 808** (85 % du budget à elle
+**77 670** · `ctxroute` **28 402** · doc `pw-mcp-tests.md` **6 808** (85 % du budget à elle
 seule).
 🛑 **Un skill fait 3,5 à 10× le budget ENTIER : il ne peut JAMAIS être livré**, et comme les
 segments non livrés sont réessayés indéfiniment, il est **annoncé à chaque tour, pour toujours**.
@@ -979,7 +979,7 @@ chantier « INJECTION INTÉGRALE » — découverte du plafond, fragmentation, d
 
 ---
 
-## 🔴 OUVERT — RENOMMAGE `mcp-doc-hooks` → `ctxroute` (décidé 04/08/2026, GO en attente)
+## 🔴 OUVERT — RENOMMAGE `ctxroute` → `ctxroute` (décidé 04/08/2026, GO en attente)
 
 **Pourquoi le nom actuel est FAUX** (deux mensonges, pas un) : ① le framework n'injecte plus
 seulement des docs **MCP** — fichier, session, skill, outil natif sont des sources de plein droit ;
@@ -1002,7 +1002,7 @@ config Gemini. ⇒ **prod vivante : GO explicite requis, à un moment où aucun 
 **MÉTHODE OBLIGATOIRE = expand/contract, fenêtre de casse NULLE** (renommer le dossier d'abord
 casserait les 12 hooks jusqu'à la mise à jour des configs) :
 1. **EXPAND** — copier/déplacer vers `~/Desktop/ctxroute`, puis poser une **jonction Windows**
-   `mklink /J ~/Desktop/mcp-doc-hooks ~/Desktop/ctxroute` : **les deux chemins fonctionnent**, aucun
+   `mklink /J ~/Desktop/ctxroute ~/Desktop/ctxroute` : **les deux chemins fonctionnent**, aucun
    agent en cours ne voit la différence.
 2. **MIGRER LES CONSOMMATEURS** — `settings.json`, `requirements.toml`, config Gemini, puis les
    1 081 occurrences par codemod (jamais à la main), puis les docs injectables + le skill (renommé

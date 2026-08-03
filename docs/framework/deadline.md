@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"deadline.js","scope":["mcp-doc-hooks"],"rank":533},{"pattern":"deadline.test.js","scope":["mcp-doc-hooks"],"rank":534},{"pattern":"deadline-gate.test.js","scope":["mcp-doc-hooks"],"rank":535},{"pattern":"deadline-charge.test.js","scope":["mcp-doc-hooks"],"rank":545}]
+rules: [{"pattern":"deadline.js","scope":["ctxroute"],"rank":533},{"pattern":"deadline.test.js","scope":["ctxroute"],"rank":534},{"pattern":"deadline-gate.test.js","scope":["ctxroute"],"rank":535},{"pattern":"deadline-charge.test.js","scope":["ctxroute"],"rank":545}]
 mode: dumb
 confirm: true
 rank: 533

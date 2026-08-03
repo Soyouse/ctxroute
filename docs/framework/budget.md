@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"budget.js","scope":["mcp-doc-hooks"]},{"pattern":"budget.test.js","scope":["mcp-doc-hooks"]},{"pattern":"budget.property.test.js","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"budget.js","scope":["ctxroute"]},{"pattern":"budget.test.js","scope":["ctxroute"]},{"pattern":"budget.property.test.js","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

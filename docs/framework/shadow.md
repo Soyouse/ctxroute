@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"loader.js","scope":["mcp-doc-hooks"]},{"pattern":"loader.test.js","scope":["mcp-doc-hooks"]},{"pattern":"shadow-inject.js","scope":["mcp-doc-hooks"]},{"pattern":"shadow-inject.test.js","scope":["mcp-doc-hooks"]},{"pattern":"shadow-reconcile.js","scope":["mcp-doc-hooks"]},{"pattern":"oracle.js","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"loader.js","scope":["ctxroute"]},{"pattern":"loader.test.js","scope":["ctxroute"]},{"pattern":"shadow-inject.js","scope":["ctxroute"]},{"pattern":"shadow-inject.test.js","scope":["ctxroute"]},{"pattern":"shadow-reconcile.js","scope":["ctxroute"]},{"pattern":"oracle.js","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

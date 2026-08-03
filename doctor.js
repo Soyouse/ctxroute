@@ -432,7 +432,7 @@ function checkCodexWiring(hooksPath) {
     'protect-files.js encore câblé dans les hooks Codex EN MÊME TEMPS que la coquille : chaque doc arrive en DOUBLE.');
 }
 
-say('mcp-doc-hooks doctor\n');
+say('ctxroute doctor\n');
 probe();
 
 // ── 3. INSTALLATION RÉELLE (uniquement avec --settings) ──────────────
@@ -462,7 +462,7 @@ const failed = checks.filter((c) => !c.ok).length;
 if (failed > 0 || !QUIET) console.log(`\n${checks.length - failed} ok, ${failed} problème(s)`);
 if (failed > 0) {
   // ⚠️ BRUYANT VOLONTAIREMENT (stderr + exit 1) : le silence EST le bug.
-  console.error('\n🚨 mcp-doc-hooks est CASSÉ — aucune doc MCP n\'est injectée :');
+  console.error('\n🚨 ctxroute est CASSÉ — aucune doc MCP n\'est injectée :');
   for (const p of problems) console.error(`   • ${p}`);
   process.exit(1);
 }

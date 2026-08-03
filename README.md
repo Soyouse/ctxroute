@@ -1,6 +1,6 @@
-# mcp-doc-hooks
+# ctxroute
 
-[![test](https://github.com/Soyouse/mcp-doc-hooks/actions/workflows/test.yml/badge.svg)](https://github.com/Soyouse/mcp-doc-hooks/actions/workflows/test.yml)
+[![test](https://github.com/Soyouse/ctxroute/actions/workflows/test.yml/badge.svg)](https://github.com/Soyouse/ctxroute/actions/workflows/test.yml)
 
 Framework générique Claude Code : injecte automatiquement une doc courte (invariants, pièges, bonnes pratiques) au contexte de l'agent dès qu'il touche un serveur MCP donné — équivalent d'un mini-skill auto-chargé au contact, mais pour la frontière MCP plutôt que la frontière fichier.
 
@@ -19,12 +19,12 @@ Un serveur MCP (Stripe, Odoo, SSH...) est une frontière à risque au même titr
     "PreToolUse": [
       {
         "matcher": "mcp__.*",
-        "hooks": [{ "type": "command", "command": "node /chemin/vers/mcp-doc-hooks/mcp-doc-inject.js", "timeout": 5 }]
+        "hooks": [{ "type": "command", "command": "node /chemin/vers/ctxroute/mcp-doc-inject.js", "timeout": 5 }]
       }
     ],
     "PreCompact": [
       {
-        "hooks": [{ "type": "command", "command": "node /chemin/vers/mcp-doc-hooks/mcp-doc-reset.js", "timeout": 5 }]
+        "hooks": [{ "type": "command", "command": "node /chemin/vers/ctxroute/mcp-doc-reset.js", "timeout": 5 }]
       }
     ]
   }
@@ -63,7 +63,7 @@ Détails d'implémentation, format du store, invariants internes : voir `HOOK-IN
 - **`servers.{name}.threshold`** / **`servers.{name}.mode`** : override par serveur — un MCP à enjeu élevé (paiement, mutation destructive) peut avoir un seuil plus bas ou un mode `dumb` fixe, indépendamment du réglage global.
 - **`filterMode`** (`"none"` / `"whitelist"` / `"blacklist"`) + **`filterList`** : limite quels serveurs sont couverts par le framework.
 - **`enabled`** (défaut `true`) : interrupteur GLOBAL — `false` coupe TOUT (injection ET tracking d'état/compteurs). Pattern standard (cf ESLint, git hooks `SKIP=...`) pour désactiver temporairement sans retirer le câblage `settings.json`.
-- **`showNotification`** (défaut `true`) : contrôle UNIQUEMENT le `systemMessage` visible (le badge `📄 [mcp-doc-hooks] ...`) — `false` n'affiche plus le badge mais l'injection réelle (`additionalContext`, ce que voit l'agent) continue normalement. Indépendant de `enabled`.
+- **`showNotification`** (défaut `true`) : contrôle UNIQUEMENT le `systemMessage` visible (le badge `📄 [ctxroute] ...`) — `false` n'affiche plus le badge mais l'injection réelle (`additionalContext`, ce que voit l'agent) continue normalement. Indépendant de `enabled`.
 
 ### Compteurs indépendants par serveur
 

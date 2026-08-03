@@ -42,7 +42,7 @@ const BUDGET_NEUF = DEFAUT_BUDGET;
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const PARC = path.join(os.homedir(), '.claude', 'hooks', 'docs');
-const SKILL = path.join(os.homedir(), '.claude', 'commands', 'mcp-doc-hooks.md');
+const SKILL = path.join(os.homedir(), '.claude', 'commands', 'ctxroute.md');
 // Arbo sortie du skill le 31/07/2026 (progressive disclosure) — cf volet ②.
 const ARBO = path.join(ICI, 'ARBORESCENCE.md');
 

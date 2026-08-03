@@ -42,7 +42,7 @@ const BANNIERE = [
   "//    `end` qui n'arrive JAMAIS et vit POUR TOUJOURS. Mesuré le 15/07/2026 :",
   '//    875 zombies `statusline.js`, un de 20 h, 0,8 Go de RAM libre sur 16.',
   "//    `.unref()` garantit ZÉRO latence ajoutée quand tout va bien.",
-  '//    Gate : mcp-doc-hooks/hooks-parc-gate.test.js — copie : deadline-vendor.test.js.',
+  '//    Gate : ctxroute/hooks-parc-gate.test.js — copie : deadline-vendor.test.js.',
   "const deadline = require('./deadline');",
   'deadline.arm();',
   '',

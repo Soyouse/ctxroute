@@ -5,7 +5,7 @@
 // ⚠️ RAISON D'ÊTRE (décision mainteneur) : un fork/mainteneur externe doit
 //    trouver DANS le repo la totale — skill du framework + docs injectables
 //    DU framework. Or ces fichiers VIVENT câblés dans le parc du mainteneur
-//    (~/.claude/commands/mcp-doc-hooks.md + ~/.claude/hooks/docs/mcp-doc-hooks/)
+//    (~/.claude/commands/ctxroute.md + ~/.claude/hooks/docs/ctxroute/)
 //    → deux copies. Ce gate rend la dérive IMPOSSIBLE : tout écart = ROUGE.
 //
 // ⚠️ SENS DE LA VÉRITÉ : le PARC est la copie CÂBLÉE (ce que les agents
@@ -24,8 +24,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 const REPO_DIR = path.join(import.meta.dirname, 'docs', 'framework');
-const PARC_SKILL = path.join(os.homedir(), '.claude', 'commands', 'mcp-doc-hooks.md');
-const PARC_DOCS = path.join(os.homedir(), '.claude', 'hooks', 'docs', 'mcp-doc-hooks');
+const PARC_SKILL = path.join(os.homedir(), '.claude', 'commands', 'ctxroute.md');
+const PARC_DOCS = path.join(os.homedir(), '.claude', 'hooks', 'docs', 'ctxroute');
 
 const parcExists = fs.existsSync(PARC_DOCS) && fs.existsSync(PARC_SKILL);
 const read = (p) => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
@@ -38,7 +38,7 @@ test('docs/framework/ existe et n\'est pas vide (la totale pour un fork)', () =>
 
 test.skipIf(!parcExists)('SKILL.md du repo == skill câblé du parc (dérive = ROUGE, recopier)', () => {
   assert.strictEqual(read(path.join(REPO_DIR, 'SKILL.md')), read(PARC_SKILL),
-    'docs/framework/SKILL.md diverge de ~/.claude/commands/mcp-doc-hooks.md — recopier le parc vers le repo (ou l\'inverse sur un fork).');
+    'docs/framework/SKILL.md diverge de ~/.claude/commands/ctxroute.md — recopier le parc vers le repo (ou l\'inverse sur un fork).');
 });
 
 test.skipIf(!parcExists)('chaque doc injectable du parc a son miroir IDENTIQUE dans le repo (aucune oubliée)', () => {

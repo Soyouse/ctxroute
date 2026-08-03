@@ -19,11 +19,11 @@
 
 - **2 interrupteurs DISTINCTS et composables** :
   - `enabled` (défaut `true`) — GLOBAL, coupe TOUT (injection ET tracking d'état). Pattern standard (ESLint, git hooks `SKIP=...`).
-  - `showNotification` (défaut `true`) — coupe UNIQUEMENT le badge visible `📄 [mcp-doc-hooks] ...`, l'injection réelle continue toujours. Ne pas confondre les deux (corrigé après une confusion en session).
-- **systemMessage enrichi** : préfixe explicite `[mcp-doc-hooks]` (distingue des autres sources de doc injectable, ex. `protect-files.js`) + granularité réelle injectée visible (ex. `stripe (tool)`, `odoo (tool+subTool)`).
+  - `showNotification` (défaut `true`) — coupe UNIQUEMENT le badge visible `📄 [ctxroute] ...`, l'injection réelle continue toujours. Ne pas confondre les deux (corrigé après une confusion en session).
+- **systemMessage enrichi** : préfixe explicite `[ctxroute]` (distingue des autres sources de doc injectable, ex. `protect-files.js`) + granularité réelle injectée visible (ex. `stripe (tool)`, `odoo (tool+subTool)`).
 - **CI matrice 3 OS** : ajout de macOS (Linux + Windows + macOS), tous verts.
-- **Docs injectables sur TOUT le repo** : 17 patterns dans `.claude/hooks/protected-paths.json`, tous scopés `["mcp-doc-hooks"]` quand le nom de fichier est générique (zéro collision avec d'autres projets), regroupés dans `docs/mcp-doc-hooks/` (pas à plat). Tout futur agent qui touche un fichier du repo, même sans contexte de session, reçoit automatiquement l'invariant pertinent.
-- **2e skill créé** : `mcp-doc-hooks-architecture.md` (philosophie, modèle mental, arbo complète, invariants — pas de how-to), distinct du skill d'usage `mcp-doc-hooks.md`.
+- **Docs injectables sur TOUT le repo** : 17 patterns dans `.claude/hooks/protected-paths.json`, tous scopés `["ctxroute"]` quand le nom de fichier est générique (zéro collision avec d'autres projets), regroupés dans `docs/ctxroute/` (pas à plat). Tout futur agent qui touche un fichier du repo, même sans contexte de session, reçoit automatiquement l'invariant pertinent.
+- **2e skill créé** : `ctxroute-architecture.md` (philosophie, modèle mental, arbo complète, invariants — pas de how-to), distinct du skill d'usage `ctxroute.md`.
 - 142 tests au total (87 unitaires lib-pure + 9 lock + 46 intégration).
 
 ## 1.2.1

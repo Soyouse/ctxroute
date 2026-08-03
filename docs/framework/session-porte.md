@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"session-inject.js","scope":["mcp-doc-hooks"]},{"pattern":"session-inject.test.js","scope":["mcp-doc-hooks"]},{"pattern":"sources-session.test.js","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"session-inject.js","scope":["ctxroute"]},{"pattern":"session-inject.test.js","scope":["ctxroute"]},{"pattern":"sources-session.test.js","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

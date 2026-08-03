@@ -146,7 +146,7 @@ function isFrameworkEnabled(config) {
 // ⚠️ NE COUPE JAMAIS l'injection elle-même (additionalContext) — seulement le
 // systemMessage user-only qui l'accompagne. Couper l'injection entière n'aurait
 // aucun sens (c'est la seule raison d'être du framework) ; ce réglage sert
-// uniquement à l'utilisateur qui préfère ne PAS voir le badge "📄 [mcp-doc-hooks]"
+// uniquement à l'utilisateur qui préfère ne PAS voir le badge "📄 [ctxroute]"
 // à chaque injection tout en gardant le bénéfice réel (contexte livré à l'agent).
 // ON par défaut — SEULE la valeur `false` littérale désactive la notification
 // (fail-open : une config cassée ne doit jamais désactiver silencieusement
@@ -156,7 +156,7 @@ function shouldShowNotification(config) {
 }
 
 // Formatte le systemMessage USER-ONLY affiché quand une injection a lieu.
-// ⚠️ Préfixe "[mcp-doc-hooks]" EXPLICITE pour que l'utilisateur distingue
+// ⚠️ Préfixe "[ctxroute]" EXPLICITE pour que l'utilisateur distingue
 // cette source des autres systèmes de doc injectable (ex: protect-files.js
 // affiche juste "📄 doc: xxx" sans préciser sa provenance — ambigu si les
 // deux systèmes tournent dans la même session, cf incident 15/07/2026 où
@@ -166,7 +166,7 @@ function shouldShowNotification(config) {
 // réelle, pas juste "un truc a été injecté pour ce serveur".
 function formatSystemMessage(server, levels) {
   const suffix = Array.isArray(levels) && levels.length > 1 ? ` (${levels.slice(1).join('+')})` : '';
-  return `📄 [mcp-doc-hooks] ${server}${suffix}`;
+  return `📄 [ctxroute] ${server}${suffix}`;
 }
 
 // Le serveur est-il couvert par le framework selon filterMode/filterList ?

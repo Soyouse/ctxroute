@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"couverture-gate.test.js","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"couverture-gate.test.js","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

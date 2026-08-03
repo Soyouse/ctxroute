@@ -1,11 +1,11 @@
 ---
 match: package.json
-scope: [mcp-doc-hooks]
+scope: [ctxroute]
 mode: dumb
 confirm: true
 rank: 374
 ---
-# package.json (mcp-doc-hooks) — invariants
+# package.json (ctxroute) — invariants
 
 `engines.node >= 22` — contrainte RÉELLE (dependency-cruiser l'exige), pas arbitraire. Ne jamais la baisser sans vérifier que tous les devDependencies la supportent encore.
 `npm run check:all` = la suite complète (tests + coupling + mutation) — TOUJOURS la lancer avant un tag de version, jamais juste `npm test`.

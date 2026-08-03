@@ -1,6 +1,6 @@
 ---
 match: paths.js
-scope: [mcp-doc-hooks]
+scope: [ctxroute]
 exclude: [protected-paths.json]
 mode: dumb
 confirm: true

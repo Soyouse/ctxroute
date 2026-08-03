@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "mcp-doc-hooks — configuration",
+  "title": "ctxroute — configuration",
   "description": "Config GLOBALE du framework (décision mainteneur 17/07/2026 : le JSON ne fait QUE du global — la cadence par doc vit dans le frontmatter de la doc, jamais ici. Zéro doublon entre les deux). Cascade : frontmatter de la doc > défauts globaux ici.",
   "type": "object",
   "additionalProperties": false,

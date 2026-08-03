@@ -1,5 +1,5 @@
 {
-  "name": "mcp-doc-hooks",
+  "name": "ctxroute",
   "version": "1.4.0",
   "description": "Claude Code framework: inject invariant/pitfall docs into agent context on first contact with each MCP server/tool/sub-tool, with configurable per-server modes, thresholds, whitelist/blacklist filtering, cross-process locking, and automatic state cleanup.",
   "main": "mcp-doc-inject.js",
@@ -41,12 +41,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/Soyouse/mcp-doc-hooks.git"
+    "url": "https://github.com/Soyouse/ctxroute.git"
   },
   "bugs": {
-    "url": "https://github.com/Soyouse/mcp-doc-hooks/issues"
+    "url": "https://github.com/Soyouse/ctxroute/issues"
   },
-  "homepage": "https://github.com/Soyouse/mcp-doc-hooks#readme",
+  "homepage": "https://github.com/Soyouse/ctxroute#readme",
   "engines": {
     "node": ">=22"
   },

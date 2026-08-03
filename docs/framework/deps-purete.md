@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"deps-purete-gate.test.js","scope":["mcp-doc-hooks"]},{"pattern":".dependency-cruiser.json","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"deps-purete-gate.test.js","scope":["ctxroute"]},{"pattern":".dependency-cruiser.json","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

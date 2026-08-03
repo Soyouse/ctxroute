@@ -46,7 +46,7 @@ const { readStdinJson } = require('./stdin-json');
 // Sortie hook — FORMAT protect-files À L'IDENTIQUE (parité de bascule).
 // `systemMessage` est CALCULÉ PAR L'APPELANT : fichier seul = '📄 doc: …'
 // (octet-identique à l'ancien), MCP = formatSystemMessage (badge
-// '[mcp-doc-hooks]', parité mcp-doc-inject), mixte = les deux joints ' · '
+// '[ctxroute]', parité mcp-doc-inject), mixte = les deux joints ' · '
 // (avant la fusion, DEUX hooks émettaient DEUX messages — on les garde tous).
 function emit(decision, fullDoc, systemMessage) {
   if (decision === 'ask') {

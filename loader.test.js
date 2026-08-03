@@ -134,10 +134,10 @@ test('TRI À L\'ÉCHELLE — 25 entrées d\'une MÊME doc : ordre local déclar�
 
 test('RULES — doc `rules:` migrée relue → règles identiques à la déclaration', () => {
   const flat = rulesFromCorpus([
-    { doc: 'p.md', text: md('rules: [{"pattern":"lock.js","scope":["mcp-doc-hooks"],"exclude":["package-lock.json"]},{"pattern":"stdin-json.js"}]\nmode: dumb\nconfirm: true\nrank: 350') },
+    { doc: 'p.md', text: md('rules: [{"pattern":"lock.js","scope":["ctxroute"],"exclude":["package-lock.json"]},{"pattern":"stdin-json.js"}]\nmode: dumb\nconfirm: true\nrank: 350') },
   ]);
   assert.deepStrictEqual(flat, [
-    { pattern: 'lock.js', doc: 'p.md', scope: ['mcp-doc-hooks'], exclude: ['package-lock.json'] },
+    { pattern: 'lock.js', doc: 'p.md', scope: ['ctxroute'], exclude: ['package-lock.json'] },
     { pattern: 'stdin-json.js', doc: 'p.md' },
   ]);
 });

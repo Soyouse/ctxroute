@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"skill.js","scope":["mcp-doc-hooks"]},{"pattern":"sources-skill.test.js","scope":["mcp-doc-hooks"]},{"pattern":"skill-registry-gate","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"skill.js","scope":["ctxroute"]},{"pattern":"sources-skill.test.js","scope":["ctxroute"]},{"pattern":"skill-registry-gate","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

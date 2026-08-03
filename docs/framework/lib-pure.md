@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"lib-pure.property.test.js","scope":["mcp-doc-hooks"],"rank":358},{"pattern":"lib-pure.js","scope":["mcp-doc-hooks"],"rank":363},{"pattern":"lib-pure.test.js","scope":["mcp-doc-hooks"],"rank":364}]
+rules: [{"pattern":"lib-pure.property.test.js","scope":["ctxroute"],"rank":358},{"pattern":"lib-pure.js","scope":["ctxroute"],"rank":363},{"pattern":"lib-pure.test.js","scope":["ctxroute"],"rank":364}]
 mode: dumb
 confirm: true
 rank: 358

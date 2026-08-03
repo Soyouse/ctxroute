@@ -1,6 +1,6 @@
 ---
 match: [doctor.js, doctor.test.js]
-scope: [mcp-doc-hooks]
+scope: [ctxroute]
 mode: dumb
 confirm: true
 rank: 356

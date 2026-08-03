@@ -1,6 +1,6 @@
 ---
 match: [stryker.conf.json, .dependency-cruiser.json, .jscpd.json]
-scope: [mcp-doc-hooks]
+scope: [ctxroute]
 mode: dumb
 confirm: true
 rank: 370

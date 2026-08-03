@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"ARBORESCENCE.md","scope":["mcp-doc-hooks"]},{"pattern":"REFACTOR-PLAN.md","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"ARBORESCENCE.md","scope":["ctxroute"]},{"pattern":"REFACTOR-PLAN.md","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 ---

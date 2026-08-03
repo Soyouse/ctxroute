@@ -1,4 +1,4 @@
-# mcp-doc-hooks — doc injectable par serveur MCP
+# ctxroute — le savoir livré au geste (injection de contexte déclarative, multi-harnais)
 
 ## ⚠️ PROD VIVANTE — NE RIEN CASSER (règle n°1, avant toute autre)
 ⚠️ **PROJET PUBLIC (open source)** : traiter le repo comme DÉJÀ public, même avant publication. ZÉRO info perso dans les fichiers trackés — jamais de prénom (dire « le mainteneur »), jamais de chemin utilisateur réel (fixtures = `C:/Users/dev/...`), jamais d'IP réelle (utiliser la plage de documentation 203.0.113.x), jamais d'email/secret/nom de client. Les docs perso (`docs/mcp/*.md`, `docs/session/*.md`) restent GITIGNORÉES — seuls les `.md.example` génériques se poussent. Avant publication effective : squasher l'historique (les vieux commits contiennent du perso) ET remplacer `mcp-doc-config.json` par un `.example` générique (la config livrée contient les NOMS des skills/projets du mainteneur — données perso ; l'utilisateur crée la sienne, les gates la valident).
@@ -42,12 +42,12 @@ Aligné = tu appliques le modèle mental SANS que le mainteneur doive répéter.
 8. **TEST DU KNOB (quand créer un réglage ?)** : « les données (patterns/scope/exclude) peuvent-elles DÉJÀ exprimer la distinction ? » OUI → rien à ajouter (précédent : cwd = une chaîne de plus dans l'axe « où », distinction fichiers/territoire déjà exprimable par le choix des patterns). NON → un mot de vocabulaire, cascade 3 autorités (précédent : driftUnit — tool vs turn écrasés dans UN compteur, indistinguables par les données). SOLUTION PRÉ-IDENTIFIÉE si un cas réel prouve un jour que les canaux de match (chemins explicites vs cwd) doivent se distinguer : un mot booléen PAR ENTRÉE (ex. matchCwd), même cascade — mesurer le cas réel D'ABORD, jamais préventivement.
 
 ## Philosophie
-Chaque MCP (Stripe, Odoo, SSH, Infra...) est une frontière à risque au même titre qu'un fichier critique. Le système `.claude/hooks/docs/*.md` documente déjà les fichiers ; `mcp-doc-hooks` fait pareil pour les serveurs MCP — un invariant/piège livré à l'agent AU moment où il touche le MCP, pas une consigne en prose qu'on espère qu'il se rappelle. Né de l'incident du 15/07/2026 (clic accidentel sur un bouton de paiement Stripe réel — cf `project_mcp_hook_docs_standard` en mémoire).
+Chaque MCP (Stripe, Odoo, SSH, Infra...) est une frontière à risque au même titre qu'un fichier critique. Le système `.claude/hooks/docs/*.md` documente déjà les fichiers ; `ctxroute` fait pareil pour les serveurs MCP — un invariant/piège livré à l'agent AU moment où il touche le MCP, pas une consigne en prose qu'on espère qu'il se rappelle. Né de l'incident du 15/07/2026 (clic accidentel sur un bouton de paiement Stripe réel — cf `project_mcp_hook_docs_standard` en mémoire).
 
 ## Emplacement — dossier autonome, pas dans .claude/hooks
-⚠️ Le code vit dans `~/Desktop/mcp-doc-hooks/` (repo git séparé, poussable sur GitHub sans mélanger le reste du home directory). `settings.json` référence ce dossier par chemin absolu — Claude Code ne se soucie pas de l'emplacement, seuls les chemins internes du framework (relatifs entre eux) doivent rester groupés.
+⚠️ Le code vit dans `~/Desktop/ctxroute/` (repo git séparé, poussable sur GitHub sans mélanger le reste du home directory). `settings.json` référence ce dossier par chemin absolu — Claude Code ne se soucie pas de l'emplacement, seuls les chemins internes du framework (relatifs entre eux) doivent rester groupés.
 
-## Arborescence — ON-DEMAND : `Desktop/mcp-doc-hooks/ARBORESCENCE.md`
+## Arborescence — ON-DEMAND : `Desktop/ctxroute/ARBORESCENCE.md`
 ⚠️ **1 ligne par fichier, filet d'EXHAUSTIVITÉ** (un fichier hors liste = trou, jamais un jugement d'importance). Sortie du skill le 31/07/2026 : elle pesait 24 625 caractères, soit 48 % du skill, et poussait l'ensemble bien au-delà du budget d'émission — le skill entier était donc ÉVINCÉ de la trame, c'est-à-dire ABSENT de ton contexte. **La LIRE dès que tu touches à la structure du repo** (ajout/suppression/renommage de fichier), et la METTRE À JOUR dans le même geste. Scellée par le volet ② de `couverture-gate.test.js`, qui lit ce fichier ET ce skill. ⚠️ Ne JAMAIS la réintégrer ici.
 
 ## Porter le framework sur un NOUVEAU HARNAIS (Codex, Gemini CLI, autre) — contrat STRICT
@@ -122,7 +122,7 @@ Détail complet, sources datées et mesures : `budget-paquets-reference.md` (on-
 ⚠️ **Un sabotage de test ne touche JAMAIS un fichier réel** : la 1re version a fait tomber 38 tests d'autres suites qui importaient `lib-pure.js` EN PARALLÈLE. Et **jamais `npx` depuis un tmpdir** — il va chercher le paquet sur le RÉSEAU (placeholder anti-dependency-confusion ramené, mesuré) : pointer le binaire local.
 
 ## Ajouter un MCP au standard
-1. Créer `Desktop/mcp-doc-hooks/docs/mcp/{server}.md`. ⚠️ **Le framework n'impose NI taille NI format** : il DOIT livrer une doc de n'importe quelle taille — si elle ne passe pas, le défaut est dans le TRANSPORT, jamais dans la doc. « <10 lignes, 1 ligne = 1 invariant/piège, ton impératif » est la convention D'USAGE de ce parc (anti-dilution) — la suivre ici, ne JAMAIS la présenter comme une règle du moteur ni la faire appliquer par un gate du framework.
+1. Créer `Desktop/ctxroute/docs/mcp/{server}.md`. ⚠️ **Le framework n'impose NI taille NI format** : il DOIT livrer une doc de n'importe quelle taille — si elle ne passe pas, le défaut est dans le TRANSPORT, jamais dans la doc. « <10 lignes, 1 ligne = 1 invariant/piège, ton impératif » est la convention D'USAGE de ce parc (anti-dilution) — la suivre ici, ne JAMAIS la présenter comme une règle du moteur ni la faire appliquer par un gate du framework.
 2. C'est tout. Aucun code à écrire — le hook générique lit tous les `.md` du dossier à la volée.
 3. Par défaut : documenter dès qu'un MCP a un invariant/piège/contexte à transmettre (presque toujours) — pas seulement après un incident.
 
@@ -163,7 +163,7 @@ un shell/MCP s'ajoute, l'énumération devient MUETTE en silence. Préférer le 
 }
 ```
 - **`enabled`** (défaut `true`) : interrupteur GLOBAL du framework — `false` coupe TOUT (injection ET tracking d'état). ⚠️ DISTINCT de `showNotification` (ne pas confondre : celui-ci coupe le fonctionnement réel, l'autre coupe juste un message visuel).
-- **`showNotification`** (défaut `true`) : contrôle UNIQUEMENT le badge visible `📄 [mcp-doc-hooks] ...` — `false` masque le badge mais l'injection réelle dans le contexte de l'agent continue normalement. Sert à l'utilisateur qui veut le bénéfice sans le bruit visuel.
+- **`showNotification`** (défaut `true`) : contrôle UNIQUEMENT le badge visible `📄 [ctxroute] ...` — `false` masque le badge mais l'injection réelle dans le contexte de l'agent continue normalement. Sert à l'utilisateur qui veut le bénéfice sans le bruit visuel.
 - **`mode`** :
   - `"dumb"` — réinjecte à CHAQUE appel du serveur. Jamais le défaut (bruit maximal), utile seulement en debug du hook lui-même.
   - `"once"` — injecte au 1er appel du serveur dans la session, plus jamais (sauf compaction). Zéro bruit, mais peut rester silencieux longtemps si le contexte dérive sans compacter.
@@ -211,7 +211,7 @@ Exemple : `servers.odoo.subToolParam = "args.tool"` + `docs/mcp/odoo/delete_reco
 **Hook UNIQUE `doc-inject.js` (matcher `*`) LIVE en prod** : sources/file.js (frontmatters) + sources/mcp.js (docs/mcp/) → gate.js (dédup par DOC, threshold par doc). `mcp-doc-inject.js` RETIRÉ du câblage (gardé comme oracle du différentiel + rollback — le doctor exige son ABSENCE, sinon double injection). Deny/ask sécurité RETIRÉS (décision mainteneur 17/07, réintroduction possible en hook séparé). Preuves : suite vitest complète (le runner est la seule source du compte), mutation 100% (0 survivant), mcp-differential 9/9, porte-differential octet, doctor vert sur câblage réel.
 ✅ **DOUBLE ÉCRITURE MORTE (27/07/2026)** — ⚠️ **RAISON EXACTE, à ne pas déformer : `protected-paths.json` était la vérité de l'ANCIEN moteur (`protect-files.js`), remplacé par la porte unique le 17/07. Le JSON ne servait plus qu'à un rollback vers un moteur mort.** Ce n'est PAS un retrait de Codex : **le framework reste pleinement compatible Codex**, ses coquilles (`codex-doc-inject`, `codex-doc-write-guard`) tournent déjà sur le NOUVEAU moteur, donc sur les frontmatters. Rien n'est fermé de ce côté et le portage multi-harnais reste l'ambition (§2bis).
 Concrètement : les frontmatters sont la SEULE source de règles, **`lint-corpus` COMPRIS** (il lisait encore le JSON — le laisser aurait ressuscité la double écriture par la bande, un gate en réclamant une entrée à chaque nouvelle doc). `source-drift-gate` et `loader-differential` SUPPRIMÉS : ils n'existaient que pour exiger la parité entre 2 sources dont une est morte. `protected-paths.json` = artefact INERTE, plus aucun lecteur — **NE PLUS JAMAIS y écrire ni le maintenir**. La classe « règle fantôme » est **ÉTEINTE PAR CONSTRUCTION** (un déclencheur vit DANS sa doc : supprimer la doc supprime la règle) — `lint-corpus.test.js` cas 5 le prouve et rougira si une source de règles EXTERNE est réintroduite.
-Plan/historique : `Desktop/mcp-doc-hooks/REFACTOR-PLAN.md`. Doctrine du patrimoine (CLAUDE.md) : plus AUCUN chantier ouvert — scaler = déposer des `.md`, le moteur ne bouge plus.
+Plan/historique : `Desktop/ctxroute/REFACTOR-PLAN.md`. Doctrine du patrimoine (CLAUDE.md) : plus AUCUN chantier ouvert — scaler = déposer des `.md`, le moteur ne bouge plus.
 
 ## Pour aller plus loin
 Étendre à SSH, Infra, autres MCP agence au fil des pièges découverts — même réflexe "par défaut : documenter" que la doc fichier (cf règle Documentation du CLAUDE.md global).

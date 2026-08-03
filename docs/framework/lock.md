@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"lock.js","scope":["mcp-doc-hooks"],"exclude":["package-lock.json"]},{"pattern":"lock.test.js","scope":["mcp-doc-hooks"]}]
+rules: [{"pattern":"lock.js","scope":["ctxroute"],"exclude":["package-lock.json"]},{"pattern":"lock.test.js","scope":["ctxroute"]}]
 mode: dumb
 confirm: true
 rank: 366

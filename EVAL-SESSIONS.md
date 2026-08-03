@@ -1,4 +1,4 @@
-# Journal d'évaluation du framework d'injection (mcp-doc-hooks)
+# Journal d'évaluation du framework d'injection (ctxroute)
 
 > **But** : tracer, session après session, comment le framework se comporte EN USAGE RÉEL — pas en test.
 > Preuve par usage (doctrine du mainteneur) : on n'organise JAMAIS de spawn/test forcé pour « valider » l'injection ;
@@ -21,7 +21,7 @@
 **Injecté au bon moment** — RAS, couverture complète observée :
 `gworkspace` (chaque appel MCP), `browser` (chaque navigate), `odoo`, `agent-social-charte` (touche `charte.json`),
 `agent-social-pipeline` (`brain.mjs`), `agent-social-testing` (`*.test.mjs`), `agent-social-footage-sync`,
-`gworkspace-proxy` (`proxy.js`), `web-recherche` (WebFetch/WebSearch), `pw-mcp-proxy`, `mcp-doc-hooks/*`.
+`gworkspace-proxy` (`proxy.js`), `web-recherche` (WebFetch/WebSearch), `pw-mcp-proxy`, `ctxroute/*`.
 
 **Réinjection à jour — PROUVÉE (le cycle écrire→réinjecter marche)** : 3 docs modifiées en cours de session
 sont revenues à jour ensuite — règle « Forms = compte perso » + jeton-court dans `gworkspace`, 403 Cloudflare

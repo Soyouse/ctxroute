@@ -1,6 +1,6 @@
 ---
 match: [vendor-deadline.js, vendor-deadline.test.js, deadline-vendor.test.js, hooks-parc-gate.test.js]
-scope: [mcp-doc-hooks]
+scope: [ctxroute]
 mode: dumb
 confirm: true
 rank: 541

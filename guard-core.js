@@ -57,7 +57,7 @@ function run(filePaths) {
 
       console.log(JSON.stringify({
         decision: 'block',
-        reason: '[mcp-doc-hooks] La doc que tu viens d\'écrire est INVALIDE — elle serait morte/faussée en silence. Corrige MAINTENANT :\n- '
+        reason: '[ctxroute] La doc que tu viens d\'écrire est INVALIDE — elle serait morte/faussée en silence. Corrige MAINTENANT :\n- '
           + errs.join('\n- ') + '\nFichier : ' + filePath,
       }));
       process.exit(0);
