@@ -739,3 +739,22 @@ C'est le pire des deux mondes : jamais délivré ET bruit permanent. Même sympt
 ⇒ Deux problèmes DISTINCTS, à ne pas confondre : (a) les skills sont hors-jeu par conception —
 soit on les découpe en sections déclenchables, soit on cesse de prétendre les injecter ; (b) des
 docs dépassent le format « <10 lignes » du parc et mangent le budget des voisines.
+
+**⚠️ LES DOCS AUSSI SONT ÉVINCÉES — pas seulement les skills (le cas skills est déjà connu).**
+Preuve du 03/08 : `.claude/hooks/docs/stryker-runner-choice.md` évincée **pendant la correction des
+configs Stryker du parc**, c'est-à-dire au moment EXACT où elle servait. Poussée dehors par des
+skills qui, eux, ne pouvaient de toute façon jamais passer.
+Arithmétique, skills mis de côté : `pw-mcp-logger.md` (2 463) + `pw-mcp-child-guard.md` (5 104)
+= 7 567 → passe de justesse. Mais `pw-mcp-tests.md` seule = **6 808 = 85 % du budget** ⇒ elle +
+n'importe quoi = éviction.
+
+🛑 **LE GATE MANQUANT, ET IL EST TRIVIAL.** La règle du parc existe déjà — « doc réinjectée < 10
+lignes, 1 ligne = 1 invariant ; au-delà, SCINDER en tier-1 + pointeur `*-reference.md` » — mais
+**rien ne la fait respecter**. C'est un invariant en PROSE, précisément ce que la doctrine interdit
+(« tant qu'aucune machine ne le vérifie, il décrit une INTENTION, pas le réel »).
+⇒ **Gate : toute doc de `.claude/hooks/docs/` dépassant N caractères = ROUGE**, message qui exige la
+scission. Avec des docs à ~1 500, il en rentre 5 par trame et l'éviction DISPARAÎT sans toucher au
+budget. ⚠️ Ne PAS « régler » en gonflant `DEFAUT_BUDGET` : le contexte est fini, et un budget qui
+enfle dilue tout le reste — le plafond protège, c'est la TAILLE des docs qui est le défaut.
+⚠️ Poser le gate avec un CLIQUET (baseline = la plus grosse doc actuelle, qui ne peut que
+descendre), sinon il serait ROUGE d'emblée sur tout le corpus et on le désactiverait.
