@@ -699,3 +699,31 @@ Sinon c'est un 2ᵉ mécanisme pour un besoin couvert — la définition d'une d
 n'a pas lieu du tout. Prévention > runbook. Aucune modification du moteur n'était nécessaire :
 `planificateur-os.md` a été écrit le même jour sur ce principe (vérifié par spawn, positif sur
 `schtasks`, muet sur `systemctl restart nginx`). Seule la question du méta invisible a survécu.
+
+---
+
+## 🔴 DEUX DÉFAUTS DU MOTEUR, OBSERVÉS EN USAGE RÉEL (session pw-mcp-proxy, 03/08/2026)
+
+### ① ÉVICTION : il déclare une doc OBLIGATOIRE puis ne la livre pas
+Message vu ~10 fois dans UNE session, jusqu'à **4 docs évincées d'un coup** :
+« N doc(s) NON injectée(s) faute de place dans cette trame. **Elles ne sont PAS optionnelles.** »
+Ce n'est pas un bug : segments indivisibles + `DEFAUT_BUDGET` 8000 + corpus qui grossit = **plafond
+atteint**. Mais le résultat est qu'un agent travaille parfois SANS un invariant réputé garanti, et
+il ne peut pas savoir ce qu'il a manqué (le nom seul ne porte pas le contenu).
+Pistes non tranchées : budget par tour plus élevé · priorité (un `🛑` passe avant un rappel de
+confort) · **scinder plus agressivement** (le format « <10 lignes » n'est PAS tenu par tout le
+corpus — plusieurs docs du parc font 20-30 lignes) · évincer d'abord les `once` déjà consommés.
+
+### ② AUCUNE DÉFENSE CONTRE UNE DOC QUI MENT — le plus grave
+Le 03/08, **TROIS docs enseignaient l'INVERSE du code** : `pw-mcp-child-guard.md` imposait le
+`stdio:'ignore'` qui ÉTAIT le défaut à corriger · `pw-mcp-transports.md` affirmait « pas conforme
+au 404 » deux heures après la mise en conformité · `pw-mcp-concierge.md` décrivait `ONSTART`,
+abandonné pour du XML. Elles n'ont été corrigées que parce qu'un agent PASSAIT dessus.
+🛑 **Une doc injectée qui a tort est PIRE que pas de doc** : elle porte le ton d'un invariant prouvé
+(`🛑 OBLIGATOIRE`) et personne ne la remet en cause. Cas limite atteint le même jour : le GATE
+`stdio:'ignore'` ET sa doc disaient la même chose FAUSSE — deux remparts d'accord entre eux et tous
+deux à côté. Il a fallu un audit humain pour en sortir.
+Piste : un **drift-test doc↔code** (une doc qui cite un littéral de code — `stdio:'ignore'`,
+`ONSTART`, un nom de fonction — doit pouvoir prouver que ce littéral EXISTE encore dans le fichier
+qu'elle documente). ⚠️ Ne couvre que les affirmations CITABLES, jamais la prose — mais c'est déjà
+ce qui a menti trois fois sur trois.
