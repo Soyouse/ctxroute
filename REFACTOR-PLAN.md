@@ -6,7 +6,7 @@
 > oracle du différentiel + rollback). Doctrine du patrimoine (CLAUDE.md) :
 > plus AUCUN chantier ouvert sur ce framework — scaler = ajouter des docs .md.
 
-## ✅ TRAITÉS LE 31/07/2026 (branche `chantier-explain`, EN ATTENTE DE BASCULE)
+## ✅ TRAITÉS LE 31/07/2026 (branche `chantier-explain` — ✅ BASCULÉE dans `master`, vérifié 03/08/2026)
 
 > ⚠️ Fait dans un **worktree isolé** — le dossier live est resté sur `master` tout
 > du long : d'autres agents utilisaient le framework pendant ce chantier.
@@ -92,9 +92,9 @@
 ## 🔴 OUVERT — INJECTION INTÉGRALE D'UN SKILL (la VRAIE cible du §20/07, ouvert 31/07/2026)
 
 **Le problème, sans détour** : un skill fait des CENTAINES DE LIGNES **par conception** — c'est le
-contrat du projet, pas une dérive. ⚠️ La règle « doc réinjectée < ~10 lignes » vaut pour les
-**DOCS**, JAMAIS pour les skills : les confondre a produit une conclusion fausse (« il suffit de
-condenser »). La trame du harnais fait 10 000 caractères. **Ça ne rentre pas, et aucune réécriture
+contrat du projet, pas une dérive. ⚠️ La convention d'usage « doc réinjectée < ~10 lignes » (règle
+du PARC, jamais du framework — cf. rejet du gate de taille, 03/08) visait les **DOCS**, JAMAIS les
+skills : les confondre a produit une conclusion fausse (« il suffit de condenser »). La trame du harnais fait 10 000 caractères. **Ça ne rentre pas, et aucune réécriture
 ne changera ça** — condenser un skill pour entrer dans la plomberie, c'est dégrader le LIVRABLE
 pour une limite de TRANSPORT : exactement ce que la doctrine interdit (« réparer le tuyau, pas le
 livrable »).
@@ -748,13 +748,20 @@ Arithmétique, skills mis de côté : `pw-mcp-logger.md` (2 463) + `pw-mcp-child
 = 7 567 → passe de justesse. Mais `pw-mcp-tests.md` seule = **6 808 = 85 % du budget** ⇒ elle +
 n'importe quoi = éviction.
 
-🛑 **LE GATE MANQUANT, ET IL EST TRIVIAL.** La règle du parc existe déjà — « doc réinjectée < 10
-lignes, 1 ligne = 1 invariant ; au-delà, SCINDER en tier-1 + pointeur `*-reference.md` » — mais
-**rien ne la fait respecter**. C'est un invariant en PROSE, précisément ce que la doctrine interdit
-(« tant qu'aucune machine ne le vérifie, il décrit une INTENTION, pas le réel »).
-⇒ **Gate : toute doc de `.claude/hooks/docs/` dépassant N caractères = ROUGE**, message qui exige la
-scission. Avec des docs à ~1 500, il en rentre 5 par trame et l'éviction DISPARAÎT sans toucher au
-budget. ⚠️ Ne PAS « régler » en gonflant `DEFAUT_BUDGET` : le contexte est fini, et un budget qui
-enfle dilue tout le reste — le plafond protège, c'est la TAILLE des docs qui est le défaut.
-⚠️ Poser le gate avec un CLIQUET (baseline = la plus grosse doc actuelle, qui ne peut que
-descendre), sinon il serait ROUGE d'emblée sur tout le corpus et on le désactiverait.
+🛑 **PISTE « GATE DE TAILLE » — REJETÉE le 03/08/2026 (décision mainteneur), ne PAS la rouvrir.**
+Elle consistait à rougir toute doc de `.claude/hooks/docs/` au-delà de N caractères, pour forcer la
+scission. **Erreur de couche** : « < 10 lignes / scinder en tier-1 + `*-reference.md` » est la
+convention D'USAGE d'UN déploiement (anti-dilution), **jamais une règle du framework**. Un gate du
+moteur qui l'impose transforme une préférence locale en contrainte universelle et **fait porter à
+l'AUTEUR de la doc un défaut du TRANSPORT**.
+⇒ **Inversion de la cible : le framework DOIT livrer une doc de n'importe quelle taille.** Chaque
+déploiement écrit ce qu'il veut, comme il veut ; si ça ne passe pas, le bug est dans le moteur.
+C'est aussi la condition de l'ambition « standard multi-harnais » (§2bis) : un moteur qui dicte le
+format de son contenu n'est pas un standard.
+⚠️ Corollaire déjà appliqué (03/08) : les mentions « <10 lignes » présentées comme une règle du
+framework ont été retirées de `README.md`, `HOOK-INTERNALS.md` et du skill (+ miroir). Le volet ⑤
+de `couverture-gate` (cliquet sur le poids des skills) reste SUSPENDU — il mesurait la même chose
+au mauvais endroit.
+⚠️ Reste VRAI et non contesté : **ne PAS « régler » le problème en gonflant `DEFAUT_BUDGET`** (le
+contexte est fini ; un budget qui enfle dilue tout le reste). La solution est le TRANSPORT, cf. le
+chantier « INJECTION INTÉGRALE » — découverte du plafond, fragmentation, déclencheur par segment.

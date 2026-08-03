@@ -90,7 +90,8 @@ Avec ce réglage, `docs/mcp/odoo/delete_record.md` s'injecte UNIQUEMENT quand `t
 ## Ajouter un MCP au standard
 
 1. Créer `docs/mcp/{server}.md` (`{server}` = le nom entre les `mcp__`, ex. `mcp__stripe__authenticate` → `stripe.md`).
-2. Format : < 10 lignes, 1 ligne = 1 invariant/piège, ton impératif, zéro filler.
+2. Format : **LIBRE. Le framework n'impose ni taille ni structure** — il doit livrer une doc de n'importe quelle taille. Une doc qui ne passe pas est un défaut du TRANSPORT, à corriger dans le moteur, jamais une doc à raccourcir.
+   *(Recommandation d'USAGE, propre à chaque déploiement : le contenu étant réinjecté à chaque geste, court et impératif — 1 ligne = 1 invariant/piège — limite la dilution. C'est un conseil, pas une contrainte, et aucun gate du framework ne l'applique.)*
 3. Aucun code à écrire — le hook générique lit tous les `.md` du dossier à la volée.
 
 ## Architecture

@@ -60,7 +60,7 @@ Le MOTEUR est portable PAR CONSTRUCTION (gate `sources-must-not-know-the-harness
 6. Fini = `npm test` vert + mutation verte + doctor vert sur le câblage réel + REFACTOR-PLAN/skill mis à jour. Un portage sans ces 4 preuves N'EST PAS fini.
 
 ## Ajouter un MCP au standard
-1. Créer `Desktop/mcp-doc-hooks/docs/mcp/{server}.md` — même format que la doc fichier : <10 lignes, 1 ligne = 1 invariant/piège, ton impératif, zéro filler.
+1. Créer `Desktop/mcp-doc-hooks/docs/mcp/{server}.md`. ⚠️ **Le framework n'impose NI taille NI format** : il DOIT livrer une doc de n'importe quelle taille — si elle ne passe pas, le défaut est dans le TRANSPORT, jamais dans la doc. « <10 lignes, 1 ligne = 1 invariant/piège, ton impératif » est la convention D'USAGE de ce parc (anti-dilution) — la suivre ici, ne JAMAIS la présenter comme une règle du moteur ni la faire appliquer par un gate du framework.
 2. C'est tout. Aucun code à écrire — le hook générique lit tous les `.md` du dossier à la volée.
 3. Par défaut : documenter dès qu'un MCP a un invariant/piège/contexte à transmettre (presque toujours) — pas seulement après un incident.
 
