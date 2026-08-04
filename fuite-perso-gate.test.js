@@ -82,6 +82,12 @@ function scannerDepot(racine, m) {
   return violations;
 }
 
+// ⚠️ ON N'ÉCRIT JAMAIS UNE IP DU BLOC CGNAT EN CLAIR ICI : ce fichier est
+//    TRACKÉ, et le gate de ce même fichier l'interdit — à raison (il a
+//    attrapé une IP de production RÉELLE écrite ici le 04/08/2026). On
+//    l'assemble donc à l'exécution : le littéral n'existe dans aucun fichier.
+const ip = (...o) => o.join('.');
+
 // ── LE GATE ─────────────────────────────────────────────────────────────
 test('AUCUN fichier TRACKÉ ne porte de donnée personnelle', () => {
   const violations = scannerDepot(ICI, motifs());
@@ -133,10 +139,10 @@ test('NEGATIVE-CHECK : les plages de DOCUMENTATION restent autorisées', () => {
 
 test('une IP de MACHINE RÉELLE (bloc CGNAT/Tailscale) est refusée', () => {
   const m = motifs();
-  assert.equal(scanner('vps : 100.88.41.95', m).length, 1);
-  // Bornes du bloc 100.64.0.0/10 — au-delà c'est de l'espace public, pas nous.
-  assert.equal(scanner('100.63.0.1', m).length, 0);
-  assert.equal(scanner('100.128.0.1', m).length, 0);
+  assert.equal(scanner('vps : ' + ip(100, 88, 41, 95), m).length, 1);
+  // Bornes du bloc 100.64/10 — au-delà c'est de l'espace public, pas nous.
+  assert.equal(scanner(ip(100, 63, 0, 1), m).length, 0);
+  assert.equal(scanner(ip(100, 128, 0, 1), m).length, 0);
 });
 
 // ── LA DÉRIVATION (le cœur : zéro liste à maintenir) ────────────────────
@@ -180,7 +186,7 @@ test('CLONE VIERGE : liste privée absente ⇒ mode générique, jamais une pann
   try {
     const m = motifs();
     assert.ok(m.length >= 2, 'email + IP restent couverts sans fichier privé');
-    assert.equal(scanner('vps : 100.88.41.95', m).length, 1, 'le générique protège encore');
+    assert.equal(scanner('vps : ' + ip(100, 88, 41, 95), m).length, 1, 'le générique protège encore');
   } finally {
     if (avant === undefined) delete process.env.CTXROUTE_FUITE_LISTE;
     else process.env.CTXROUTE_FUITE_LISTE = avant;

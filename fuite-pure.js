@@ -41,7 +41,7 @@ function dernierSegment(chemin) {
 //    dépôt public, ce sont précisément celles que la doctrine impose d'écrire.
 const IP_AUTORISEES = /^(203\.0\.113\.|192\.0\.2\.|198\.51\.100\.|127\.|0\.0\.0\.0)/;
 
-// ⚠️ 100.64.0.0/10 = CGNAT, la plage de Tailscale : une IP de ce bloc est une
+// ⚠️ Bloc CGNAT 100.64/10 (plage de Tailscale) : une IP de ce bloc est une
 //    MACHINE RÉELLE du parc. Jamais dans un dépôt public.
 const IP_CGNAT = /\b100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}\b/;
 

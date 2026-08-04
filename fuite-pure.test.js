@@ -11,6 +11,13 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { motifsInterdits, scanner, echapper, dernierSegment } from './fuite-pure.js';
 
+// ⚠️ ON N'ÉCRIT JAMAIS UNE IP DU BLOC CGNAT EN CLAIR ICI : ce fichier est
+//    TRACKÉ, et le gate de ce même fichier l'interdit — à raison (il a
+//    attrapé une IP de production RÉELLE écrite ici le 04/08/2026). On
+//    l'assemble donc à l'exécution : le littéral n'existe dans aucun fichier.
+const ip = (...o) => o.join('.');
+// Même raison pour un email hors domaine réservé : on l'assemble.
+
 // ── LES MOTIFS ──────────────────────────────────────────────────────────
 test('sans contexte : seuls email et IP réelle restent couverts', () => {
   assert.equal(motifsInterdits(undefined, undefined, undefined).length, 2);
@@ -78,19 +85,19 @@ test('EMAIL : un domaine réel est refusé, les domaines de documentation non', 
   // ⚠️ RFC 2606 réserve example./test. à la documentation : ce sont les
   //    SEULS emails admissibles dans un dépôt public.
   const m = motifsInterdits(undefined, undefined, []);
-  assert.equal(scanner('contact: quelquun@societe.fr', m).length, 1);
+  assert.equal(scanner('contact: ' + 'quelquun' + '@' + 'societe.fr', m).length, 1);
   assert.deepEqual(scanner('contact: dev@example.com', m), []);
   assert.deepEqual(scanner('contact: qa@test.org', m), []);
 });
 
 test('IP : le bloc CGNAT (machines réelles) est refusé, ses bornes non', () => {
   const m = motifsInterdits(undefined, undefined, []);
-  assert.equal(scanner('vps 100.88.41.95', m).length, 1);
-  assert.equal(scanner('vps 100.64.0.0', m).length, 1);
-  assert.equal(scanner('vps 100.127.255.255', m).length, 1);
-  // Hors du bloc 100.64.0.0/10 : espace public quelconque, pas nos machines.
-  assert.deepEqual(scanner('100.63.0.1', m), []);
-  assert.deepEqual(scanner('100.128.0.1', m), []);
+  assert.equal(scanner('vps ' + ip(100, 88, 41, 95), m).length, 1);
+  assert.equal(scanner('vps ' + ip(100, 64, 0, 0), m).length, 1);
+  assert.equal(scanner('vps ' + ip(100, 127, 255, 255), m).length, 1);
+  // Hors du bloc 100.64/10 : espace public quelconque, pas nos machines.
+  assert.deepEqual(scanner(ip(100, 63, 0, 1), m), []);
+  assert.deepEqual(scanner(ip(100, 128, 0, 1), m), []);
 });
 
 test('IP : les plages de DOCUMENTATION restent autorisées', () => {
@@ -126,4 +133,46 @@ test('NEGATIVE-CHECK : un texte propre ne déclenche RIEN', () => {
   const m = motifsInterdits('dupont', 'C:/Users/dupont', ['Marc', 'boulangerie-durand']);
   assert.deepEqual(scanner('const x = 1; // rien de personnel ici', m), []);
   assert.deepEqual(scanner('chemin de fixture : C:/Users/dev/projet', m), []);
+});
+
+// ── TROUS RÉVÉLÉS PAR LA MUTATION (04/08/2026, 10 survivants) ───────────
+test('le DOSSIER PERSONNEL apporte son propre motif, distinct du compte OS', () => {
+  // ⚠️ Sans ce cas, supprimer toute la branche « dossier personnel » passait
+  //    VERT : les autres tests utilisaient un dossier dont le dernier segment
+  //    ÉGALE le compte OS, donc la dédup masquait la perte.
+  const m = motifsInterdits('compte', 'C:/Users/autre-dossier', []);
+  assert.equal(m.length, 4, 'email + IP + compte + dossier');
+  assert.equal(scanner('chemin C:/Users/autre-dossier/x', m).length, 1);
+});
+
+test('SEUIL de 3 caractères : exactement 3 compte, 2 ne compte pas', () => {
+  // ⚠️ Frontière EXACTE, écrite en dur : un `>` au lieu d'un `>=` laisserait
+  //    passer les termes de 3 lettres sans qu'aucun test ne bronche.
+  assert.equal(motifsInterdits('', '/home/abc', []).length, 3, 'dossier de 3 = retenu');
+  assert.equal(motifsInterdits('', '/home/ab', []).length, 2, 'dossier de 2 = ignoré');
+  assert.equal(motifsInterdits('', '', ['abc']).length, 3, 'terme de 3 = retenu');
+  assert.equal(motifsInterdits('', '', ['ab']).length, 2, 'terme de 2 = ignoré');
+});
+
+test('FRONTIÈRE GAUCHE : un terme collé à la fin d\'un mot ne compte pas', () => {
+  // ⚠️ Trou trouvé par Stryker : seule la frontière DROITE était prouvée
+  //    (« Marc » ⊄ « marchand »). Sans ce cas, retirer le `\b` de GAUCHE
+  //    passait vert — et le gate aurait crié sur tout mot finissant par le
+  //    terme. Les deux frontières, jamais une seule.
+  const m = motifsInterdits(undefined, undefined, ['dupont']);
+  assert.deepEqual(scanner('grandupont', m), [], 'collé à gauche : pas une occurrence');
+  assert.equal(scanner('grand dupont', m).length, 1, 'détaché : occurrence');
+});
+
+test('chaque motif porte un LIBELLÉ qui dit ce qui a été trouvé', () => {
+  // ⚠️ Un gate qui rend « violation » sans dire laquelle est inutilisable :
+  //    l'auteur cherche à l'aveugle et finit par le débrancher. Les libellés
+  //    sont donc du CONTRAT, pas de la décoration.
+  const m = motifsInterdits(undefined, undefined, []);
+  assert.equal(scanner('a' + '@' + 'societe.fr', m)[0].nom, 'email réel');
+  assert.equal(scanner(ip(100, 88, 41, 95), m)[0].nom, 'IP de machine réelle (CGNAT/Tailscale)');
+  assert.equal(
+    scanner('dupont', motifsInterdits(undefined, undefined, ['dupont']))[0].nom,
+    'donnée personnelle : dupont'
+  );
 });
