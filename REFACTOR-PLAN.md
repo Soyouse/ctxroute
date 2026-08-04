@@ -416,7 +416,11 @@ aucun dialecte depuis le 03/08). Seule inconnue à MESURER : le format du transc
 marqueur d'appel d'outil équivalent à `"type":"tool_use"`. ⚠️ **Mesurer sur un payload/transcript
 RÉEL, jamais sur parole** (règle du portage).
 
-### ③ ✅ LIVRÉ (04/08/2026) — et le diagnostic ci-dessous était TROP DOUX
+### ③ 🟡 POSÉ mais PAS ENCORE ACTIF (04/08/2026) — et le diagnostic ci-dessous était TROP DOUX
+> **Résumé en une ligne** : le réglage est écrit, scellé par un gate, et ne casse rien (prouvé en
+> session réelle) — mais la version installée (0.144.6) **ne connaît pas la clé**, donc il n'agit
+> pas encore. Ne pas cocher ce chantier tant que la mise à jour + la mesure de bout en bout n'ont
+> pas eu lieu (cf « NUANCE MESURÉE » plus bas).
 
 > 🛑 **CE N'ÉTAIT PAS « une doc qui ment » : c'était une PANNE SILENCIEUSE EN PROD.**
 > Le texte d'origine (conservé plus bas) concluait « ce n'est pas cassé, le plancher 8 000 est
@@ -446,6 +450,35 @@ RÉEL, jamais sur parole** (règle du portage).
 > reproduite le lendemain.
 > ⚠️ **Ne PAS en conclure que Codex a besoin de paquets** : avec `0`, il n'a **aucun plafond**. La
 > fragmentation reste un contournement de Claude Code uniquement.
+>
+> ### ⚠️ NUANCE MESURÉE LE MÊME JOUR — le réglage est INERTE sur la version INSTALLÉE
+> Mesures (04/08/2026, `codex.exe` 0.144.6, 341 Mo) :
+> | Chaîne cherchée dans le binaire | Occurrences |
+> |---|---|
+> | `additionalContextLimit` / `additional_context_limit` | **0 / 0** |
+> | témoins de la même famille : `PreToolUse` · `UserPromptSubmit` · `additionalContext` · `hookSpecificOutput` · `permissionDecision` | 44 · 38 · 15 · 8 · 5 |
+> ⇒ la méthode de mesure est VALIDÉE par les témoins (chaînes UTF-8 bien lisibles) : la clé
+> **n'existe pas** dans 0.144.6. Elle est **documentée**, mais la doc ne dit pas depuis QUELLE
+> version — et **0.146.0 est disponible** (non installée).
+>
+> ✅ **AUCUNE CASSE — prouvé en session RÉELLE**, pas déduit : `codex exec` sur cette machine rend
+> `hook: SessionStart` ×2 → `Completed` ×2 → `UserPromptSubmit Completed`. Les hooks du fichier
+> MANAGÉ se chargent et s'exécutent : Codex **ignore** la clé inconnue au lieu de rejeter le
+> fichier. C'était le vrai risque de ce changement, il est levé.
+>
+> 🛑 **DONC, à ne pas surinterpréter** : le réglage est CORRECT et prêt, mais il **n'agit pas sur
+> 0.144.6**. Dire « la panne est réparée ici » serait faux. Deux questions restent OUVERTES et
+> **indécidables par grep** (`context_limit` seul = 3 occurrences, ambigu — et rétro-ingénierer un
+> comportement documenté est INTERDIT par la méthode) :
+> ① 0.144.6 plafonne-t-il quand même, sans réglage pour le débrayer ?
+> ② à partir de quelle version la clé est-elle honorée ?
+> **Seule façon honnête de trancher : mettre Codex à jour (0.146.0), puis MESURER une injection
+> volumineuse réelle de bout en bout.** À faire avec le chantier ② (canari Codex), qui est
+> justement le témoin qui manque pour voir ce qu'il advient à l'autre bout.
+>
+> ⚠️ **Découvert au passage, à traiter** : `~/.codex/config.toml` utilise `[features].codex_hooks`,
+> que 0.144.6 déclare **DÉPRÉCIÉ** (« Use `[features].hooks` instead »). Le fichier managé, lui,
+> est déjà en `hooks = true`.
 
 <details><summary>Diagnostic d'origine (conservé — il montre comment on sous-estime un trou)</summary>
 
