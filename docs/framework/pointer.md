@@ -7,7 +7,7 @@ rank: 350
 # ctxroute — déplacé en dossier autonome (repo git séparé)
 
 Le framework (code + tests) vit maintenant dans `~/Desktop/ctxroute/` (repo git propre, poussable sur GitHub sans mélanger avec le reste du home directory).
-Câblage `settings.json` → chemins absolus pointent vers ce dossier (`legacy-mcp-inject.js`, `ctxroute-reset.js`).
+Câblage `settings.json` → chemins absolus vers ce dossier : `doc-inject.js` (la PORTE, 12 déclarations de paquets), `ctxroute-reset.js`, `turn-count.js`, `session-inject.js`, `canari-check.js`. ⚠️ `legacy-mcp-inject.js` n'est PAS câblé (relique = oracle du différentiel).
 Doc interne complète : `Desktop/ctxroute/HOOK-INTERNALS.md`. Usage/config : `Desktop/ctxroute/README.md` (et skill `.claude/commands/ctxroute.md`).
 ⚠️ Les docs MCP personnalisées du mainteneur (`docs/mcp/stripe.md`, `odoo.md` — avec vrais emails/clients) vivent dans `Desktop/ctxroute/docs/mcp/*.md`, gitignorées. Seuls les `.md.example` génériques sont poussés sur GitHub.
 Modif du framework → éditer dans `Desktop/ctxroute/`, PAS ici (ce dossier ne contient plus le code).
