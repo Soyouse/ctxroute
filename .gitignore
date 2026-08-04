@@ -8,4 +8,7 @@ node_modules/
 reports/
 
 # Config UTILISATEUR (noms de skills/projets = données perso) — créer depuis le .example
-mcp-doc-config.json
+ctxroute-config.json
+
+# Termes prives du DEPLOIEMENT (jamais publies) — cf fuite-perso-gate.test.js
+.fuite-perso-local.json
