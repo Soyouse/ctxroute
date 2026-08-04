@@ -89,11 +89,17 @@
   acme-infra 69 017, ctxroute 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
   ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.
 
-## ✅ PAQUETS — CONSTRUIT ET PROUVÉ (03/08/2026) · ⏸️ EN ATTENTE DE GO POUR LA BASCULE
+## ✅ PAQUETS — LIVE EN PRODUCTION (bascule faite le 03/08/2026)
 
-**État : le code est FINI et scellé, le câblage n'est PAS fait** (règle n°1 du skill : la bascule
-exige un GO EXPLICITE, à un moment où aucun agent ne tourne). `master` est intact, les autres
-agents tournent dessus sans rien voir.
+> ⚠️ **SECTION CORRIGÉE LE 04/08/2026 — elle annonçait encore « EN ATTENTE DE GO, câblage PAS
+> fait ».** C'était FAUX depuis la bascule : `settings.json` déclare **12 paquets**
+> (`--paquet k --paquets 12`) et les injections arrivent scellées/numérotées à chaque geste.
+> Un backlog qui décrit un chantier livré comme « en attente » fait re-décider ce qui est décidé.
+
+**État : LIVE.** Le câblage est en place, les autres agents en bénéficient.
+⚠️ Le **N = 3** cité plus bas dans le dimensionnement est PÉRIMÉ : c'est **N = 12** (le plus gros
+contenu du parc, 79 516 c, exige 11 trames). Le raisonnement de dimensionnement reste valable, le
+chiffre non.
 
 **Preuves** : 816 tests verts · **mutation 100,00 % (0 survivant)** · 0 clone jscpd · doctor vert ·
 différentiels (`porte-differential` à l'octet, `mcp-differential`) VERTS ⇒ parité confirmée.
@@ -205,6 +211,55 @@ qui tient aujourd'hui sort exactement comme aujourd'hui, à l'octet — médiane
 Le risque de bascule est donc borné aux cas qui, sans ça, étaient DÉJÀ cassés.
 ⚠️ **N est un cliquet, DÉRIVÉ d'une mesure sur le plus gros contenu réel — jamais deviné.** Trop
 petit = l'éviction revient ; trop grand = des spawns pour rien sur un poste sujet à la saturation.
+
+## 🔴 PROCHAIN CHANTIER — `enforce` : ARRÊTER le geste, pas seulement l'informer (ouvert 04/08/2026)
+
+> ⚠️ **DÉCISION DU MAINTENEUR REQUISE avant de coder** : c'est un retour sur le retrait du
+> deny/ask du 17/07/2026 — mais pris, cette fois, en connaissance du fait ci-dessous.
+
+### LE FAIT QUI ROUVRE LE SUJET (doc officielle, mesuré le 04/08/2026)
+Claude Code, page Hooks : *« Where the reminder appears depends on the event: **PreToolUse**,
+PostToolUse, PostToolUseFailure, PostToolBatch: **next to the tool result** »*.
+⇒ **`additionalContext` d'un PreToolUse n'arrive PAS avant l'outil : il arrive À CÔTÉ DE SON
+RÉSULTAT.** Le hook s'exécute avant, son TEXTE non.
+🛑 **Conséquence directe, à ne jamais réoublier : une injection ne peut PAS empêcher le geste
+qu'elle vise.** Elle protège le geste SUIVANT. L'incident FONDATEUR du framework (le clic de
+paiement) ne serait donc PAS évité par une doc injectée — seul un `deny` l'aurait fait.
+⚠️ Le skill affirmait « le savoir livré AU MOMENT du geste » : vrai pour l'exécution du hook,
+FAUX pour l'arrivée du texte. Corrigé.
+
+### CE QUI EXISTE, SUR LES DEUX HARNAIS (doc officielle, 04/08/2026 — ne pas re-chercher)
+| | Claude Code | Codex |
+|---|---|---|
+| forme JSON | `permissionDecision: "deny"` + `permissionDecisionReason` | **identique** (+ ancienne forme `decision:"block"`) |
+| repli | exit 2 + stderr | exit 2 + stderr |
+| raison → modèle | oui (*« blocks the tool call, and shows Claude the reason »*) | oui |
+| interaction utilisateur | **aucune** | **aucune** (*« fully automatic — without requiring approval prompts »*) |
+⇒ **`deny` est 100 % autonome et DISPONIBLE À L'IDENTIQUE sur les deux harnais** : c'est la
+condition d'un standard. 🛑 **`ask` est PROSCRIT** — il escalade vers l'humain (anti 0-human), et
+Codex le parse sans le supporter.
+
+### CIBLE
+- Un mot PAR ENTRÉE, cascadable comme les autres (les 4 autorités, `defaults.{source}` compris) :
+  `enforce: true` — défaut `false` = comportement d'aujourd'hui, à l'identique (contrat §6).
+- `true` ⇒ la doc part en `permissionDecisionReason` (PAS en `additionalContext`) et l'outil est
+  REFUSÉ. Le corps du savoir doit tenir dans la raison, sinon on informe à moitié.
+- 🛑 **PIÈGE MORTEL — LA BOUCLE INFINIE** : bloquer sans mémoire ⇒ l'agent réessaie ⇒ on rebloque,
+  sans fin. **La solution est DÉJÀ dans le vocabulaire** : `enforce: true` + `mode: once` = blocage
+  au 1er geste, savoir livré, l'agent refait l'appel, ça passe. **Zéro mécanisme neuf.**
+  ⇒ **`enforce` + `dumb` DOIT être ROUGE à la validation** (deadlock déclaré), et `enforce` + `smart`
+  aussi (le seuil rouvrirait la porte au hasard). Seul `once` est cohérent — le gate doit le dire.
+- Coquilles : le dialecte (`permissionDecision` vs exit 2) vit dans la COQUILLE, jamais dans le
+  noyau — `porte-core` décide « bloquer ou informer », chaque harnais l'exprime.
+- Preuves exigées : spawn réel par harnais (blocage effectif + raison reçue), negative-check
+  (une doc sans `enforce` ne bloque JAMAIS), mutation 100 %, doctor probe.
+
+### CE QUI RESTE VRAI ET NE CHANGE PAS
+« L'injection informe, ne bloque jamais » demeure le DÉFAUT. `enforce` est l'exception déclarée,
+jamais l'inverse : un rappel de confort qui bloque rend le système insupportable, et un système
+qu'on subit finit débranché.
+
+---
 
 ## ✅ LIVRÉ — `note:` — le commentaire d'auteur, invisible à l'agent qui agit (04/08/2026)
 
@@ -413,7 +468,14 @@ sujets sont désormais SÉPARÉS — les avoir mélangés est ce qui a fait dér
 
 ---
 
-## 🔵 OUVERT — 3 manques trouvés le 31/07/2026 en écrivant une doc « déclencher sur un GESTE »
+## 🟡 EN GRANDE PARTIE TRAITÉ — 3 manques trouvés le 31/07/2026 (doc « déclencher sur un GESTE »)
+
+> ⚠️ **STATUT CORRIGÉ LE 04/08/2026 — cette section était marquée OUVERTE en entier.**
+> **FERMÉS** : §A (faux vert `mcp:`), §B + §B0 (joker `tool:["*"]` + négation sur l'axe outil —
+> la table de §B0 est donc PÉRIMÉE, l'axe outil a ses 3 opérateurs), §E (`explain` livré),
+> §G (3 tests rouges), §D (`docs/mcp/ssh.md` existe — vérifié 04/08).
+> **RESTENT OUVERTS** : §C (recette « geste » — partiellement écrite dans les docs) et §F
+> (`sources.md` au-delà du seuil de dilution, à scinder À FROID).
 
 > Contexte : première doc du parc dont l'intention n'est pas « quel FICHIER touches-tu » mais
 > « quel GESTE poses-tu » (poser un conteneur / un service / une tâche planifiée ⇒ le déclarer).
@@ -985,7 +1047,16 @@ n'a pas lieu du tout. Prévention > runbook. Aucune modification du moteur n'ét
 
 ## 🔴 DEUX DÉFAUTS DU MOTEUR, OBSERVÉS EN USAGE RÉEL (session pw-mcp-proxy, 03/08/2026)
 
-### ① ÉVICTION : il déclare une doc OBLIGATOIRE puis ne la livre pas
+### ① ✅ RÉSOLU (03/08/2026) — ÉVICTION : il déclarait une doc OBLIGATOIRE puis ne la livrait pas
+
+> ⚠️ **STATUT CORRIGÉ LE 04/08/2026.** Le transport multi-trames a supprimé la cause : une doc
+> trop lourde est MORCELÉE et livrée, l'indélivrabilité est impossible par construction.
+> Le diagnostic ci-dessous est CONSERVÉ (il explique pourquoi le transport existe) — mais
+> ⚠️ **les « pistes non tranchées » qu'il liste sont CADUQUES** : elles proposent notamment de
+> « scinder plus agressivement », c'est-à-dire de faire porter à l'auteur d'une doc un défaut du
+> TRANSPORT — exactement ce que la décision du 03/08 a rejeté. Ne PAS les rouvrir.
+
+#### Diagnostic d'origine (conservé pour mémoire)
 Message vu ~10 fois dans UNE session, jusqu'à **4 docs évincées d'un coup** :
 « N doc(s) NON injectée(s) faute de place dans cette trame. **Elles ne sont PAS optionnelles.** »
 Ce n'est pas un bug : segments indivisibles + `DEFAUT_BUDGET` 8000 + corpus qui grossit = **plafond
