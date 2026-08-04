@@ -322,6 +322,7 @@ function validate(data) {
   }
   for (const e of cadenceErrors(data)) errs.push(e);
   for (const e of noteErrors(data)) errs.push(e);
+  for (const e of blocYamlErrors(data)) errs.push(e);
   if ('confirm' in data && typeof data.confirm !== 'boolean') {
     errs.push('`confirm` doit être true ou false');
   }
@@ -350,6 +351,7 @@ function validateMcp(data) {
   }
   for (const e of cadenceErrors(data)) errs.push(e);
   for (const e of noteErrors(data)) errs.push(e);
+  for (const e of blocYamlErrors(data)) errs.push(e);
   return errs;
 }
 // Stryker restore StringLiteral
@@ -362,6 +364,32 @@ function validateMcp(data) {
 // ⚠️ `note` = commentaire d'AUTEUR, jamais du contrôle. Validé sur la FORME
 //    seulement (texte, ou liste de textes pour plusieurs remarques) : en valider
 //    le CONTENU reviendrait à lui donner un sens, donc à en faire de la config.
+// ⚠️ MARQUEURS DE BLOC YAML (`|`, `>`) — REJETÉS, jamais supportés.
+//    Trouvé le 04/08/2026 par simulation adversariale, sur `note` :
+//      note: |
+//        ligne un
+//        ligne deux
+//    donnait `note === "|"`, validation VERTE, et les deux lignes PERDUES EN
+//    SILENCE (une ligne non conforme est ignorée par le parser — totalité).
+//    L'auteur croit avoir écrit trois lignes ; il a écrit un tube.
+//
+// ⚠️ LA RÉPONSE N'EST PAS DE SUPPORTER LE MULTI-LIGNE : ce parser est un
+//    SOUS-ENSEMBLE de YAML, délibérément (cf en-tête — « vouloir juste ajouter
+//    le multi-ligne = la première marche vers un parser YAML »). La réponse est
+//    de rendre le piège BRUYANT et de donner la forme qui marche.
+//
+// ⚠️ Général à TOUTES les clés, pas seulement `note` : `match: |` souffre du
+//    même sort. Mesuré avant de poser la garde : 0 doc du parc concernée.
+function blocYamlErrors(data) {
+  const errs = [];
+  for (const [k, v] of Object.entries(data)) {
+    if (v === '|' || v === '>') {
+      errs.push(`\`${k}\` : les blocs YAML multi-lignes (\`|\`, \`>\`) ne sont PAS supportes — les lignes suivantes seraient PERDUES. Utiliser une liste inline : ${k}: [ligne un, ligne deux]`);
+    }
+  }
+  return errs;
+}
+
 function noteErrors(data) {
   if (!('note' in data)) return [];
   const v = data.note;

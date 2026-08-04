@@ -204,3 +204,59 @@ if (config) {
   ok('gate defaults : le même verdict est VERT sur les clés réelles (sinon le check ne prouve rien)',
     verdict(declarees) === true);
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// GATE — les exemples JSON du README DOIVENT être des configs VALIDES
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ BUG RÉEL (trouvé le 04/08/2026 par /stack-audit, présent depuis le
+//    17/07/2026 — 18 jours) : le README enseignait
+//    `servers: { stripe: { threshold: 1, mode: "dumb" } }` alors que la cadence
+//    par serveur avait été RETIRÉE du schéma. Un utilisateur qui copiait
+//    l'exemple d'accueil obtenait une config REJETÉE. Sur un dépôt PUBLIC,
+//    c'est la première chose que lit un arrivant.
+//
+// ⚠️ La classe d'erreur = « la doc dérive du code ». Une relecture ne la ferme
+//    pas (elle a survécu 18 jours) : ce gate la rend IMPOSSIBLE. Tout exemple
+//    de config du README est confronté au schéma, clé par clé.
+{
+  const readme = fs.readFileSync(path.join(import.meta.dirname, 'README.md'), 'utf8');
+  const schema = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'ctxroute-config.schema.json'), 'utf8'));
+
+  // Blocs ```json du README qui ressemblent à une config (clé connue au 1er niveau).
+  const blocs = [...readme.matchAll(/```json\s*\n([\s\S]*?)```/g)].map((m) => m[1]);
+  const connues = Object.keys(schema.properties);
+  const configs = [];
+  for (const b of blocs) {
+    let o = null;
+    try { o = JSON.parse(b); } catch { continue; }   // extrait de doc non-JSON : ignoré
+    if (o && typeof o === 'object' && !Array.isArray(o)
+      && Object.keys(o).some((k) => connues.includes(k))) configs.push(o);
+  }
+  ok(`README : au moins un exemple de config détecté (${configs.length})`, configs.length >= 1);
+
+  for (const [i, cfg] of configs.entries()) {
+    for (const k of Object.keys(cfg)) {
+      ok(`README ex.${i} : clé \`${k}\` existe dans le schéma`, connues.includes(k));
+    }
+    // `servers.{nom}` : réglages STRUCTURELS seulement — c'est ici qu'était le bug.
+    for (const [nom, v] of Object.entries(cfg.servers || {})) {
+      const admises = Object.keys(schema.properties.servers.additionalProperties.properties);
+      for (const k of Object.keys(v || {})) {
+        ok(`README ex.${i} : servers.${nom}.${k} admise (${admises.join(',')})`, admises.includes(k));
+      }
+    }
+    // `defaults.{source}` : uniquement les sources du registre.
+    const srcOk = Object.keys(schema.properties.defaults.properties);
+    for (const k of Object.keys(cfg.defaults || {})) {
+      ok(`README ex.${i} : defaults.${k} est une source réelle`, srcOk.includes(k));
+    }
+  }
+
+  // ⚠️ NEGATIVE-CHECK : le gate DOIT rougir sur l'exemple exact qui a menti 18 jours.
+  const admisesSrv = Object.keys(schema.properties.servers.additionalProperties.properties);
+  ok('README : NEGATIVE-CHECK — l\'ancien exemple (servers.stripe.mode) serait REJETÉ',
+    !admisesSrv.includes('mode') && !admisesSrv.includes('threshold'));
+  ok('README : NEGATIVE-CHECK — une clé de 1er niveau inventée serait REJETÉE',
+    !connues.includes('cadenceGlobale'));
+}

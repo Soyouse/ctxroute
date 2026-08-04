@@ -52,15 +52,38 @@ Détails d'implémentation, format du store, invariants internes : voir `HOOK-IN
   "defaultThreshold": 4,
   "filterMode": "none",
   "filterList": [],
+  "defaults": {
+    "mcp":   { "mode": "smart", "threshold": 4 },
+    "skill": { "mode": "once" }
+  },
   "servers": {
-    "stripe": { "threshold": 1, "mode": "dumb" }
+    "odoo": { "subToolParam": "args.tool" }
   }
 }
 ```
 
 - **`mode`** : `"dumb"` (réinjecte à chaque appel du serveur) · `"once"` (1 seule fois par contexte, jusqu'à compaction) · `"smart"` (défaut — comme `once`, mais réinjecte aussi si ≥ N appels D'AUTRES outils se sont écoulés depuis le dernier appel à ce serveur précis).
 - **`defaultThreshold`** : N par défaut pour le mode `smart`.
-- **`servers.{name}.threshold`** / **`servers.{name}.mode`** : override par serveur — un MCP à enjeu élevé (paiement, mutation destructive) peut avoir un seuil plus bas ou un mode `dumb` fixe, indépendamment du réglage global.
+- **`defaults.{source}`** : défauts pour TOUTES les docs d'une catégorie — `file` · `mcp` · `skill` · `tool` (les sources du moteur). Étage intermédiaire entre le global et l'entrée. Tout est facultatif.
+- **`servers.{name}.subToolParam`** : réglage STRUCTUREL d'un serveur (routage vers le niveau 3), jamais de cadence.
+- ⚠️ **`servers.{name}.mode` / `.threshold` N'EXISTENT PLUS** (retirés le 17/07/2026, correction du README le 04/08/2026 — il les enseignait encore). La cadence d'une doc MCP vit dans le **frontmatter de la doc** (`docs/mcp/{serveur}.md`), celle d'une catégorie dans `defaults.{source}` : une seule vérité par réglage, jamais deux. Les écrire ici fait ROUGIR le schéma — bruyamment, jamais en silence.
+
+### Cascade des réglages (`mode` · `threshold` · `driftUnit`)
+
+Quatre étages, du plus général au plus spécifique — le dernier qui déclare gagne, et une valeur absente ou invalide fait simplement descendre d'un cran :
+
+1. défaut du **framework** (codé en dur : existe même sans aucun fichier de config)
+2. **global** (`mode`, `defaultThreshold`, `defaultDriftUnit`)
+3. **`defaults.{source}`** (toutes les docs d'une catégorie)
+4. **l'entrée** (frontmatter de la doc, ou entrée du registre `skills`)
+
+⚠️ Une seule exception, volontaire : la source `skill` saute l'étage 2 (son défaut framework est `once`, celui des docs `smart`).
+
+### `note` — commentaire d'auteur
+
+Toute entrée (frontmatter de doc, entrée de `skills`) accepte `note:` — texte ou liste de textes. **Le moteur ne la lit jamais** et elle **n'atteint jamais le contexte de l'agent** : le frontmatter est retiré du corps injecté. Elle s'adresse à qui vient *modifier* la doc (« pourquoi ce `mode` », « pourquoi ce `scope` »).
+
+⚠️ N'y mettez pas le *pourquoi d'un invariant* : celui-là doit rester dans le corps, visible de l'agent qui agit — une règle privée de sa raison finit contournée.
 - **`filterMode`** (`"none"` / `"whitelist"` / `"blacklist"`) + **`filterList`** : limite quels serveurs sont couverts par le framework.
 - **`enabled`** (défaut `true`) : interrupteur GLOBAL — `false` coupe TOUT (injection ET tracking d'état/compteurs). Pattern standard (cf ESLint, git hooks `SKIP=...`) pour désactiver temporairement sans retirer le câblage `settings.json`.
 - **`showNotification`** (défaut `true`) : contrôle UNIQUEMENT le `systemMessage` visible (le badge `📄 [ctxroute] ...`) — `false` n'affiche plus le badge mais l'injection réelle (`additionalContext`, ce que voit l'agent) continue normalement. Indépendant de `enabled`.

@@ -408,3 +408,21 @@ test('note : N\'ATTEINT JAMAIS le corps injecté', () => {
   assert.strictEqual(r.body.includes('note'), false);
   assert.strictEqual(r.body.trim(), 'corps visible');
 });
+
+// ⚠️ Trouvé par SIMULATION ADVERSARIALE (04/08/2026), pas par un test qui échoue :
+//    un bloc YAML `|` rendait la valeur « | » et PERDAIT les lignes suivantes en
+//    silence, validation verte. Le parser reste un sous-ensemble de YAML (jamais
+//    de multi-ligne) — c'est le PIÈGE qu'on rend bruyant, pas la limite qu'on lève.
+test('bloc YAML `|` / `>` : ROUGE, avec la forme qui marche dans le message', () => {
+  const { data } = parse('---\nmatch: x.js\nnote: |\n  perdue un\n  perdue deux\n---\ncorps\n');
+  assert.strictEqual(data.note, '|');
+  const errs = validate(data);
+  assert.strictEqual(errs.length, 1);
+  assert.ok(errs[0].includes('note'));
+  assert.ok(errs[0].includes('[ligne un, ligne deux]'), 'le message DOIT donner la forme valide');
+  assert.strictEqual(validate({ match: 'x.js', note: '>' }).length, 1);
+  assert.strictEqual(validateMcp({ mode: '|' }).length >= 1, true);
+  // La forme correcte reste VERTE (sinon la garde interdirait l'usage légitime).
+  assert.deepStrictEqual(validate({ match: 'x.js', note: ['ligne un', 'ligne deux'] }), []);
+  assert.deepStrictEqual(validate({ match: 'x.js', note: 'un pipe | au milieu' }), []);
+});

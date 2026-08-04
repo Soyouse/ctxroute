@@ -212,6 +212,46 @@ Le risque de bascule est donc borné aux cas qui, sans ça, étaient DÉJÀ cass
 ⚠️ **N est un cliquet, DÉRIVÉ d'une mesure sur le plus gros contenu réel — jamais deviné.** Trop
 petit = l'éviction revient ; trop grand = des spawns pour rien sur un poste sujet à la saturation.
 
+## ✅ /stack-audit du 04/08/2026 — 2 MANQUES trouvés et FERMÉS dans le même geste
+
+### ① Le README enseignait une config que le SCHÉMA REFUSE (18 jours)
+`README.md` montrait `servers: { stripe: { threshold: 1, mode: "dumb" } }` — cadence par serveur
+**retirée du schéma le 17/07/2026**. Un arrivant qui copiait l'exemple d'accueil d'un dépôt PUBLIC
+obtenait une config rejetée.
+⚠️ **Une relecture ne ferme pas cette classe** (elle a survécu 18 jours, à travers plusieurs
+sessions et un audit). **Gate posé** : tout bloc ```json du README est confronté au schéma, clé par
+clé (1er niveau, `servers.*`, `defaults.*`), + negative-check sur l'exemple exact qui a menti.
+README corrigé ET complété (cascade 4 étages, `defaults`, `note`).
+
+### ② `note: |` perdait les lignes suivantes EN SILENCE
+Trouvé par **simulation adversariale** (pas par un test rouge) :
+```yaml
+note: |
+  ligne un
+  ligne deux
+```
+donnait `note === "|"`, **validation VERTE**, et les deux lignes PERDUES. L'auteur croit avoir écrit
+trois lignes ; il a écrit un tube. ⚠️ Et `note` est précisément le champ qui invite à écrire long.
+⚠️ **La réponse N'EST PAS de supporter le multi-ligne** (le parser est un sous-ensemble de YAML,
+délibérément — « vouloir juste ajouter le multi-ligne = la première marche vers un parser YAML »).
+La réponse est de rendre le piège BRUYANT : `|` et `>` sont REJETÉS **pour toutes les clés** (pas
+seulement `note` — `match: |` souffrait du même sort), avec un message qui donne la forme qui
+marche (`[ligne un, ligne deux]`). Mesuré avant de poser la garde : **0 doc du parc concernée**.
+
+### Vérifié CONFORME (preuves)
+`testTimeout: 30000` présent (suite à spawns) · arbo exhaustive (aucun fichier ajouté) · couplage
+48 modules/144 deps, 0 clone · doctor vert sur les 2 harnais · mutation 100 % (1775 mutants).
+
+### Limites ASSUMÉES de cet audit (à ne pas lire comme des preuves)
+- **CI jamais exécutée** : rien n'est poussé. Or les fichiers VIVANTS (skill, docs injectables de
+  `~/.claude/hooks/docs/`) sont déjà modifiés, donc déployés de fait. La doctrine « CI verte avant
+  déploiement » n'est pas tenue sur ce périmètre-là.
+- **`skillDefaults` supprimé SANS expand/contract** (la doctrine impose ajouter → migrer → retirer).
+  Assumé : un seul consommateur, et `additionalProperties: false` rend le rejet BRUYANT, jamais
+  silencieux. Pour un dépôt public, ça reste un breaking change — noté au README, pas de CHANGELOG.
+
+---
+
 ## 🔴 PROCHAIN CHANTIER — `enforce` : ARRÊTER le geste, pas seulement l'informer (ouvert 04/08/2026)
 
 > ⚠️ **DÉCISION DU MAINTENEUR REQUISE avant de coder** : c'est un retour sur le retrait du
