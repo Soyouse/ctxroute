@@ -12,7 +12,7 @@
 //    pareil. Seul le sabotage prouve.
 //
 // ⚠️ Le sabotage se fait TOUJOURS sur un FAUX parc en tmpdir (via
-//    MCP_DOC_HOOKS_DIR / MCP_DOC_HOME), JAMAIS sur le vrai `~/.claude/hooks`
+//    CTXROUTE_HOOKS_DIR / CTXROUTE_HOME), JAMAIS sur le vrai `~/.claude/hooks`
 //    (307 docs réelles, 556 règles vivantes servant d'autres agents EN CE
 //    MOMENT). Un test qui écrit dans un artefact livré = le bug du 15/07.
 //
@@ -39,7 +39,7 @@ function runLint(parc, args = []) {
   const r = spawnSync(process.execPath, [LINT, ...args], {
     encoding: 'utf8',
     // ⚠️ Isolation TOTALE : le lint ne doit jamais voir le vrai parc ni le vrai home.
-    env: { ...process.env, MCP_DOC_HOOKS_DIR: parc.hooks, MCP_DOC_HOME: parc.home },
+    env: { ...process.env, CTXROUTE_HOOKS_DIR: parc.hooks, CTXROUTE_HOME: parc.home },
   });
   return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
 }

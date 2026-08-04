@@ -21,10 +21,10 @@ const injection = () => 'ma doc\n[source: .claude/hooks/docs/x.md]\n';
 function lancer(payload, stateDir) {
   execFileSync(process.execPath, [path.join(ICI, 'canari-check.js')], {
     input: JSON.stringify(payload),
-    // ⚠️ Nom EXACT de l'env var du framework (`MCP_DOC_STATE_DIR`) : avec un
+    // ⚠️ Nom EXACT de l'env var du framework (`CTXROUTE_STATE_DIR`) : avec un
     //    nom approchant, le test écrit dans le VRAI dossier d'état et croit
     //    échouer. Erreur commise en écrivant cette suite.
-    env: { ...process.env, MCP_DOC_STATE_DIR: stateDir },
+    env: { ...process.env, CTXROUTE_STATE_DIR: stateDir },
   });
 }
 
@@ -62,7 +62,7 @@ test('SPAWN RÉEL : MUET par contrat — stdout VIDE et exit 0 (ne bloque jamais
   fs.writeFileSync(t, appel().repeat(SEUIL_APPELS));
   const out = execFileSync(process.execPath, [path.join(ICI, 'canari-check.js')], {
     input: JSON.stringify({ transcript_path: t }),
-    env: { ...process.env, MCP_DOC_STATE_DIR: d },
+    env: { ...process.env, CTXROUTE_STATE_DIR: d },
   });
   assert.equal(out.toString(), '', 'stdout DOIT rester vide : il serait injecté dans le contexte');
 });

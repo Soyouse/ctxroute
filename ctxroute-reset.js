@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════════════
-// Hook PreCompact — reset du store "vu" de mcp-doc-inject.js
+// Hook PreCompact — reset du store "vu" de legacy-mcp-inject.js
 // ═══════════════════════════════════════════════════════════════════════
 //
-// PROBLÈME RÉSOLU : mcp-doc-inject.js n'injecte qu'UNE fois par serveur MCP
-// par session (state/mcp-doc-seen-<session_id>.json). Mais une COMPACTION
+// PROBLÈME RÉSOLU : legacy-mcp-inject.js n'injecte qu'UNE fois par serveur MCP
+// par session (state/ctxroute-seen-<session_id>.json). Mais une COMPACTION
 // vide le contexte du modèle SANS changer session_id → sans ce reset, la
 // doc injectée avant compaction disparaît du contexte mais le store dit
 // encore "déjà vu" → plus jamais réinjectée alors que l'agent l'a oubliée.
@@ -18,10 +18,10 @@
 // ⚠️ FAIL-OPEN : erreur de suppression = pas grave (pire cas = pas de
 // réinjection après compaction, jamais un blocage). Jamais deny/ask ici.
 // ⚠️ sanitizeSessionId vient de lib-pure.js — SOURCE UNIQUE partagée avec
-// mcp-doc-inject.js (un format de nom de fichier dupliqué à 2 endroits
+// legacy-mcp-inject.js (un format de nom de fichier dupliqué à 2 endroits
 // diverge silencieusement si l'un des deux change sans l'autre).
 // ⚠️ Lecture stdin factorisée dans stdin-json.js (détecté dupliqué par
-// jscpd avec mcp-doc-inject.js avant extraction).
+// jscpd avec legacy-mcp-inject.js avant extraction).
 // ═══════════════════════════════════════════════════════════════════════
 
 const fs = require('fs');
@@ -29,7 +29,7 @@ const path = require('path');
 const lib = require('./lib-pure');
 const { readStdinJson } = require('./stdin-json');
 
-// ⚠️ stateDir vient de paths.js — SOURCE UNIQUE partagée avec mcp-doc-inject.js.
+// ⚠️ stateDir vient de paths.js — SOURCE UNIQUE partagée avec legacy-mcp-inject.js.
 // Il était hardcodé ici ET là-bas : deux copies d'une même vérité, qui divergent
 // en silence dès que l'une bouge (les 2 hooks viseraient alors des dossiers
 // différents — le reset ne resetterait plus rien, sans aucune erreur visible).
@@ -46,7 +46,7 @@ readStdinJson(
   (data) => {
     try {
       // ⚠️ QUATRE stores à vider : 'doc-seen-' (porte unifiée, dédup par DOC)
-      //    + 'mcp-doc-seen-' (legacy mcp-doc-inject.js, gardé le temps du
+      //    + 'ctxroute-seen-' (legacy legacy-mcp-inject.js, gardé le temps du
       //    rollback) + 'turn-count-' (compteur de tours, driftUnit 18/07/2026 —
       //    la compaction ouvre un nouveau contexte : les tours repartent de 0
       //    comme les compteurs d'outils) + 'plan-' (plan mémoïsé par invocation
@@ -60,7 +60,7 @@ readStdinJson(
       //    purge par PRÉFIXE session : le maître ET tous ses sous-agents
       //    (pire cas fail-open = une réinjection, jamais un état gelé).
       const scoped = lib.scopeId(data.session_id, data.agent_id);
-      for (const prefix of ['doc-seen-', 'mcp-doc-seen-', 'turn-count-', 'plan-']) {
+      for (const prefix of ['doc-seen-', 'ctxroute-seen-', 'turn-count-', 'plan-']) {
         // ⚠️ 'plan-' se balaie TOUJOURS par préfixe : sa clé porte un suffixe
         //    d'invocation (`--inv-…`), donc la suppression ciblée d'un chemin
         //    exact ne le trouverait jamais.

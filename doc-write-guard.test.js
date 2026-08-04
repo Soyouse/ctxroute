@@ -20,9 +20,9 @@ function run(rel, content, { kind = 'file' } = {}) {
     encoding: 'utf8',
     env: {
       ...process.env,
-      MCP_DOC_FILEDOCS_DIR: roots.file,
-      MCP_DOC_DOCS_DIR: roots.mcp,
-      MCP_DOC_SESSIONDOCS_DIR: roots.session,
+      CTXROUTE_FILEDOCS_DIR: roots.file,
+      CTXROUTE_DOCS_DIR: roots.mcp,
+      CTXROUTE_SESSIONDOCS_DIR: roots.session,
     },
   });
   return r;

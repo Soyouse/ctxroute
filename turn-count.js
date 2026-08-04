@@ -15,7 +15,7 @@
 //    injecté à côté du prompt. Cette porte n'émet JAMAIS rien — un console.log
 //    ici polluerait chaque tour de chaque agent. Compter, se taire, sortir.
 // ⚠️ MÊME mécanisme de store que la porte (session-store.js, préfixe DISTINCT
-//    'turn-count-') — jamais un 2ᵉ système d'état. Reset par mcp-doc-reset.js
+//    'turn-count-') — jamais un 2ᵉ système d'état. Reset par ctxroute-reset.js
 //    (PreCompact) comme les deux autres stores.
 // ⚠️ FAIL-OPEN intégral : state illisible = repartir de 0, inécrivable = tant
 //    pis pour ce tour (pire cas = une réinjection retardée, jamais un blocage).

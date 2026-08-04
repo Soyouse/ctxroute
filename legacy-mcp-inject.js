@@ -29,7 +29,7 @@
 //               contexte a eu le temps de "dériver") se refait rappeler l'invariant.
 //   Seuil réglable par serveur (config.json → "servers.{server}.threshold"),
 //   sinon "defaultThreshold". PreCompact reste le reset ABSOLU (tous modes) :
-//   cf mcp-doc-reset.js — la compaction vide le contexte, rien à voir avec le compteur.
+//   cf ctxroute-reset.js — la compaction vide le contexte, rien à voir avec le compteur.
 //
 // ⚠️ COMPTEURS INDÉPENDANTS PAR SERVEUR — "autre outil" = TOUT outil qui
 //   N'EST PAS ce serveur précis, y compris un AUTRE serveur MCP. Ex : Stripe
@@ -72,7 +72,7 @@
 //   au standard = déposer `docs/mcp/{server}.md` (et optionnellement des .md
 //   par outil/sous-outil). Aucun code par serveur.
 //
-// STORE = state/mcp-doc-seen-<session_id>.json :
+// STORE = state/ctxroute-seen-<session_id>.json :
 //   { "<server>": { "seen": true, "sinceLastCall": <int> } }
 //   ⚠️ CLÉ = session_id, même isolation voulue que odoo-provenance.js.
 // ⚠️ SECTION CRITIQUE (load→modifier→save de CE fichier) protégée par un lock
@@ -108,10 +108,10 @@ function loadConfig() {
   }
 }
 
-// State par session, préfixe 'mcp-doc-seen-' (dédup par SERVEUR) — I/O partagée
+// State par session, préfixe 'ctxroute-seen-' (dédup par SERVEUR) — I/O partagée
 // avec doc-inject.js ('doc-seen-') : cf session-store.js (extrait 16/07, gate jscpd).
 const store = require('./session-store');
-const STORE_PREFIX = 'mcp-doc-seen-';
+const STORE_PREFIX = 'ctxroute-seen-';
 const loadState = (sessionId) => store.loadState(STORE_PREFIX, sessionId);
 const saveState = (sessionId, state) => store.saveState(STORE_PREFIX, sessionId, state);
 
@@ -120,7 +120,7 @@ function lockDirFor(sessionId) {
 }
 
 // ── PURGE des fichiers d'état PÉRIMÉS ──
-// PROBLÈME : 1 session = 1 fichier state/mcp-doc-seen-<id>.json, jamais
+// PROBLÈME : 1 session = 1 fichier state/ctxroute-seen-<id>.json, jamais
 // supprimé automatiquement → croissance illimitée sur des mois d'usage.
 // FIX : purge PROBABILISTE (pas à CHAQUE appel — éviter un readdir+stat sur
 // TOUT le dossier à chaque invocation du hook, coûteux et inutile) des
@@ -128,22 +128,22 @@ function lockDirFor(sessionId) {
 // borner la croissance sans overhead perceptible.
 // ⚠️ Probabilité et TTL surchargeables par env var UNIQUEMENT pour les
 // tests (déterminisme) — en prod, les valeurs par défaut s'appliquent toujours.
-// ⚠️ Number.isFinite() et NON `||` : `MCP_DOC_GC_PROBABILITY=0` est une valeur
+// ⚠️ Number.isFinite() et NON `||` : `CTXROUTE_GC_PROBABILITY=0` est une valeur
 // LÉGITIME (désactiver la purge en test) que `||` avalerait silencieusement en
 // retombant sur 0.02 — le zéro est falsy. Même piège pour le TTL.
 function envNum(name, fallback) {
   const v = Number(process.env[name]);
   return Number.isFinite(v) && process.env[name] !== '' && process.env[name] !== undefined ? v : fallback;
 }
-const GC_PROBABILITY = envNum('MCP_DOC_GC_PROBABILITY', 0.02);
-const GC_TTL_MS = envNum('MCP_DOC_GC_TTL_MS', 30 * 24 * 60 * 60 * 1000); // 30 jours
+const GC_PROBABILITY = envNum('CTXROUTE_GC_PROBABILITY', 0.02);
+const GC_TTL_MS = envNum('CTXROUTE_GC_TTL_MS', 30 * 24 * 60 * 60 * 1000); // 30 jours
 
 function pruneOldStateFiles() {
   if (Math.random() >= GC_PROBABILITY) return;
   try {
     const now = Date.now();
     for (const f of fs.readdirSync(paths.stateDir())) {
-      if (!f.startsWith('mcp-doc-seen-') || !f.endsWith('.json')) continue;
+      if (!f.startsWith('ctxroute-seen-') || !f.endsWith('.json')) continue;
       const full = path.join(paths.stateDir(), f);
       const st = fs.statSync(full);
       if (now - st.mtimeMs > GC_TTL_MS) fs.rmSync(full, { force: true });

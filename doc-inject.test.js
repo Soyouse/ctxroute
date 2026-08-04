@@ -28,9 +28,9 @@ function run(payload, { raw, env, args = [] } = {}) {
       encoding: 'utf8',
       env: {
         ...process.env,
-        MCP_DOC_FILEDOCS_DIR: DOCS,
-        MCP_DOC_STATE_DIR: STATE,
-        MCP_DOC_CONFIG_PATH: CONFIG,
+        CTXROUTE_FILEDOCS_DIR: DOCS,
+        CTXROUTE_STATE_DIR: STATE,
+        CTXROUTE_CONFIG_PATH: CONFIG,
         ...env,
       },
     }, (err, stdout) => resolve({ code: err ? err.code : 0, stdout }));
@@ -137,7 +137,7 @@ test('CONCURRENCE réelle : 10 appels parallèles étrangers → AUCUN incrémen
   const sid = 'conc';
   // ⚠️ Timeout de lock RELEVÉ (env test, cf lock.js) : on prouve l'ATOMICITÉ,
   //    pas la disponibilité — 2 s expirent légitimement sous charge (fail-open).
-  const env = { MCP_DOC_LOCK_TIMEOUT_MS: '20000' };
+  const env = { CTXROUTE_LOCK_TIMEOUT_MS: '20000' };
   // 1er appel : A devient "vue" (compteur 0).
   await run({ tool_name: 'Read', tool_input: { file_path: 'C:/p/aaa.js' }, session_id: sid }, { env });
   // 10 appels PARALLÈLES matchant B = 10 outils étrangers pour A.
@@ -162,7 +162,7 @@ test('MCP : frontmatter `mode: dumb` → réinjecté à CHAQUE appel malgré glo
   fs.writeFileSync(path.join(MCPDOCS, 'srv.md'), '---\nmode: dumb\n---\nPIEGE-SRV\n');
   fs.writeFileSync(path.join(MCPDOCS, 'ctrl.md'), 'PIEGE-CTRL\n');
   fs.writeFileSync(CONFIG, JSON.stringify({ mode: 'once', defaultThreshold: 4 }));
-  const env = { MCP_DOC_DOCS_DIR: MCPDOCS };
+  const env = { CTXROUTE_DOCS_DIR: MCPDOCS };
 
   const p1 = { tool_name: 'mcp__srv__ping', tool_input: {}, session_id: 'fm-mcp' };
   const r1 = await run(p1, { env });
@@ -191,7 +191,7 @@ test('TURN : skill smart driftUnit turn — réinjecté après N TOURS, insensib
     skills: { turnskill: { match: ['proj-turn'], mode: 'smart', threshold: 1, driftUnit: 'turn' } },
   }));
   const payload = { tool_name: 'Read', tool_input: { file_path: 'C:/proj-turn/x.js' }, session_id: 'sturn' };
-  const env = { MCP_DOC_FILEDOCS_DIR: DOCS, MCP_DOC_STATE_DIR: STATE, MCP_DOC_CONFIG_PATH: CONFIG };
+  const env = { CTXROUTE_FILEDOCS_DIR: DOCS, CTXROUTE_STATE_DIR: STATE, CTXROUTE_CONFIG_PATH: CONFIG };
 
   // Tour 0 : 1er match → pointeur injecté.
   const r1 = parseOut((await run(payload)).stdout);
@@ -231,7 +231,7 @@ test('SKILL : le CONTENU du skill est injecté (lu en direct, frontmatter stripp
       fantome: { match: ['proj-fantome'], mode: 'dumb' },
     },
   }));
-  const env = { MCP_DOC_SKILLS_DIR: skillsDir };
+  const env = { CTXROUTE_SKILLS_DIR: skillsDir };
   // Skill existant → son CORPS (sans le frontmatter du harnais), pas un pointeur.
   const r1 = parseOut((await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj-corps/x.js' }, session_id: 'sk1' }, { env })).stdout);
   assert.ok(r1.hookSpecificOutput.additionalContext.includes('INVARIANT_DU_SKILL'));
@@ -291,8 +291,8 @@ test('SOUS-AGENT : PreCompact maître purge le store du maître ET ceux des sous
   const sub = { ...base, agent_id: 'ccc333', agent_type: 'Explore' };
   await run(base); await run(sub); // les deux états consommés
   const reset = (payload) => new Promise((resolve) => {
-    const child = execFile(process.execPath, [path.join(__dirname, 'mcp-doc-reset.js')], {
-      encoding: 'utf8', env: { ...process.env, MCP_DOC_STATE_DIR: STATE, MCP_DOC_CONFIG_PATH: CONFIG },
+    const child = execFile(process.execPath, [path.join(__dirname, 'ctxroute-reset.js')], {
+      encoding: 'utf8', env: { ...process.env, CTXROUTE_STATE_DIR: STATE, CTXROUTE_CONFIG_PATH: CONFIG },
     }, (err) => resolve(err ? err.code : 0));
     child.stdin.end(JSON.stringify(payload));
   });

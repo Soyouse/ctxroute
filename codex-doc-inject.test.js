@@ -31,9 +31,9 @@ function run(payload, { raw, env } = {}) {
       encoding: 'utf8',
       env: {
         ...process.env,
-        MCP_DOC_FILEDOCS_DIR: DOCS,
-        MCP_DOC_STATE_DIR: STATE,
-        MCP_DOC_CONFIG_PATH: CONFIG,
+        CTXROUTE_FILEDOCS_DIR: DOCS,
+        CTXROUTE_STATE_DIR: STATE,
+        CTXROUTE_CONFIG_PATH: CONFIG,
         ...env,
       },
     }, (err, stdout) => resolve({ code: err ? err.code : 0, stdout }));

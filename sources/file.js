@@ -10,7 +10,7 @@
 // ⚠️ CE MODULE NE CONNAÎT AUCUN HARNAIS. Il ne sait rien de Claude Code, de
 //    `permissionDecision` ni de `hookSpecificOutput`. Il répond à une question,
 //    il ne décide RIEN. Traduire en dialecte de harnais = le rôle de la porte
-//    (mcp-doc-inject.js, protect-files.js, futur portage Codex).
+//    (legacy-mcp-inject.js, protect-files.js, futur portage Codex).
 //    Y introduire un format de sortie = casser le portage multi-harnais.
 //
 // ⚠️ SÉMANTIQUE FIGÉE — réplique EXACTE de protect-files.js (529 règles en prod).

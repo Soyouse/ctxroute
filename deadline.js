@@ -75,7 +75,7 @@ const DEFAULT_MS = 30000;
  * Arme l'échéance du process courant. À appeler AU PLUS TÔT, avant toute I/O.
  *
  * @param {object} [opts]
- * @param {number} [opts.ms]      - délai (défaut 30000 — cf en-tête, valeur corrigée après régression réelle). Env MCP_DOC_DEADLINE_MS pour les tests.
+ * @param {number} [opts.ms]      - délai (défaut 30000 — cf en-tête, valeur corrigée après régression réelle). Env CTXROUTE_DEADLINE_MS pour les tests.
  * @param {Function} [opts.onExpire] - best-effort AVANT de sortir (ex. écrire ce qu'on a).
  *                                     ⚠️ S'il throw, on sort QUAND MÊME : une sortie
  *                                     de secours qui peut échouer n'est pas une sortie.
@@ -83,7 +83,7 @@ const DEFAULT_MS = 30000;
  */
 function arm(opts) {
   const o = opts || {};
-  const envMs = Number(process.env.MCP_DOC_DEADLINE_MS);
+  const envMs = Number(process.env.CTXROUTE_DEADLINE_MS);
   const ms = Number.isFinite(o.ms) ? o.ms : Number.isFinite(envMs) && envMs > 0 ? envMs : DEFAULT_MS;
 
   const t = setTimeout(() => {

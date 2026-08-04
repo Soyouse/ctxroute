@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 //
 // ⚠️ ZÉRO I/O (même règle que sources/file.js — gate dependency-cruiser).
-//    Réplique EXACTE de la sélection de mcp-doc-inject.js : serverName →
+//    Réplique EXACTE de la sélection de legacy-mcp-inject.js : serverName →
 //    isServerActive (filterMode/filterList) → docCandidatePaths (3 niveaux,
 //    subToolParam, isSafePathSegment). Toute la sémantique vit dans lib-pure ;
 //    ce module ne fait qu'ALIGNER les candidats sur le vocabulaire de la porte
@@ -24,7 +24,7 @@ const { MODES, DRIFT_UNITS } = require('../frontmatter');
 
 /**
  * Docs MCP candidates pour cet appel. [] si outil non-MCP ou serveur filtré.
- * @param {object} config - mcp-doc-config.json
+ * @param {object} config - ctxroute-config.json
  * @param {{toolName: string, toolInput: object}} payload
  * @returns {Array<{doc: string, sourceLabel: string, level: string, server: string}>}
  *   ORDRE = global → spécifique (server, tool, subTool) — même ordre que
@@ -48,7 +48,7 @@ function matchingDocs(config, { toolName, toolInput }) {
 // (l'auteur propose) ; valeur absente OU invalide → fallback config serveur
 // (l'utilisateur/global dispose, cf lib-pure). TOTAL : ne throw jamais.
 // ⚠️ Jamais de `confirm` ici : la source MCP INFORME, elle ne demande jamais
-//    de confirmation (parité mcp-doc-inject.js, qui n'a aucun ask).
+//    de confirmation (parité legacy-mcp-inject.js, qui n'a aucun ask).
 function declFor(config, server, fm) {
   const data = fm || {};
   const decl = {

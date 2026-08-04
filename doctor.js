@@ -41,10 +41,10 @@ const { spawnSync } = require('child_process');
 
 // ⚠️ HOOK UNIQUE depuis la fusion (17/07/2026) : doc-inject.js (la porte)
 //    injecte TOUTES les docs — fichier (frontmatters) ET MCP (docs/mcp/).
-//    mcp-doc-inject.js est RETIRÉ du câblage (gardé dans le repo pour le
+//    legacy-mcp-inject.js est RETIRÉ du câblage (gardé dans le repo pour le
 //    différentiel mcp-differential.test.js et le rollback).
 const PORTE = path.join(__dirname, 'doc-inject.js');
-const RESET_HOOK = path.join(__dirname, 'mcp-doc-reset.js');
+const RESET_HOOK = path.join(__dirname, 'ctxroute-reset.js');
 // Porte SŒUR SessionStart (docs/session/ injectées à chaque début de session).
 const SESSION_PORTE = path.join(__dirname, 'session-inject.js');
 // Garde d'écriture PostToolUse (feedback temps réel sur doc invalide).
@@ -79,7 +79,7 @@ function check(name, cond, detail) {
 // répétition exacte du bug qu'on cherche à empêcher.
 function probe() {
   say('probe bout-en-bout (spawn du hook réel) :');
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-doctor-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-doctor-'));
   const docsDir = path.join(tmp, 'docs');
   const fileDocsDir = path.join(tmp, 'filedocs');
   const stateDir = path.join(tmp, 'state');
@@ -101,11 +101,11 @@ function probe() {
 
     const env = {
       ...process.env,
-      MCP_DOC_CONFIG_PATH: configPath,
-      MCP_DOC_DOCS_DIR: docsDir,
-      MCP_DOC_FILEDOCS_DIR: fileDocsDir,
-      MCP_DOC_STATE_DIR: stateDir,
-      MCP_DOC_GC_PROBABILITY: '0', // purge désactivée : le probe ne doit rien supprimer
+      CTXROUTE_CONFIG_PATH: configPath,
+      CTXROUTE_DOCS_DIR: docsDir,
+      CTXROUTE_FILEDOCS_DIR: fileDocsDir,
+      CTXROUTE_STATE_DIR: stateDir,
+      CTXROUTE_GC_PROBABILITY: '0', // purge désactivée : le probe ne doit rien supprimer
     };
 
     // Probe 1 — voie MCP de la porte (source sources/mcp.js).
@@ -161,7 +161,7 @@ function probe() {
     // doctor trouvé le 19/07/2026). Preuve = poser les 3 fichiers, reset,
     // exiger leur ABSENCE.
     fs.mkdirSync(stateDir, { recursive: true });
-    const storeFiles = ['doc-seen-', 'mcp-doc-seen-', 'turn-count-'].map((p) => path.join(stateDir, `${p}doctor-probe.json`));
+    const storeFiles = ['doc-seen-', 'ctxroute-seen-', 'turn-count-'].map((p) => path.join(stateDir, `${p}doctor-probe.json`));
     for (const f of storeFiles) fs.writeFileSync(f, '{}');
     const rr = spawnSync(process.execPath, [RESET_HOOK], {
       input: JSON.stringify({ hook_event_name: 'PreCompact', session_id: 'doctor-probe', trigger: 'auto' }),
@@ -170,7 +170,7 @@ function probe() {
     });
     check('le reset PreCompact SUPPRIME réellement les 3 stores (pas juste exit 0)',
       rr.status === 0 && storeFiles.every((f) => !fs.existsSync(f)),
-      'mcp-doc-reset.js sort en exit 0 mais les stores SURVIVENT — docs jamais réinjectées après compaction, en silence.');
+      'ctxroute-reset.js sort en exit 0 mais les stores SURVIVENT — docs jamais réinjectées après compaction, en silence.');
 
     // Probe 3 — porte SESSION (docs/session/ → SessionStart). Même pattern :
     // une porte qui tourne sans injecter = mort silencieuse.
@@ -181,7 +181,7 @@ function probe() {
     const rs = spawnSync(process.execPath, [SESSION_PORTE], {
       input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup', session_id: 'doctor-probe' }),
       encoding: 'utf8',
-      env: { ...env, MCP_DOC_SESSIONDOCS_DIR: sessionDocsDir },
+      env: { ...env, CTXROUTE_SESSIONDOCS_DIR: sessionDocsDir },
     });
     let outS = null;
     try { outS = JSON.parse((rs.stdout || '').trim()); } catch { /* outS reste null */ }
@@ -221,7 +221,7 @@ function probe() {
         tool_input: { file_path: 'C:/tmp/doctor-probe-skill-target.js' },
       }),
       encoding: 'utf8',
-      env: { ...env, MCP_DOC_SKILLS_DIR: skillsDirProbe },
+      env: { ...env, CTXROUTE_SKILLS_DIR: skillsDirProbe },
     });
     let outK = null;
     try { outK = JSON.parse((rk.stdout || '').trim()); } catch { /* outK reste null */ }
@@ -308,34 +308,34 @@ function checkWiring(settingsPath) {
   // (elle évolue avec Claude Code ; un parsing rigide serait un faux négatif).
   const commands = JSON.stringify(settings).match(/"command"\s*:\s*"([^"]+)"/g) || [];
 
-  // ── RESET (mcp-doc-reset.js, PreCompact) : sans lui, docs jamais réinjectées
+  // ── RESET (ctxroute-reset.js, PreCompact) : sans lui, docs jamais réinjectées
   //    après compaction, en silence.
-  const resets = commands.filter((c) => c.includes('mcp-doc-reset'));
-  check('le reset PreCompact est câblé (mcp-doc-reset.js)', resets.length >= 1,
-    'mcp-doc-reset.js absent de settings.json : plus de réinjection après compaction, en silence.');
+  const resets = commands.filter((c) => c.includes('ctxroute-reset'));
+  check('le reset PreCompact est câblé (ctxroute-reset.js)', resets.length >= 1,
+    'ctxroute-reset.js absent de settings.json : plus de réinjection après compaction, en silence.');
   for (const c of resets) {
-    const m = /([A-Za-z]:[\\/][^"]*?|\/[^"]*?)mcp-doc-reset\.js/.exec(c);
+    const m = /([A-Za-z]:[\\/][^"]*?|\/[^"]*?)ctxroute-reset\.js/.exec(c);
     if (!m) continue;
-    const file = `${m[1]}mcp-doc-reset.js`;
-    check('le fichier câblé existe : mcp-doc-reset.js', fs.existsSync(file),
+    const file = `${m[1]}ctxroute-reset.js`;
+    check('le fichier câblé existe : ctxroute-reset.js', fs.existsSync(file),
       `settings.json pointe vers un fichier INEXISTANT : ${file} — hook mort en silence.`);
-    check('le fichier câblé est bien CE repo : mcp-doc-reset.js',
-      path.resolve(file) === path.resolve(path.join(__dirname, 'mcp-doc-reset.js')),
+    check('le fichier câblé est bien CE repo : ctxroute-reset.js',
+      path.resolve(file) === path.resolve(path.join(__dirname, 'ctxroute-reset.js')),
       `settings.json pointe vers une AUTRE copie du framework : ${file} (ce repo : ${__dirname}) — tes modifications ici ne s'appliquent pas.`);
   }
 
-  // ── HOOK UNIQUE : depuis la fusion (17/07/2026), mcp-doc-inject.js ne doit
+  // ── HOOK UNIQUE : depuis la fusion (17/07/2026), legacy-mcp-inject.js ne doit
   //    PLUS être câblé — la porte injecte aussi les docs MCP. Le laisser =
   //    docs MCP injectées EN DOUBLE à chaque appel (tokens brûlés en silence).
-  check('mcp-doc-inject.js n\'est PLUS câblé (la porte couvre le MCP — sinon double injection)',
-    !commands.some((c) => c.includes('mcp-doc-inject')),
-    'mcp-doc-inject.js encore câblé dans settings.json : docs MCP injectées en DOUBLE (porte + legacy).');
+  check('legacy-mcp-inject.js n\'est PLUS câblé (la porte couvre le MCP — sinon double injection)',
+    !commands.some((c) => c.includes('legacy-mcp-inject')),
+    'legacy-mcp-inject.js encore câblé dans settings.json : docs MCP injectées en DOUBLE (porte + legacy).');
 
   // ── PORTE (doc-inject.js) : l'injecteur UNIQUE (fichier + MCP) depuis la fusion.
-  // ⚠️ `doc-inject.js` ≠ `mcp-doc-inject.js` (legacy retiré). Une porte non câblée
+  // ⚠️ `doc-inject.js` ≠ `legacy-mcp-inject.js` (legacy retiré). Une porte non câblée
   //    ou pointant vers un fichier mort = plus AUCUNE doc injectée, EN SILENCE —
   //    exactement le mode de panne que ce dead-man switch existe pour attraper.
-  const porte = commands.filter((c) => /doc-inject\.js/.test(c) && !c.includes('mcp-doc-inject'));
+  const porte = commands.filter((c) => /doc-inject\.js/.test(c) && !c.includes('legacy-mcp-inject'));
   check('la PORTE (doc-inject.js) est câblée — sinon plus AUCUNE doc injectée', porte.length >= 1,
     'doc-inject.js absent de settings.json : depuis la fusion, c\'est LUI qui injecte TOUTES les docs. Mort silencieux.');
   for (const c of porte) {
@@ -412,13 +412,13 @@ function checkCodexWiring(hooksPath) {
     'codex-doc-inject.js absent du câblage Codex : AUCUNE doc injectée côté Codex, en silence.');
   check('la garde CODEX (codex-doc-write-guard.js) est câblée en PostToolUse', wired('codex-doc-write-guard.js'),
     'codex-doc-write-guard.js absent : écritures apply_patch sans filet temps réel.');
-  check('le reset (mcp-doc-reset.js, PORTE RÉUTILISÉE) est câblé en PreCompact', wired('mcp-doc-reset.js'),
-    'mcp-doc-reset.js absent du câblage Codex : plus de réinjection après compaction, en silence.');
+  check('le reset (ctxroute-reset.js, PORTE RÉUTILISÉE) est câblé en PreCompact', wired('ctxroute-reset.js'),
+    'ctxroute-reset.js absent du câblage Codex : plus de réinjection après compaction, en silence.');
   check('la porte SESSION (session-inject.js, RÉUTILISÉE) est câblée en SessionStart', wired('session-inject.js'),
     'session-inject.js absent du câblage Codex : docs/session/ jamais injectées côté Codex.');
   check('la porte TOUR (turn-count.js, RÉUTILISÉE) est câblée en UserPromptSubmit', wired('turn-count.js'),
     'turn-count.js absent du câblage Codex : driftUnit turn mort côté Codex.');
-  for (const name of ['codex-doc-inject.js', 'codex-doc-write-guard.js', 'mcp-doc-reset.js', 'session-inject.js', 'turn-count.js']) {
+  for (const name of ['codex-doc-inject.js', 'codex-doc-write-guard.js', 'ctxroute-reset.js', 'session-inject.js', 'turn-count.js']) {
     if (wired(name)) {
       check(`le fichier câblé existe et est CE repo : ${name}`, expectRepo(name),
         `le câblage Codex pointe vers une copie/un fichier inexistant pour ${name} (ce repo : ${__dirname}).`);

@@ -9,7 +9,7 @@
 // Stryker de muter cette logique sans bruit (un fichier mêlé à du fs/stdin
 // produit des mutants équivalents non détectables — faux signal).
 //
-// Consommé par mcp-doc-inject.js (le seul point d'I/O : lit stdin/fs, appelle
+// Consommé par legacy-mcp-inject.js (le seul point d'I/O : lit stdin/fs, appelle
 // ces fonctions, écrit stdout/fs). AUCUNE fonction ici ne doit avoir d'effet
 // de bord observable — mêmes entrées ⇒ mêmes sorties, toujours.
 // ═══════════════════════════════════════════════════════════════════════

@@ -9,4 +9,4 @@ confirm: true
 ⚠️ AUCUN état, AUCUN lock, AUCUNE dédup : la réinjection post-compaction est le BUT. Ne pas « optimiser » en ajoutant un once/smart ici.
 ⚠️ `sources/session.js` = PUR (muté Stryker 13/13), ordre ALPHA par id via localeCompare (un ternaire `<` = mutant équivalent garanti, retiré par construction). Frontmatter strippé via frontmatter.parse (source unique).
 ⚠️ FAIL-OPEN intégral (dossier absent inclus) ; vivacité couverte par doctor (probe 3 + check câblage session-inject) — ne pas retirer ces checks.
-⚠️ `enabled: false` de mcp-doc-config.json coupe AUSSI cette porte (interrupteur global unique).
+⚠️ `enabled: false` de ctxroute-config.json coupe AUSSI cette porte (interrupteur global unique).

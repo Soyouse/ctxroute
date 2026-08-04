@@ -10,7 +10,7 @@
 // ⚠️ RUSH : l'ancien lit `.rush`, la porte lit `config.confirm` (#4). Le test lit
 //    l'état RÉEL du .rush et donne à la porte la config équivalente — si les deux
 //    mécanismes ne se miroir plus, ce test casse (c'est voulu : la session de
-//    bascule doit reporter l'état du .rush dans mcp-doc-config.json).
+//    bascule doit reporter l'état du .rush dans ctxroute-config.json).
 //
 // Skippé sur clone vierge (pas de parc réel). Spawns réels mais peu nombreux.
 // ═══════════════════════════════════════════════════════════════════════
@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const LEGACY = process.env.MCP_DOC_LEGACY_PATH || path.join(os.homedir(), '.claude', 'hooks', 'protect-files.js');
+const LEGACY = process.env.CTXROUTE_LEGACY_PATH || path.join(os.homedir(), '.claude', 'hooks', 'protect-files.js');
 const PORTE = path.join(__dirname, 'doc-inject.js');
 const parcPresent = fs.existsSync(LEGACY);
 
@@ -46,7 +46,7 @@ function runHook(script, payload, env) {
 async function both(payload) {
   const [vieux, neuf] = await Promise.all([
     runHook(LEGACY, payload, {}),
-    runHook(PORTE, payload, { MCP_DOC_CONFIG_PATH: CONFIG, MCP_DOC_STATE_DIR: path.join(TMP, 'state') }),
+    runHook(PORTE, payload, { CTXROUTE_CONFIG_PATH: CONFIG, CTXROUTE_STATE_DIR: path.join(TMP, 'state') }),
   ]);
   return { vieux, neuf };
 }

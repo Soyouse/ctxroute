@@ -2,8 +2,8 @@
 // SESSION-STORE — I/O du state par session (fichier JSON sous state/). PARTAGÉ.
 // ═══════════════════════════════════════════════════════════════════════
 //
-// ⚠️ Extrait le 16/07/2026 (gate jscpd) : mcp-doc-inject.js (dédup par SERVEUR,
-//    préfixe 'mcp-doc-seen-') et doc-inject.js (dédup par DOC, 'doc-seen-')
+// ⚠️ Extrait le 16/07/2026 (gate jscpd) : legacy-mcp-inject.js (dédup par SERVEUR,
+//    préfixe 'ctxroute-seen-') et doc-inject.js (dédup par DOC, 'doc-seen-')
 //    portaient le MÊME trio storeFile/loadState/saveState — deux copies d'une
 //    même vérité qui divergent en silence.
 // ⚠️ FAIL-OPEN : state illisible = {} (repartir de zéro), state inécrivable =

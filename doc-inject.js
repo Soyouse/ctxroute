@@ -6,7 +6,7 @@
 // ⚠️ LIVE depuis le 17/07/2026 (bascule fichier puis fusion MCP le même jour).
 //    Câblée dans settings.json ; c'est ELLE qui injecte TOUTES les docs
 //    (fichier via frontmatters, MCP via docs/mcp/) — protect-files.js ne garde
-//    que deny/ask sécurité, mcp-doc-inject.js est RETIRÉ (cf REFACTOR-PLAN.md).
+//    que deny/ask sécurité, legacy-mcp-inject.js est RETIRÉ (cf REFACTOR-PLAN.md).
 //
 // ⚠️ EXTENSIBLE PAR REGISTRE : les sources vivent dans source-adapters.js
 //    (contrat d'adaptateur documenté là-bas). Ajouter une source N'ÉDITE
@@ -22,7 +22,7 @@
 //    [source: .claude/hooks/docs/…]. Scellée par porte-differential.test.js.
 //
 // ⚠️ Le rush d'aujourd'hui (.rush) devient `confirm: false` dans
-//    mcp-doc-config.json (confirmFor, #4) — la porte NE lit JAMAIS .rush.
+//    ctxroute-config.json (confirmFor, #4) — la porte NE lit JAMAIS .rush.
 //    À la bascule : reporter l'état du .rush dans la config, puis retirer le fichier.
 //
 // ⚠️ FAIL-OPEN intégral (config/corpus/state illisibles → exit 0 sans stdout),
@@ -46,7 +46,7 @@ const { readStdinJson } = require('./stdin-json');
 // Sortie hook — FORMAT protect-files À L'IDENTIQUE (parité de bascule).
 // `systemMessage` est CALCULÉ PAR L'APPELANT : fichier seul = '📄 doc: …'
 // (octet-identique à l'ancien), MCP = formatSystemMessage (badge
-// '[ctxroute]', parité mcp-doc-inject), mixte = les deux joints ' · '
+// '[ctxroute]', parité legacy-mcp-inject), mixte = les deux joints ' · '
 // (avant la fusion, DEUX hooks émettaient DEUX messages — on les garde tous).
 function emit(decision, fullDoc, systemMessage) {
   if (decision === 'ask') {

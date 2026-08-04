@@ -1,5 +1,5 @@
 {
-  "$schema": "./mcp-doc-config.schema.json",
+  "$schema": "./ctxroute-config.schema.json",
   "enabled": true,
   "showNotification": true,
   "mode": "smart",

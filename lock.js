@@ -6,8 +6,8 @@
 // PROBLÈME RÉSOLU : Claude Code peut exécuter des appels d'outils INDÉPENDANTS
 // en parallèle (documenté dans le system prompt : "make all independent tool
 // calls in parallel"). Si deux appels MCP concurrents visent le MÊME
-// session_id, deux process `node mcp-doc-inject.js` distincts peuvent
-// lire→modifier→écrire state/mcp-doc-seen-<session_id>.json en même temps :
+// session_id, deux process `node legacy-mcp-inject.js` distincts peuvent
+// lire→modifier→écrire state/ctxroute-seen-<session_id>.json en même temps :
 // race condition classique read-modify-write, perte d'écriture silencieuse
 // (le 2e process écrase l'état du 1er sans voir ses changements).
 // ⚠️ Signal doctrine : "concurrence NON SÉRIALISÉE sur état mutable partagé"
@@ -39,7 +39,7 @@ const RETRY_DELAY_MS = 10;
 //    parallèles = 30 spawns), 2 s expirent LÉGITIMEMENT → fallback → écriture
 //    sautée = faux rouge sur l'atomicité. Le test relève le timeout pour
 //    neutraliser la dimension disponibilité. En PROD : toujours 2000 ms.
-const DEFAULT_TIMEOUT_MS = Number(process.env.MCP_DOC_LOCK_TIMEOUT_MS) || 2000;
+const DEFAULT_TIMEOUT_MS = Number(process.env.CTXROUTE_LOCK_TIMEOUT_MS) || 2000;
 const STALE_MS = 5000; // un lock plus vieux que ça = process mort, on le force
 
 // Attente BLOQUANTE synchrone courte (fs.mkdirSync busy-wait). Pas de setTimeout

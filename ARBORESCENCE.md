@@ -10,11 +10,11 @@
 
 **Code** :
 - `Desktop/ctxroute/ARBORESCENCE.md` — CE fichier : le filet d'exhaustivité lui-même (1 ligne = 1 fichier + rôle). Sorti du skill le 31/07/2026 (48 % de son poids) ; le skill n'en garde qu'un pointeur. Scellé par le volet ② de couverture-gate.
-- `Desktop/ctxroute/mcp-doc-inject.js` — RELIQUE (retiré du câblage 17/07/2026, la porte couvre le MCP) : gardé comme oracle du différentiel mcp + rollback. Le doctor exige son ABSENCE du câblage.
-- `Desktop/ctxroute/mcp-doc-reset.js` — hook PreCompact. Vide les 3 stores de session à chaque compaction (doc-seen, mcp-doc-seen legacy, turn-count — reset absolu, tous modes).
+- `Desktop/ctxroute/legacy-mcp-inject.js` — RELIQUE (retiré du câblage 17/07/2026, la porte couvre le MCP) : gardé comme oracle du différentiel mcp + rollback. Le doctor exige son ABSENCE du câblage.
+- `Desktop/ctxroute/ctxroute-reset.js` — hook PreCompact. Vide les 3 stores de session à chaque compaction (doc-seen, ctxroute-seen legacy, turn-count — reset absolu, tous modes).
 - `Desktop/ctxroute/turn-count.js` — porte TOUR (UserPromptSubmit, câblée 18/07/2026) : incrémente le compteur de tours de la session (store 'turn-count-'). MUETTE par contrat (stdout UserPromptSubmit = contexte injecté). Capteur du `driftUnit: turn`.
 - `Desktop/ctxroute/lib-pure.js` — TOUTE la logique décisionnelle, zéro I/O (fs/path/process interdits). Mutée par Stryker.
-- `Desktop/ctxroute/lock.js` — lock cross-process (`fs.mkdirSync` atomique) protégeant les accès concurrents à `state/`. Timeout 2 s fail-open (prod, intouchable) ; env `MCP_DOC_LOCK_TIMEOUT_MS` réservée aux tests de concurrence (prouver l'atomicité hors charge).
+- `Desktop/ctxroute/lock.js` — lock cross-process (`fs.mkdirSync` atomique) protégeant les accès concurrents à `state/`. Timeout 2 s fail-open (prod, intouchable) ; env `CTXROUTE_LOCK_TIMEOUT_MS` réservée aux tests de concurrence (prouver l'atomicité hors charge).
 - `Desktop/ctxroute/stdin-json.js` — lecture stdin→JSON partagée par les 2 hooks (extrait après détection de duplication par jscpd).
 - `Desktop/ctxroute/paths.js` — SOURCE UNIQUE des chemins (config/docs/state) + 3 env vars d'isolation réservées aux tests/doctor. Aucun `path.join(__dirname,...)` ad-hoc ailleurs.
 - `Desktop/ctxroute/doctor.js` — dead-man switch : 7 sondes bout-en-bout (5 portes + garde d'écriture + reset), chacune prouvée par EFFET RÉEL (injection dans le contexte, store incrémenté, stores effacés — jamais juste exit 0, trou fermé 19/07) + câblage `settings.json` fichier par fichier. Câblé en SessionStart (`--quiet`), hurle si mort.
@@ -46,7 +46,7 @@
 - `Desktop/ctxroute/codex-doc-inject.js` — coquille CODEX PreToolUse (19/07/2026) : porte-core + emit Codex (SANS permissionDecision, ask DÉGRADÉ en contexte préfixé — « ask » Codex parsed-not-supported).
 - `Desktop/ctxroute/codex-doc-inject.test.js` — suite spawn de la coquille Codex (dialecte seul : dégradation ask, clé sans agent_id, fail-open).
 - `Desktop/ctxroute/corpus.js` — I/O partagée shadow+porte : lecture récursive des .md du parc (ids identiques aux `doc` du JSON).
-- `Desktop/ctxroute/session-store.js` — I/O partagée des states par session (préfixes distincts : `mcp-doc-seen-` serveurs / `doc-seen-` docs). Extrait par gate jscpd.
+- `Desktop/ctxroute/session-store.js` — I/O partagée des states par session (préfixes distincts : `ctxroute-seen-` serveurs / `doc-seen-` docs). Extrait par gate jscpd.
 - `Desktop/ctxroute/session-inject.js` — PORTE SESSION (SessionStart, câblée 17/07/2026) : injecte TOUT `docs/session/*.md` à chaque début de session ET après chaque compaction (le « CLAUDE.md géré par le framework »). Zéro état, zéro dédup, fail-open.
 - `Desktop/ctxroute/sources/session.js` — SOURCE « session » : corpus docs/session → docs ordonnées (alpha, frontmatter strippé). PURE, mutée 13/13.
 - `Desktop/ctxroute/sources/skill.js` — SOURCE « skill » (18/07/2026) : registre `config.skills` → skills déclenchés par PÉRIMÈTRE. 2 dimensions RÉUTILISÉES (fichier via matchingDocs, MCP via lib.serverName), union dédupée. L'adaptateur injecte le CORPS du skill lu en direct (paths.skillsDir(), frontmatter harnais strippé — décision mainteneur 18/07/2026), fallback pointeur si fichier illisible. PURE, mutée 100%.
@@ -63,12 +63,12 @@
 **Config & état** :
 - `Desktop/ctxroute/deps-criticite.json` — MANIFESTE de criticité des dépendances : chaque dépendance de chaque `package.json` est classée `moteur` (détermine la sortie livrée ⇒ épinglage EXACT obligatoire) ou `ordinaire`. Non classée = ROUGE — trancher EST le but.
 - `Desktop/ctxroute/deps-criticite-pure.js` — NOYAU PUR du gate de criticité (muté Stryker). La règle vit ICI, pas dans le test : Stryker ne mute pas le code des tests, une règle qui y vivrait serait INVÉRIFIABLE.
-- `Desktop/ctxroute/mcp-doc-config.json.example` — config générique livrée (le vrai `mcp-doc-config.json` est gitignoré : il porte les noms de skills/projets = données perso).
+- `Desktop/ctxroute/ctxroute-config.json.example` — config générique livrée (le vrai `ctxroute-config.json` est gitignoré : il porte les noms de skills/projets = données perso).
 - `Desktop/ctxroute/package-lock.json` — verrou de dépendances (`npm ci`). Ne jamais l'éditer à la main.
-- `Desktop/ctxroute/mcp-doc-config.json` — config (mode + seuils + filtres). Prise en compte immédiate, pas de redémarrage. `$schema` → validation IDE.
-- `Desktop/ctxroute/mcp-doc-config.schema.json` — JSON Schema de la config (enums fermés, clés strictes). Drift-test dans config-gate.test.js : clé de config hors schéma = ROUGE (la classe du bug testserver999).
+- `Desktop/ctxroute/ctxroute-config.json` — config (mode + seuils + filtres). Prise en compte immédiate, pas de redémarrage. `$schema` → validation IDE.
+- `Desktop/ctxroute/ctxroute-config.schema.json` — JSON Schema de la config (enums fermés, clés strictes). Drift-test dans config-gate.test.js : clé de config hors schéma = ROUGE (la classe du bug testserver999).
 - `Desktop/ctxroute/docs/mcp/{server}.md` / `{server}/{tool}.md` / `{server}/{subTool}.md` — docs par serveur/outil/sous-outil. ⚠️ Gitignoré (vrais invariants perso : emails, clients). Versions génériques poussées sur GitHub = `{server}.md.example`.
-- `Desktop/ctxroute/state/mcp-doc-seen-<session_id>.json` — état runtime (généré automatiquement, purgé après 30j).
+- `Desktop/ctxroute/state/ctxroute-seen-<session_id>.json` — état runtime (généré automatiquement, purgé après 30j).
 - `Desktop/ctxroute/state/.lock-<session_id>/` — dossier-lock temporaire (existe seulement pendant la section critique, jamais commité).
 
 **Tests & qualité** (tous OBLIGATOIRES, jamais temporaires) :
@@ -83,12 +83,12 @@
 - `Desktop/ctxroute/doc-write-guard.test.js` — intégration de la garde (spawn, parc tmpdir) : block sur typo/clé interdite, silence sur sain/session/hors-parc, fail-open.
 - `Desktop/ctxroute/sources-session.test.js` — tests DÉTERMINISTES de `sources/session.js` (cible Stryker).
 - `Desktop/ctxroute/sources-skill.test.js` — tests DÉTERMINISTES de `sources/skill.js` (cible Stryker) : skillRules, matchingSkills (union fichier+serveur, dédup), serverMatches, declFor, contrat MODES en dur.
-- `Desktop/ctxroute/skill-registry-gate.test.js` — GATE : tout skill de `config.skills` EXISTE dans le harnais (Claude Code : ~/.claude/commands/{nom}.md). Rename/suppression = pointeur fantôme = ROUGE. SENS INVERSE (19/07), OPT-IN EXPLICITE : ne s'active QUE si la clé `skillsWithoutPerimeter` est présente (même []) — c'est l'interrupteur d'adoption de la discipline zéro-silence (un langage n'impose jamais une politique). Actif → tout skill du harnais DOIT être enregistré (`skills`) OU déclaré sans périmètre, sinon ROUGE. `findMissing`/`findUndeclared` négative-checkés. Skippé sur clone vierge (env MCP_DOC_SKILLS_DIR pour tests).
+- `Desktop/ctxroute/skill-registry-gate.test.js` — GATE : tout skill de `config.skills` EXISTE dans le harnais (Claude Code : ~/.claude/commands/{nom}.md). Rename/suppression = pointeur fantôme = ROUGE. SENS INVERSE (19/07), OPT-IN EXPLICITE : ne s'active QUE si la clé `skillsWithoutPerimeter` est présente (même []) — c'est l'interrupteur d'adoption de la discipline zéro-silence (un langage n'impose jamais une politique). Actif → tout skill du harnais DOIT être enregistré (`skills`) OU déclaré sans périmètre, sinon ROUGE. `findMissing`/`findUndeclared` négative-checkés. Skippé sur clone vierge (env CTXROUTE_SKILLS_DIR pour tests).
 - `Desktop/ctxroute/session-inject.test.js` — intégration de la porte session (spawn, tmpdir) : ordre, contrat SessionStart, fail-open, enabled:false.
 - `Desktop/ctxroute/sources-file.test.js` — tests DÉTERMINISTES de `sources/file.js` (cible Stryker). ⚠️ Créé après audit : le cœur du refactor n'avait AUCUN test unitaire, sa seule couverture était le différentiel de 75 min (inlançable par Stryker).
 - `Desktop/ctxroute/sources-mcp.test.js` — tests DÉTERMINISTES de `sources/mcp.js` (cible Stryker) : ids corpus, ordre global→spécifique, filtres, declFor.
 - `Desktop/ctxroute/sources-tool.test.js` — tests DÉTERMINISTES de `sources/tool.js` (cible Stryker) : match exact/casse, scope/exclude, totalité, ordre.
-- `Desktop/ctxroute/mcp-differential.test.js` — DIFFÉRENTIEL MCP : spawn vieux (mcp-doc-inject) vs porte unique sur 9 séquences (modes, overrides, granularité, filtres) — gate de parité du retrait du legacy. Timeout 60 s par test (spawns sous charge).
+- `Desktop/ctxroute/mcp-differential.test.js` — DIFFÉRENTIEL MCP : spawn vieux (legacy-mcp-inject) vs porte unique sur 9 séquences (modes, overrides, granularité, filtres) — gate de parité du retrait du legacy. Timeout 60 s par test (spawns sous charge).
 - `Desktop/ctxroute/gate.test.js` — tests DÉTERMINISTES de gate.js (cible Stryker). WRITE_TOOLS épinglés EN DUR (contrat protect-files).
 - `Desktop/ctxroute/gate.property.test.js` — property-based de gate.js (fast-check, inputs générés). JAMAIS lancé par Stryker (non déterministe) : chaque invariant a AUSSI son cas déterministe dans gate.test.js.
 - `Desktop/ctxroute/doc-inject.test.js` — intégration de la porte (spawn, corpus tmpdir) : allow/ask/rush/dédup smart/fail-open, zéro écriture d'état en corpus dumb.
@@ -111,7 +111,7 @@
 - `Desktop/ctxroute/vendor-deadline.test.js` — PREUVE sur COPIE tmpdir avant de toucher la prod : dry-run inoffensif, idempotence, 0 « manuel », `node --check` (syntaxe), les 9 suites du parc IDENTIQUES avant/après (anti-régression), et chaque hook patché meurt vraiment. ⚠️ Les 3 angles sont nécessaires : « le process meurt » était VERT sur un fichier cassé (un crash meurt aussi).
 - `Desktop/ctxroute/file-differential.test.js` — DIFFÉRENTIEL : rejoue `sources/file.js` ET le vrai `protect-files.js` sur 2021 cas dérivés des règles réelles, exige des docs identiques ET ORDONNÉES. ⚠️ ~75 min (spawns) → `npm run test:differential`, hors de `npm test`. Skippé si `protect-files.js` absent (clone vierge).
 - `Desktop/ctxroute/lock.test.js` — 9 tests dédiés au lock cross-process, dont la régression du bug "checkout frais" (15/07/2026 : lock.js supposait `state/` déjà existant, cassait en CI, invisible en local).
-- `Desktop/ctxroute/mcp-doc-inject.test.js` — tests d'intégration (spawn process, dont 1 test de concurrence réelle). ⚠️ Config de test = tmpdir via `MCP_DOC_CONFIG_PATH`, JAMAIS le fichier réel du repo.
+- `Desktop/ctxroute/legacy-mcp-inject.test.js` — tests d'intégration (spawn process, dont 1 test de concurrence réelle). ⚠️ Config de test = tmpdir via `CTXROUTE_CONFIG_PATH`, JAMAIS le fichier réel du repo.
 - `Desktop/ctxroute/stryker.conf.json` — config mutation (mute TOUS les modules purs : lib-pure, sources/file, frontmatter, migrate, lint ; break 99, runner vitest perTest — node:test/commandRunner BANNIS 16/07/2026).
 - `Desktop/ctxroute/vitest.config.mjs` — config vitest par défaut (`npm test`) : toutes les suites SAUF les lourdes.
 - `Desktop/ctxroute/vitest.stryker.config.mjs` — config vitest DÉDIÉE à Stryker : SEULES les 5 suites déterministes des modules mutés (jamais property/spawn).

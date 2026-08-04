@@ -25,8 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_DIR = path.dirname(fileURLToPath(import.meta.url));
 // Config utilisateur gitignorée (19/07/2026) : réelle si présente, sinon .example.
-const REAL_CONFIG = path.join(REPO_DIR, 'mcp-doc-config.json');
-const CONFIG_PATH = fs.existsSync(REAL_CONFIG) ? REAL_CONFIG : path.join(REPO_DIR, 'mcp-doc-config.json.example');
+const REAL_CONFIG = path.join(REPO_DIR, 'ctxroute-config.json');
+const CONFIG_PATH = fs.existsSync(REAL_CONFIG) ? REAL_CONFIG : path.join(REPO_DIR, 'ctxroute-config.json.example');
 // ⚠️ SOURCE UNIQUE du chemin = paths.skillsDir() (partagée avec l'adaptateur
 //    skill qui LIT le corps des skills — deux définitions divergeraient en silence).
 const { skillsDir } = await import('./paths.js').then((m) => m.default || m);

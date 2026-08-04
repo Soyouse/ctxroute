@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Mutation UNIQUEMENT sur lib-pure.js (logique décisionnelle, zéro I/O). mcp-doc-inject.js/mcp-doc-reset.js/lock.js ne sont PAS mutés : I/O (fs/stdin/stdout) = intégration/contrat, jamais Stryker (doctrine : isoler la décision de l'I/O AVANT de muter).",
+  "_comment": "Mutation UNIQUEMENT sur lib-pure.js (logique décisionnelle, zéro I/O). legacy-mcp-inject.js/ctxroute-reset.js/lock.js ne sont PAS mutés : I/O (fs/stdin/stdout) = intégration/contrat, jamais Stryker (doctrine : isoler la décision de l'I/O AVANT de muter).",
   "_runner_comment": "⚠️ vitest OBLIGATOIRE (node:test BANNI 16/07/2026, cf stryker-runner-choice.md) : perTest + workers vivants = zéro spawn par mutant (12 min → secondes/minutes mesuré). NE JAMAIS revenir à command/commandRunner — gate dans mutation-workflow-gate.test.js. Les suites lancées par mutant = celles que vitest.config.mjs inclut (include/exclude) : nouveau module pur ⇒ sa suite DOIT être découverte par vitest, pas listée ici.",
   "testRunner": "vitest",
   "vitest": {

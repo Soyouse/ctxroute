@@ -199,7 +199,7 @@ test('APRÈS patch — CHAQUE hook du parc meurt tout seul', { skip, timeout: 30
     const r = await new Promise((resolve) => {
       const child = spawn(process.execPath, [path.join(dir, f)], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, MCP_DOC_DEADLINE_MS: '400' },
+        env: { ...process.env, CTXROUTE_DEADLINE_MS: '400' },
       });
       child.stdout.on('data', () => {});
       child.stderr.on('data', () => {});

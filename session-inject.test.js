@@ -23,9 +23,9 @@ function run({ docs = null, config = null, stdin } = {}) {
     encoding: 'utf8',
     env: {
       ...process.env,
-      MCP_DOC_SESSIONDOCS_DIR: docsDir,
-      MCP_DOC_CONFIG_PATH: configPath,
-      MCP_DOC_STATE_DIR: join(base, 'state'),
+      CTXROUTE_SESSIONDOCS_DIR: docsDir,
+      CTXROUTE_CONFIG_PATH: configPath,
+      CTXROUTE_STATE_DIR: join(base, 'state'),
     },
   });
 }

@@ -2,7 +2,7 @@
   "forbidden": [
     {
       "name": "no-circular",
-      "comment": "Aucune dépendance circulaire — le repo est volontairement plat (mcp-doc-inject.js/mcp-doc-reset.js → lib-pure.js/lock.js, jamais l'inverse).",
+      "comment": "Aucune dépendance circulaire — le repo est volontairement plat (legacy-mcp-inject.js/ctxroute-reset.js → lib-pure.js/lock.js, jamais l'inverse).",
       "severity": "error",
       "from": {},
       "to": {
@@ -56,7 +56,7 @@
         "path": "^paths\\.js$"
       },
       "to": {
-        "path": "^(lib-pure|lock|stdin-json|mcp-doc-inject|mcp-doc-reset|doctor)\\.js$"
+        "path": "^(lib-pure|lock|stdin-json|legacy-mcp-inject|ctxroute-reset|doctor)\\.js$"
       }
     },
     {
@@ -92,7 +92,7 @@
         "path": "^sources/"
       },
       "to": {
-        "path": "^(mcp-doc-inject|mcp-doc-reset|doctor|paths|deadline)\\.js$"
+        "path": "^(legacy-mcp-inject|ctxroute-reset|doctor|paths|deadline)\\.js$"
       }
     },
     {
@@ -131,7 +131,7 @@
         "path": "^deadline\\.js$"
       },
       "to": {
-        "path": "^(lib-pure|lock|stdin-json|paths|mcp-doc-inject|mcp-doc-reset|doctor|frontmatter)\\.js$"
+        "path": "^(lib-pure|lock|stdin-json|paths|legacy-mcp-inject|ctxroute-reset|doctor|frontmatter)\\.js$"
       }
     },
     {
@@ -142,7 +142,7 @@
         "path": "^stdin-json\\.js$"
       },
       "to": {
-        "path": "^(lib-pure|lock|mcp-doc-inject|mcp-doc-reset)\\.js$"
+        "path": "^(lib-pure|lock|legacy-mcp-inject|ctxroute-reset)\\.js$"
       }
     },
     {
@@ -167,7 +167,7 @@
         "path": "^lint\\.js$"
       },
       "to": {
-        "path": "^(mcp-doc-inject|mcp-doc-reset|doctor|paths|deadline|lint-corpus)\\.js$"
+        "path": "^(legacy-mcp-inject|ctxroute-reset|doctor|paths|deadline|lint-corpus)\\.js$"
       }
     },
     {
@@ -206,7 +206,7 @@
         "path": "^gate\\.js$"
       },
       "to": {
-        "path": "^(paths|lock|corpus|stdin-json|deadline|doctor|mcp-doc-inject|mcp-doc-reset|doc-inject)\\.js$"
+        "path": "^(paths|lock|corpus|stdin-json|deadline|doctor|legacy-mcp-inject|ctxroute-reset|doc-inject)\\.js$"
       }
     },
     {
@@ -214,7 +214,7 @@
       "severity": "error",
       "comment": "⚠️ explain.js est un outil de DIAGNOSTIC (fail-LOUD, lecture seule, hors chemin critique). Aucune porte/garde ne doit l'importer : un hook est spawné à CHAQUE appel d'outil de CHAQUE agent, et un outil qui hurle n'a rien à faire dans un chemin fail-open. Le sens inverse est la règle : explain consomme collect-core, jamais l'inverse.",
       "from": {
-        "path": "^(doc-inject|porte-core|guard-core|doc-write-guard|session-inject|turn-count|mcp-doc-reset|mcp-doc-inject|codex-doc-inject|canari|canari-check)\\.js$"
+        "path": "^(doc-inject|porte-core|guard-core|doc-write-guard|session-inject|turn-count|ctxroute-reset|legacy-mcp-inject|codex-doc-inject|canari|canari-check)\\.js$"
       },
       "to": {
         "path": "^explain\\.js$"
@@ -250,7 +250,7 @@
     "doNotFollow": {
       "path": "node_modules"
     },
-    "includeOnly": "(^(mcp-doc-inject|mcp-doc-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure|explain|collect-core|budget|porte-core|guard-core|codex-doc-inject|codex-doc-write-guard|canari|canari-check)\\.js$|^(fs|path|child_process|os|crypto)$)",
+    "includeOnly": "(^(legacy-mcp-inject|ctxroute-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure|explain|collect-core|budget|porte-core|guard-core|codex-doc-inject|codex-doc-write-guard|canari|canari-check)\\.js$|^(fs|path|child_process|os|crypto)$)",
     "tsPreCompilationDeps": false
   }
 }

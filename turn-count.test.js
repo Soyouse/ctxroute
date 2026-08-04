@@ -22,8 +22,8 @@ function makeEnv(extra = {}) {
     configPath,
     env: {
       ...process.env,
-      MCP_DOC_CONFIG_PATH: configPath,
-      MCP_DOC_STATE_DIR: stateDir,
+      CTXROUTE_CONFIG_PATH: configPath,
+      CTXROUTE_STATE_DIR: stateDir,
       ...extra,
     },
   };
@@ -90,12 +90,12 @@ test('FAIL-OPEN : stdin poubelle et store corrompu → exit 0 muet, compteur rep
   }
 });
 
-test('mcp-doc-reset.js (PreCompact) remet AUSSI le compteur de tours à zéro', () => {
+test('ctxroute-reset.js (PreCompact) remet AUSSI le compteur de tours à zéro', () => {
   const { stateDir, env, tmp } = makeEnv();
   try {
     run(env, { hook_event_name: 'UserPromptSubmit', session_id: 'sess-r', prompt: 'x' });
     expect(readTurns(stateDir, 'sess-r')).toBe(1);
-    const rr = spawnSync(process.execPath, [path.join(__dirname, 'mcp-doc-reset.js')], {
+    const rr = spawnSync(process.execPath, [path.join(__dirname, 'ctxroute-reset.js')], {
       input: JSON.stringify({ hook_event_name: 'PreCompact', session_id: 'sess-r', trigger: 'auto' }),
       encoding: 'utf8',
       env,

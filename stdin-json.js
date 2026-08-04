@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════════════
 // Lecture stdin → JSON, format Claude Code hooks. Boilerplate partagé par
-// TOUS les hooks (mcp-doc-inject.js, mcp-doc-reset.js) — extrait ici après
+// TOUS les hooks (legacy-mcp-inject.js, ctxroute-reset.js) — extrait ici après
 // détection de duplication par jscpd (couplage implicite : même code copié
 // dans 2 fichiers = même contrat modifié à 2 endroits si le format change).
 // ═══════════════════════════════════════════════════════════════════════

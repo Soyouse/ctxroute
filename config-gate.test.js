@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 //
 // ⚠️ NE JAMAIS SUPPRIMER NI ASSOUPLIR. Bug RÉEL (découvert le 15/07/2026,
-// présent depuis le 1er commit) : `mcp-doc-config.json` a été committé avec
+// présent depuis le 1er commit) : `ctxroute-config.json` a été committé avec
 // des valeurs de FIXTURE laissées par les tests d'intégration
 // (`filterMode: "whitelist"`, `filterList: ["testserver999"]`). Résultat :
 // le framework tournait, sortait exit(0) à chaque appel MCP, n'injectait
@@ -31,20 +31,20 @@ function ok(name, cond) {
 }
 
 // ⚠️ CHEMINS EN DUR, VOLONTAIREMENT — NE JAMAIS passer par paths.js ici.
-// paths.js honore MCP_DOC_CONFIG_PATH/MCP_DOC_DOCS_DIR (surcharges de test) :
+// paths.js honore CTXROUTE_CONFIG_PATH/CTXROUTE_DOCS_DIR (surcharges de test) :
 // ce gate vérifie le fichier RÉELLEMENT LIVRÉ dans le repo, donc il doit être
 // AVEUGLE à toute surcharge d'environnement. Sinon un env var traînant dans le
 // shell/la CI ferait valider une autre config que celle qui part en prod —
 // le gate se saborderait lui-même, exactement le bug qu'il existe pour attraper.
-// ⚠️ PUBLICATION (19/07/2026) : mcp-doc-config.json = config UTILISATEUR,
+// ⚠️ PUBLICATION (19/07/2026) : ctxroute-config.json = config UTILISATEUR,
 // gitignorée (noms de skills/projets = données perso). Le repo livre
-// mcp-doc-config.json.example. Ce gate valide la VRAIE config si présente
+// ctxroute-config.json.example. Ce gate valide la VRAIE config si présente
 // (machine mainteneur/installée), sinon le .example (clone vierge/CI) —
 // les DEUX doivent toujours passer les mêmes invariants.
-const REAL_CONFIG = path.join(import.meta.dirname, 'mcp-doc-config.json');
+const REAL_CONFIG = path.join(import.meta.dirname, 'ctxroute-config.json');
 const CONFIG_PATH = fs.existsSync(REAL_CONFIG)
   ? REAL_CONFIG
-  : path.join(import.meta.dirname, 'mcp-doc-config.json.example');
+  : path.join(import.meta.dirname, 'ctxroute-config.json.example');
 const DOCS_DIR = path.join(import.meta.dirname, 'docs', 'mcp');
 
 // ── La config (réelle ou .example livré) doit être lisible et valide ──
@@ -53,7 +53,7 @@ try {
   config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 } catch { /* config reste null → tests suivants échouent proprement */ }
 
-ok('la config (mcp-doc-config.json ou .example livré) existe et est un JSON valide', config !== null && typeof config === 'object');
+ok('la config (ctxroute-config.json ou .example livré) existe et est un JSON valide', config !== null && typeof config === 'object');
 
 if (config) {
   // ── Le framework doit être ALLUMÉ dans la config livrée ──
@@ -97,12 +97,12 @@ if (config) {
 //    silencieux, le hook l'ignore sans un mot). Pas d'ajv (zéro dépendance) :
 //    on vérifie l'ENVELOPPE (clés connues, types des enums) — l'IDE fait le reste.
 {
-  const schema = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'mcp-doc-config.schema.json'), 'utf8'));
+  const schema = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'ctxroute-config.schema.json'), 'utf8'));
   const knownKeys = Object.keys(schema.properties);
   for (const k of Object.keys(config)) {
     ok(`config livrée : clé "${k}" connue du schéma`, knownKeys.includes(k));
   }
-  ok('config livrée : $schema pointe le fichier du repo', config.$schema === './mcp-doc-config.schema.json');
+  ok('config livrée : $schema pointe le fichier du repo', config.$schema === './ctxroute-config.schema.json');
   ok('schéma : mode et filterMode restent des enums fermés',
     Array.isArray(schema.properties.mode.enum) && Array.isArray(schema.properties.filterMode.enum));
   const srvSchema = schema.properties.servers.additionalProperties;

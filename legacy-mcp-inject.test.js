@@ -1,16 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Tests mcp-doc-inject.js + mcp-doc-reset.js — suite vitest (zéro dep hors runner).
+// Tests legacy-mcp-inject.js + ctxroute-reset.js — suite vitest (zéro dep hors runner).
 //
 // Spawn les hooks en child process, feed stdin JSON (format Claude Code hooks
 // vérifié contre la doc officielle : session_id, tool_name, tool_input,
 // hook_event_name), parse stdout JSON, assert. Chaque cas = session_id
-// JETABLE isolé → state/mcp-doc-seen-<id>.json nettoyé en fin de run.
+// JETABLE isolé → state/ctxroute-seen-<id>.json nettoyé en fin de run.
 //
 // Couvre : extraction serverName, mode once/smart/dumb, seuil par défaut
 // et par serveur, reset PreCompact, doc absente = silence, outil non-MCP
 // ignoré, isolation par session.
 //
-// Run : `npx vitest run mcp-doc-inject.test.js` depuis le repo.
+// Run : `npx vitest run legacy-mcp-inject.test.js` depuis le repo.
 // ═══════════════════════════════════════════════════════════════════════
 
 import { test, afterAll } from 'vitest';
@@ -20,19 +20,19 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 
-const HOOK = path.join(import.meta.dirname, 'mcp-doc-inject.js');
-const RESET_HOOK = path.join(import.meta.dirname, 'mcp-doc-reset.js');
+const HOOK = path.join(import.meta.dirname, 'legacy-mcp-inject.js');
+const RESET_HOOK = path.join(import.meta.dirname, 'ctxroute-reset.js');
 const STATE_DIR = path.join(import.meta.dirname, 'state');
-// ⚠️ NE JAMAIS repointer CONFIG_PATH vers le mcp-doc-config.json du repo.
+// ⚠️ NE JAMAIS repointer CONFIG_PATH vers le ctxroute-config.json du repo.
 // Les tests écrivaient leurs fixtures dans le VRAI fichier puis restauraient
 // "l'original" — lequel était déjà une config de test committée : le framework
 // est resté désactivé en prod (whitelist testserver999) depuis le 1er commit,
 // en silence. Config de test = fichier JETABLE en tmpdir, passé au hook via
-// MCP_DOC_CONFIG_PATH. Zéro écriture dans le repo, rien à restaurer, un Ctrl-C
+// CTXROUTE_CONFIG_PATH. Zéro écriture dans le repo, rien à restaurer, un Ctrl-C
 // en cours de run ne peut plus rien casser.
 const CONFIG_PATH = path.join(
-  fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-test-')),
-  'mcp-doc-config.json'
+  fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-test-')),
+  'ctxroute-config.json'
 );
 const DOCS_DIR = path.join(import.meta.dirname, 'docs', 'mcp');
 
@@ -43,9 +43,9 @@ function run(hook, payload, env = {}) {
   const r = spawnSync('node', [hook], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
-    // ⚠️ MCP_DOC_CONFIG_PATH sur TOUT spawn : sans lui le hook relirait le
+    // ⚠️ CTXROUTE_CONFIG_PATH sur TOUT spawn : sans lui le hook relirait le
     // vrai config du repo et les tests dépendraient de l'environnement local.
-    env: { ...process.env, MCP_DOC_CONFIG_PATH: CONFIG_PATH, ...env },
+    env: { ...process.env, CTXROUTE_CONFIG_PATH: CONFIG_PATH, ...env },
   });
   return { stdout: (r.stdout || '').trim(), status: r.status };
 }
@@ -396,21 +396,21 @@ function setConfig(obj) {
 {
   const s = 'test-gc-old-17', keep = 'test-gc-keep-17';
   setConfig({ mode: 'once', defaultThreshold: 4, servers: {} });
-  callMcp(s, TEST_SERVER);    // crée state/mcp-doc-seen-test-gc-old-17.json
-  callMcp(keep, TEST_SERVER); // crée state/mcp-doc-seen-test-gc-keep-17.json (restera récent)
+  callMcp(s, TEST_SERVER);    // crée state/ctxroute-seen-test-gc-old-17.json
+  callMcp(keep, TEST_SERVER); // crée state/ctxroute-seen-test-gc-keep-17.json (restera récent)
 
-  const oldFile = path.join(STATE_DIR, 'mcp-doc-seen-test-gc-old-17.json');
+  const oldFile = path.join(STATE_DIR, 'ctxroute-seen-test-gc-old-17.json');
   const oldMtime = (Date.now() - 60 * 24 * 60 * 60 * 1000) / 1000; // 60 jours dans le passé
   fs.utimesSync(oldFile, oldMtime, oldMtime);
 
   // TTL forcé à 30 jours, probabilité forcée à 1 (déterministe pour le test) via env.
   callMcp('test-gc-trigger-17', TEST_SERVER, 'do_thing', {}, {
-    MCP_DOC_GC_PROBABILITY: '1',
-    MCP_DOC_GC_TTL_MS: String(30 * 24 * 60 * 60 * 1000),
+    CTXROUTE_GC_PROBABILITY: '1',
+    CTXROUTE_GC_TTL_MS: String(30 * 24 * 60 * 60 * 1000),
   });
 
   ok('fichier state périmé (60j > TTL 30j) → supprimé par la purge', !fs.existsSync(oldFile));
-  ok('fichier state récent → conservé par la purge', fs.existsSync(path.join(STATE_DIR, `mcp-doc-seen-${keep}.json`)));
+  ok('fichier state récent → conservé par la purge', fs.existsSync(path.join(STATE_DIR, `ctxroute-seen-${keep}.json`)));
   sessions.add('test-gc-trigger-17');
 }
 
@@ -419,7 +419,7 @@ function setConfig(obj) {
 // cross-process de lock.js, pas juste une lecture de code). ──
 function callMcpAsync(sessionId, server, tool = 'do_thing') {
   return new Promise((resolve) => {
-    const p = spawn('node', [HOOK], { env: { ...process.env, MCP_DOC_CONFIG_PATH: CONFIG_PATH } });
+    const p = spawn('node', [HOOK], { env: { ...process.env, CTXROUTE_CONFIG_PATH: CONFIG_PATH } });
     let out = '';
     p.stdout.on('data', (c) => (out += c));
     p.stdin.write(JSON.stringify({
@@ -450,7 +450,7 @@ test(`concurrence : ${N_CALLS} appels parallèles sur ${N_SERVERS} serveurs → 
   // ⚠️ Timeout de lock RELEVÉ (env test, cf lock.js) : ce test prouve
   //    l'ATOMICITÉ, pas la disponibilité — sous charge (suites parallèles),
   //    2 s expirent légitimement (fail-open voulu) = faux rouge d'atomicité.
-  process.env.MCP_DOC_LOCK_TIMEOUT_MS = '20000';
+  process.env.CTXROUTE_LOCK_TIMEOUT_MS = '20000';
   const s = 'test-concurrency-18';
   sessions.add(s);
   const dirs = [];
@@ -464,7 +464,7 @@ test(`concurrence : ${N_CALLS} appels parallèles sur ${N_SERVERS} serveurs → 
   for (let i = 0; i < N_CALLS; i++) calls.push(callMcpAsync(s, `concserver${i % N_SERVERS}`));
   await Promise.all(calls);
 
-  const stateFile = path.join(STATE_DIR, `mcp-doc-seen-${s}.json`);
+  const stateFile = path.join(STATE_DIR, `ctxroute-seen-${s}.json`);
   let seenCount = 0;
   try {
     const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
@@ -473,7 +473,7 @@ test(`concurrence : ${N_CALLS} appels parallèles sur ${N_SERVERS} serveurs → 
 
   for (const d of dirs) { try { fs.unlinkSync(d); } catch {} }
 
-  delete process.env.MCP_DOC_LOCK_TIMEOUT_MS; // ne jamais fuir sur les autres tests
+  delete process.env.CTXROUTE_LOCK_TIMEOUT_MS; // ne jamais fuir sur les autres tests
   assert.ok(seenCount === N_SERVERS,
     `concurrence : ${N_CALLS} appels parallèles sur ${N_SERVERS} serveurs → AUCUNE écriture perdue (lock cross-process)`);
 });
@@ -483,7 +483,7 @@ afterAll(() => {
   try { fs.rmSync(path.dirname(CONFIG_PATH), { recursive: true, force: true }); } catch {}
   for (const s of sessions) {
     const safe = String(s).replace(/[^a-zA-Z0-9_-]/g, '');
-    const f = path.join(STATE_DIR, `mcp-doc-seen-${safe}.json`);
+    const f = path.join(STATE_DIR, `ctxroute-seen-${safe}.json`);
     try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
     const lockDir = path.join(STATE_DIR, `.lock-${safe}`);
     try { if (fs.existsSync(lockDir)) fs.rmdirSync(lockDir); } catch {}

@@ -41,7 +41,7 @@ test('SHADOW N\'INJECTE JAMAIS — stdout VIDE même sur un match plein', async 
   const state = fs.mkdtempSync(path.join(os.tmpdir(), 'shadow-state-'));
   const r = await spawnShadow(
     JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'C:/x/fichier-piege.js' } }),
-    { MCP_DOC_FILEDOCS_DIR: docs, MCP_DOC_STATE_DIR: state }
+    { CTXROUTE_FILEDOCS_DIR: docs, CTXROUTE_STATE_DIR: state }
   );
   assert.strictEqual(r.code, 0);
   assert.strictEqual(r.stdout, '', 'le shadow a ÉMIS quelque chose = bascule déguisée sans GO');
@@ -50,7 +50,7 @@ test('SHADOW N\'INJECTE JAMAIS — stdout VIDE même sur un match plein', async 
 test('SHADOW JOURNALISE — docs calculées écrites en JSONL, non-match logué aussi', async () => {
   const docs = faussesDocs();
   const state = fs.mkdtempSync(path.join(os.tmpdir(), 'shadow-state-'));
-  const env = { MCP_DOC_FILEDOCS_DIR: docs, MCP_DOC_STATE_DIR: state };
+  const env = { CTXROUTE_FILEDOCS_DIR: docs, CTXROUTE_STATE_DIR: state };
   await spawnShadow(JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: 'C:/x/fichier-piege.js' } }), env);
   await spawnShadow(JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'C:/x/anodin.txt' } }), env);
 
@@ -65,7 +65,7 @@ test('SHADOW JOURNALISE — docs calculées écrites en JSONL, non-match logué 
 test('FAIL-OPEN — stdin poubelle, corpus inexistant : exit 0, stdout vide, zéro throw', async () => {
   const state = fs.mkdtempSync(path.join(os.tmpdir(), 'shadow-state-'));
   for (const stdin of ['pas du json', '{}', JSON.stringify({ tool_name: 'Edit', tool_input: {} })]) {
-    const r = await spawnShadow(stdin, { MCP_DOC_FILEDOCS_DIR: 'C:/nexiste/pas', MCP_DOC_STATE_DIR: state });
+    const r = await spawnShadow(stdin, { CTXROUTE_FILEDOCS_DIR: 'C:/nexiste/pas', CTXROUTE_STATE_DIR: state });
     assert.strictEqual(r.code, 0, `exit ≠ 0 sur : ${stdin}`);
     assert.strictEqual(r.stdout, '');
   }

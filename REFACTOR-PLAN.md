@@ -2,7 +2,7 @@
 
 > Statut : ✅ **TERMINÉ (17/07/2026)** — architecture cible ATTEINTE. Hook UNIQUE
 > `doc-inject.js` (matcher `*`) live en prod : sources/file.js + sources/mcp.js →
-> gate.js (dédup par DOC). `mcp-doc-inject.js` retiré du câblage (gardé comme
+> gate.js (dédup par DOC). `legacy-mcp-inject.js` retiré du câblage (gardé comme
 > oracle du différentiel + rollback). Doctrine du patrimoine (CLAUDE.md) :
 > plus AUCUN chantier ouvert sur ce framework — scaler = ajouter des docs .md.
 
@@ -103,7 +103,7 @@ zéro éviction*, numéros `k/N` et marqueur commun vérifiés.
 **Ce qui a été construit** — aucun fichier nouveau :
 `budget.planifierPaquets` (pur) · `porte-core` (plan mémoïsé par invocation + émission du paquet k)
 · `lib.parsePaquetArgs` (pur) · coquille `doc-inject.js` (dialecte : `tool_use_id` + argv) ·
-`mcp-doc-reset` purge le 4ᵉ store (`plan-`).
+`ctxroute-reset` purge le 4ᵉ store (`plan-`).
 
 **3 défauts RÉELS trouvés par les gates, pas par relecture** (à ne pas réintroduire) :
 1. **Découpage sans mémoïsation** — la porte fragmentait même sans identifiant d'invocation ⇒ les N
@@ -489,7 +489,7 @@ qu'un fichier critique » et que le défaut est « documenter ». Zéro code : u
 **FAIT (sur GO explicite du mainteneur, prod touchée et vérifiée)** :
 - Port vitest complet : 398 tests / 35 s, mutation **100,00% en 30 s** (0 survivant : 2 tués, 2 équivalents `Stryker disable` justifiés dans sources/file.js), break 99 (marge délibérée — ne PAS monter).
 - **#8** : `~/.claude/hooks/protect-files.js` retire le frontmatter avant injection (`FRONTMATTER_RE` = copie de FM_RE) → la migration frontmatter ne polluera plus le contexte. Prouvé rouge/vert sur copie avant prod.
-- **#12** : 0 doc orpheline (7 réf `inject: never` + 7 règles ajoutées). **#6** : 5 faux positifs exclus. **#13** : lint-corpus --quiet en SessionStart. **#11** : protect-files.js a sa doc (`docs/protect-files.md`). **#5** : `mcp-doc-config.schema.json` + drift-test dans config-gate.
+- **#12** : 0 doc orpheline (7 réf `inject: never` + 7 règles ajoutées). **#6** : 5 faux positifs exclus. **#13** : lint-corpus --quiet en SessionStart. **#11** : protect-files.js a sa doc (`docs/protect-files.md`). **#5** : `ctxroute-config.schema.json` + drift-test dans config-gate.
 - ⚠️ Découverte : `scope` = OR (`some`) — un scope large (ex. `zenon-infra` du modèle bookings) sur-matche. Scopes précis obligatoires.
 
 **FAIT session fusion partie 1 (16/07/2026 après-midi)** :
@@ -501,14 +501,14 @@ qu'un fichier critique » et que le défaut est « documenter ». Zéro code : u
 
 - **SHADOW CÂBLÉ (16/07/2026, 15h)** : `loader.js` (corpus frontmatters → règles ordonnées, entrelacement résolu par rank PAR ENTRÉE — 23 docs re-migrées, mutation 100%, différentiel in-process à chaque npm test) + `shadow-inject.js` (PreToolUse `*`, n'injecte JAMAIS, journalise `state/shadow-*.jsonl`) + `shadow-reconcile.js` (verdict : rejoue l'oracle partagé `oracle.js`, exit 1 divergence / exit 2 journal vide). Preuve : spawn réel silencieux + reconcile 0 divergence. Prend effet aux NOUVELLES sessions.
 
-- **PORTE UNIFIÉE ÉCRITE (16/07/2026, 15h30 — NON CÂBLÉE)** : `gate.js` (décision pure par DOC : dumb/once/smart, compteurs étrangers, ask via confirmFor — muté 100,00%, 0 survivant) + `doc-inject.js` (coquille I/O, format de sortie protect-files À L'IDENTIQUE, ne lit JAMAIS `.rush` : rush = `confirm: false` config) + `corpus.js`/`session-store.js` (I/O partagées shadow/mcp-doc-inject, gate jscpd). **Parité prouvée par `porte-differential.test.js`** : vieux vs nouveau sur parc réel, contenu injecté à l'octet près, décision miroir du `.rush`, systemMessage identique. Reconcile jour 1 : 0 divergence / 53 payloads réels.
+- **PORTE UNIFIÉE ÉCRITE (16/07/2026, 15h30 — NON CÂBLÉE)** : `gate.js` (décision pure par DOC : dumb/once/smart, compteurs étrangers, ask via confirmFor — muté 100,00%, 0 survivant) + `doc-inject.js` (coquille I/O, format de sortie protect-files À L'IDENTIQUE, ne lit JAMAIS `.rush` : rush = `confirm: false` config) + `corpus.js`/`session-store.js` (I/O partagées shadow/legacy-mcp-inject, gate jscpd). **Parité prouvée par `porte-differential.test.js`** : vieux vs nouveau sur parc réel, contenu injecté à l'octet près, décision miroir du `.rush`, systemMessage identique. Reconcile jour 1 : 0 divergence / 53 payloads réels.
 
 - **DÉRIVE DES 2 SOURCES TROUVÉE ET FERMÉE (17/07/2026)** : le reconcile a hurlé 53/473 la veille de la bascule. Diagnostic : 34 réelles (19 = time-skew de la construction), toutes traçables à **3 règles** dérivées entre `protected-paths.json` (ancien) et les frontmatters (neuf) — la double écriture transitoire avait dérivé DANS LES DEUX SENS : `sitemap-sync.py`+`notify.ts` ajoutés au frontmatter seul (JSON en retard), `specs/tla` (dispatcher-tla-spec) raté par la migration côté frontmatter (le neuf RATAIT = régression). **Fix au mérite** (frontmatter dispatcher ajouté rank 191 ; 2 règles reportées au JSON), ordre vérifié identique vieux/neuf sur les payloads sensibles, miroir resync, journal shadow pollué purgé. **Gate mécanique posé** : `source-drift-gate.test.js` (diff symétrique 586 règles = 0, sens critique distingué, dans test:fast + CI) → cette classe redevient ROUGE au pre-push, jamais découverte à la veille d'une bascule. 497 tests verts.
   ⚠️ Leçon : le `source-drift-gate` (statique, EXHAUSTIF sur 586 règles) est une preuve d'équivalence PLUS FORTE que le reconcile (échantillonné sur trafic). Pour la bascule : gate vert + différentiel de match vert = certitude, sans attendre N jours. Le reconcile devient confirmation, pas gate bloquant.
 
 - **BASCULE FICHIER FAITE (17/07/2026, GO mainteneur)** : `confirm: false` (miroir .rush), porte câblée à la place de l'injection de protect-files, doctor étendu (porte surveillée + negative-checks). Deny/ask sécurité RETIRÉS sur décision explicite du mainteneur (« on s'en tape de la sécurité, pas la priorité ») — réintroduction possible plus tard en hook séparé.
 
-- **✅ FUSION MCP FAITE — HOOK UNIQUE (17/07/2026, GO mainteneur « on fait tout maintenant »)** : `sources/mcp.js` (pur, muté 100% : payload → docs 'mcp/…', decl mode/threshold hérités de servers.{name}) + `gate.js` threshold PAR DOC + `doc-inject.js` aiguille fichier+MCP (fail-open local du corpus MCP, systemMessages composés ' · ') + `mcp-doc-reset.js` purge les 2 stores. **Parité prouvée : `mcp-differential.test.js`** (9 séquences spawn vieux vs nouveau : dumb/once/smart, overrides, granularité 3 niveaux, filtres, enabled/showNotification). Câblage : porte sur `*`, `mcp-doc-inject.js` RETIRÉ (doctor exige son absence — double injection sinon). 525 tests verts, mutation 100,00% (0 survivant, cache purgé), doctor 15/15 sur le câblage réel, preuve vivante des 2 voies par spawn réel.
+- **✅ FUSION MCP FAITE — HOOK UNIQUE (17/07/2026, GO mainteneur « on fait tout maintenant »)** : `sources/mcp.js` (pur, muté 100% : payload → docs 'mcp/…', decl mode/threshold hérités de servers.{name}) + `gate.js` threshold PAR DOC + `doc-inject.js` aiguille fichier+MCP (fail-open local du corpus MCP, systemMessages composés ' · ') + `ctxroute-reset.js` purge les 2 stores. **Parité prouvée : `mcp-differential.test.js`** (9 séquences spawn vieux vs nouveau : dumb/once/smart, overrides, granularité 3 niveaux, filtres, enabled/showNotification). Câblage : porte sur `*`, `legacy-mcp-inject.js` RETIRÉ (doctor exige son absence — double injection sinon). 525 tests verts, mutation 100,00% (0 survivant, cache purgé), doctor 15/15 sur le câblage réel, preuve vivante des 2 voies par spawn réel.
 
 **HORS REPO (autres projets, pas ce framework)** : glue agent-social → vitest ; audit Stryker prospection-mcp/infra/publer ; README/exemples publics (nice-to-have).
 
@@ -649,7 +649,7 @@ AUTOMATIQUES », jamais en sautant des vérifications.
 
 ## ⚠️ MESURES DE LA PHASE 0 — ne pas re-débattre sans nouvelles données
 
-**Purge 30 j** : EXISTE (`mcp-doc-inject.js`, `GC_TTL_MS`, probabiliste, fail-open, testée). Vérifiée le 15/07/2026.
+**Purge 30 j** : EXISTE (`legacy-mcp-inject.js`, `GC_TTL_MS`, probabiliste, fail-open, testée). Vérifiée le 15/07/2026.
 
 **Moteur MCP** : vérité terrain 6/6 (spawn du vrai hook, state isolé) — `dumb` réinjecte, `smart` se tait au 2ᵉ appel, serveur sans doc = silence, outil non-MCP = hors périmètre. **Le moteur est juste.**
 
@@ -664,7 +664,7 @@ AUTOMATIQUES », jamais en sautant des vérifications.
 Cause : **les patterns ne sont PAS des noms de fichiers.** `.test.js` (136 matches × 3 docs) et `.test.mjs` (47) sont des **suffixes VOLONTAIRES** — c'est la famille des docs de convention de test. `demo-`, `browser-recover`, `.dependency-cruiser` sont des préfixes/fragments. Un segment ne vaut jamais `.test.js` → la règle meurt. **Le substring n'est pas un accident, c'est la feature.**
 ⚠️ Le corpus du différentiel ne pouvait PAS voir ça : il est dérivé des règles, pas des vrais fichiers. Toute future idée sur le matching se mesure sur de VRAIS chemins.
 
-**Faux positifs réels** (mesurés, ~41) : `lock.js`→`package-lock.json` (9), `config.js`→`mcp-doc-config.json` (6), `search.js`→`research.json` (3), `paths.js`→`protected-paths.json` (2).
+**Faux positifs réels** (mesurés, ~41) : `lock.js`→`package-lock.json` (9), `config.js`→`ctxroute-config.json` (6), `search.js`→`research.json` (3), `paths.js`→`protected-paths.json` (2).
 → **Problème de DONNÉES, pas de moteur.** Fix = `exclude` sur ces 5 règles (l'outil existe déjà). Rayon de souffle nul.
 
 **⚠️ TROU OUVERT — couverture MCP : 2 serveurs documentés sur 16 branchés.**
@@ -674,7 +674,7 @@ Documentés : `stripe`, `odoo`. Non documentés : **`ssh` (VPS prod)**, **`infra
 
 **`rank` → parent/enfant : IDÉE MESURÉE PUIS ABANDONNÉE (16/07/2026).** Mesuré sur **75 374 vrais fichiers × 568 règles** : 36 séquences co-injectées, 39 paires ordonnées, **0 conflit** (jamais A→B et B→A). MAIS les paires mélangent de vrais parent→enfant (`pointer.md → config-gate.md`) et des **voisins accidentels** (`ssh-async → tests-protocol`) dont l'ordre ne vient que de l'index JSON. Nommer ces 39 contraintes = les relire et les juger À LA MAIN — exactement ce que le refactor interdit (« personne ne relit les règles »). → **`rank` reste** (dérivé de l'index, comportement identique). Règle pour les FUTURES docs sans `rank` (à implémenter dans le loader) : injectées APRÈS les docs rankées, ordre alphabétique (déterministe). Le passage à un ordre sémantique = chantier séparé, humain, post-bascule (même doctrine que `smart` et le tri `confirm`).
 
-**⚠️ DIVERGENCE scope/exclude INTRA-DOC — trou du format frontmatter, MESURÉ (16/07/2026).** Sur 103 docs multi-règles, **31 ont des scopes/excludes DIFFÉRENTS entre leurs règles** (ex. `pointer.md` : `lib-pure.js` scopé `[ctxroute]` mais `mcp-doc-inject.js` sans scope). Le format `match: [a, b]` + UN `scope:` par doc ne peut PAS les représenter — `declaration()` prenait `entries[0]` et aurait perdu/écrasé des scopes EN SILENCE (sur-injection ou doc morte). Fix : clé **`rules:`** = liste JSON inline d'objets `{pattern, scope?, exclude?}` (JSON.parse : total via try/catch, zéro mini-langage, format d'origine des règles). Docs homogènes → `match:` simple (lisible) ; divergentes → `rules:`. `rules` + (`match`/`scope`/`exclude`) = CONTRADICTION rouge. Le parser reste un sous-ensemble plat — JSON inline ≠ YAML.
+**⚠️ DIVERGENCE scope/exclude INTRA-DOC — trou du format frontmatter, MESURÉ (16/07/2026).** Sur 103 docs multi-règles, **31 ont des scopes/excludes DIFFÉRENTS entre leurs règles** (ex. `pointer.md` : `lib-pure.js` scopé `[ctxroute]` mais `legacy-mcp-inject.js` sans scope). Le format `match: [a, b]` + UN `scope:` par doc ne peut PAS les représenter — `declaration()` prenait `entries[0]` et aurait perdu/écrasé des scopes EN SILENCE (sur-injection ou doc morte). Fix : clé **`rules:`** = liste JSON inline d'objets `{pattern, scope?, exclude?}` (JSON.parse : total via try/catch, zéro mini-langage, format d'origine des règles). Docs homogènes → `match:` simple (lisible) ; divergentes → `rules:`. `rules` + (`match`/`scope`/`exclude`) = CONTRADICTION rouge. Le parser reste un sous-ensemble plat — JSON inline ≠ YAML.
 
 ## Latence — déjà mesuré, ne pas re-débattre
 
@@ -714,9 +714,9 @@ Hypothèse NON vérifiée : 430 ms est ~6-10× la normale (30-80 ms) ; cause pro
 ## 17/07/2026 — DETTE COSMÉTIQUE (backlog FROID — NE PAS agir, NE PAS relancer)
 ⚠️ CECI N'EST PAS UNE TÂCHE. Aucun agent ne doit la ressortir comme « à faire », ni mettre la moindre pression dessus. Elle est notée UNIQUEMENT pour mémoire, pas pour action. Si tu es un agent qui lit ceci : ne propose PAS de la traiter, ne la signale PAS comme un manque, ne l'audite PAS comme un défaut. Elle est VOLONTAIREMENT laissée en l'état — c'est le bon état.
 - **Quoi** : les deux sources formatent leur badge de notification différemment — `fileAdapter` via `gate.docLabel`, `mcpAdapter` via `formatSystemMessage`/`shouldShowNotification` (source-adapters.js). Deux « dialectes » de notif.
-- **Pourquoi c'est là et pourquoi c'est CORRECT** : chaque source réplique À L'IDENTIQUE le badge de son ancêtre (protect-files.js / mcp-doc-inject.js) — c'est une CONTRAINTE DE PARITÉ, exigée par les tests différentiels de bascule. Y toucher MAINTENANT casserait le différentiel. L'asymétrie est donc la BONNE décision tant que les reliques vivent.
+- **Pourquoi c'est là et pourquoi c'est CORRECT** : chaque source réplique À L'IDENTIQUE le badge de son ancêtre (protect-files.js / legacy-mcp-inject.js) — c'est une CONTRAINTE DE PARITÉ, exigée par les tests différentiels de bascule. Y toucher MAINTENANT casserait le différentiel. L'asymétrie est donc la BONNE décision tant que les reliques vivent.
 - **Impact réel** : zéro. Aucun bug, aucune régression, aucune dette technique fonctionnelle. Purement cosmétique (deux chemins de formatage au lieu d'un).
-- **Le jour LOINTAIN où ça pourrait bouger** (et seulement si le mainteneur le décide, jamais un agent) : après le retrait définitif de protect-files.js ET mcp-doc-inject.js, quand la contrainte de parité octet n'existe plus. À ce moment SEULEMENT, unifier les deux `message()` derrière un formateur paramétré unique. Pas avant. Pas de deadline. Pas de rappel.
+- **Le jour LOINTAIN où ça pourrait bouger** (et seulement si le mainteneur le décide, jamais un agent) : après le retrait définitif de protect-files.js ET legacy-mcp-inject.js, quand la contrainte de parité octet n'existe plus. À ce moment SEULEMENT, unifier les deux `message()` derrière un formateur paramétré unique. Pas avant. Pas de deadline. Pas de rappel.
 - Audit yeux-neufs 17/07/2026 : architecture MCP/fichier notée 9/10, séparation JUSTIFIÉE (deux moteurs de matching réellement distincts, pipeline unique mutualisé). Ce point est le SEUL écart au 10, et il est explicitement classé « ne rien faire maintenant ».
 
 ## 18/07/2026 — BACKLOG : cadence `smart` & dérive de contexte (brainstorm, PAS urgent)
@@ -781,7 +781,7 @@ Donc : nouveau hook + modif de gate.js (pur, muté 100%, sous 2 différentiels d
    → les différentiels restent verts pour les cas par défaut (ne pas casser la parité).
 5. **declFor (cascade)** : ajouter driftUnit à la cascade 3 étages, DANS sources/skill.js ET
    dans la voie docs (frontmatter.js + sources/mcp.js declFor). Réutiliser le pattern cascade existant.
-6. **mcp-doc-reset.js** (PreCompact) : reset des DEUX compteurs (tool + turn).
+6. **ctxroute-reset.js** (PreCompact) : reset des DEUX compteurs (tool + turn).
 7. **settings.json** (PROD, prudence) : câbler le hook UserPromptSubmit. Prouver sur COPIE d'abord.
 8. **doctor.js** : Probe « compteur turn incrémente » + négative-check dans doctor.test.js
    (saboter la porte turn → doctor hurle « voie turn »). cloneFrameworkWithSources si besoin.
@@ -1025,3 +1025,24 @@ accents du fichier Codex. Un remplacement de texte sur un fichier UTF-8 se fait 
 ⚠️ **RESTE OUVERT** : le worktree périmé `~/Desktop/mcp-doc-hooks-paquets` (branche
 `chantier-paquets`, 8 règles de pureté inertes) porte encore l'ancien nom — décision du mainteneur
 en attente.
+
+### Volet 2 — les IDENTIFIANTS INTERNES (fait dans la foulée, 04/08/2026)
+
+Le nom du framework ne suffisait pas : **6 fichiers et 13 variables d'environnement** portaient encore
+le préfixe `mcp-doc`. Un installeur ouvrait `ctxroute` et y trouvait `mcp-doc-config.json` —
+incohérent pour un projet qui vise un standard public.
+- `mcp-doc-reset.js` → **`ctxroute-reset.js`** (câblé dans les DEUX harnais, migrés)
+- `mcp-doc-inject.js` → **`legacy-mcp-inject.js`** (relique = oracle du différentiel ; le nouveau nom
+  DIT enfin ce que c'est : le moteur MCP-only d'avant la fusion du 17/07)
+- `mcp-doc-config.json` / `.schema.json` / `.example` → **`ctxroute-config.*`**
+- `MCP_DOC_*` → **`CTXROUTE_*`** (13 variables) · préfixes de store `mcp-doc-seen-`,
+  `mcp-doc-doctor-`, `mcp-doc-wiring-`… → `ctxroute-*`
+- 5 fichiers d'état orphelins `state/mcp-doc-seen-*.json` (moteur legacy, jamais écrits en prod)
+  supprimés.
+- Les hooks PERSONNELS du mainteneur (`~/.claude/hooks/deadline.js`, `gate-disabled.js`) suivaient
+  la même convention : alignés aussi. ⚠️ Aucun changement de comportement — **rien ne définit ces
+  variables en prod**, elles ne servent qu'aux tests.
+Preuves : 866 tests · doctor VERT sur les deux harnais · couplage vert (47 modules / 144 deps) ·
+injection réelle re-prouvée par spawn (positif 3 428 c. / négatif silencieux).
+⚠️ Il ne reste `mcp-doc` NULLE PART, sauf les deux mentions HISTORIQUES de ce document et le
+worktree périmé `mcp-doc-hooks-paquets`.

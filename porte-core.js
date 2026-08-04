@@ -48,7 +48,7 @@ const STORE_PREFIX = 'doc-seen-';
 //    `once` ⇒ les suivants décident « rien à injecter » ⇒ paquets 2..N VIDES.
 //    Ici, le premier arrivé décide et range sa décision ; les autres la
 //    RELISENT. Le découpage, lui, est pur et déterministe : chacun le
-//    recalcule et n'émet que son indice. Purgé par mcp-doc-reset.js.
+//    recalcule et n'émet que son indice. Purgé par ctxroute-reset.js.
 const PLAN_PREFIX = 'plan-';
 // Compteur de TOURS (porte turn-count.js, UserPromptSubmit) — préfixe distinct.
 const TURN_PREFIX = 'turn-count-';
@@ -156,7 +156,7 @@ function run(data, emit, options) {
       //    l'état), tous recalculent le MÊME découpage par déterminisme pur.
       //    N'importe lequel peut être le premier — c'est sans importance.
       // ⚠️ Clé PRÉFIXÉE PAR LA SESSION (et non l'invocation seule) : c'est ce
-      //    qui rend le plan purgeable par `mcp-doc-reset.js`, qui balaie par
+      //    qui rend le plan purgeable par `ctxroute-reset.js`, qui balaie par
       //    préfixe de session. Une clé orpheline ne serait nettoyée que par le
       //    GC de TTL — un déchet silencieux, exactement ce qu'on refuse.
       const clePlan = sessionId + '--inv-' + invocationId;

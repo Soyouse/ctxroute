@@ -6,7 +6,7 @@
 //    HUMAIN L'UTILISE (CLI + argv + exit code). Un test in-process validerait
 //    des fonctions, pas l'outil.
 //
-// ⚠️ PARC JETABLE OBLIGATOIRE (MCP_DOC_FILEDOCS_DIR) : écrire une doc de test
+// ⚠️ PARC JETABLE OBLIGATOIRE (CTXROUTE_FILEDOCS_DIR) : écrire une doc de test
 //    dans le vrai parc l'injecterait CHEZ TOUS LES AGENTS qui tournent en
 //    parallèle. Le parc réel est de la PROD.
 //
@@ -41,7 +41,7 @@ function parcAvec(docs) {
 function lancer(args, parc) {
   return execFileSync(process.execPath, [EXPLAIN, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, MCP_DOC_FILEDOCS_DIR: parc },
+    env: { ...process.env, CTXROUTE_FILEDOCS_DIR: parc },
   });
 }
 const json = (args, parc) => JSON.parse(lancer([...args, '--json'], parc));
@@ -143,7 +143,7 @@ test('LECTURE SEULE : explain n\'écrit JAMAIS dans le store de session', () => 
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'explain-state-'));
   execFileSync(process.execPath, [EXPLAIN, '--file', 'C:/projet/gate.js', '--json'], {
     encoding: 'utf8',
-    env: { ...process.env, MCP_DOC_FILEDOCS_DIR: parc, MCP_DOC_STATE_DIR: stateDir },
+    env: { ...process.env, CTXROUTE_FILEDOCS_DIR: parc, CTXROUTE_STATE_DIR: stateDir },
   });
   assert.deepEqual(fs.readdirSync(stateDir), [], 'aucun fichier d\'état ne doit être créé');
 });

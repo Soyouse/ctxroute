@@ -2,9 +2,9 @@
 
 ## 1.4.0
 
-**Bug le plus grave du projet, corrigé** : `mcp-doc-config.json` était committé avec des résidus de FIXTURE de test (`filterMode: "whitelist"`, `filterList: ["testserver999"]`) — depuis le 1er commit. Le framework tournait, sortait `exit(0)` à chaque appel MCP et n'injectait RIEN pour stripe/odoo. L'incident Stripe qui a motivé tout ce repo n'était donc PAS couvert, pendant des jours, **en silence, avec 100% des tests verts**.
+**Bug le plus grave du projet, corrigé** : `ctxroute-config.json` était committé avec des résidus de FIXTURE de test (`filterMode: "whitelist"`, `filterList: ["testserver999"]`) — depuis le 1er commit. Le framework tournait, sortait `exit(0)` à chaque appel MCP et n'injectait RIEN pour stripe/odoo. L'incident Stripe qui a motivé tout ce repo n'était donc PAS couvert, pendant des jours, **en silence, avec 100% des tests verts**.
 
-- **Cause racine supprimée** : les tests d'intégration écrivaient dans le VRAI fichier de config et « restauraient l'original » — lequel était déjà pollué (boucle circulaire). Les fixtures vivent maintenant dans un tmpdir jetable (`MCP_DOC_CONFIG_PATH`). Un test n'écrit JAMAIS dans un fichier livré.
+- **Cause racine supprimée** : les tests d'intégration écrivaient dans le VRAI fichier de config et « restauraient l'original » — lequel était déjà pollué (boucle circulaire). Les fixtures vivent maintenant dans un tmpdir jetable (`CTXROUTE_CONFIG_PATH`). Un test n'écrit JAMAIS dans un fichier livré.
 - **`config-gate.test.js`** (nouveau) : tout serveur ayant une doc DOIT être couvert par la config livrée. Aucun résidu de fixture ne peut plus atteindre le repo.
 - **`doctor.js`** (nouveau, dead-man switch) : spawne le vrai hook en isolation et vérifie qu'il injecte RÉELLEMENT, + vérifie le câblage `settings.json` (qui vit hors du repo, donc qu'aucun test ne pouvait voir). Câblé en SessionStart `--quiet` : muet s'il est vivant, hurle s'il est mort. `doctor.test.js` le sabote (sur copie tmpdir) pour prouver qu'il se déclenche — un dead-man switch jamais testé est une fausse confiance.
 - **SÉCURITÉ — path traversal fermé** : `subTool` (issu de `tool_input`, donc de données potentiellement externes) composait un chemin sans filtrage → `../../..` sortait de `docs/mcp/` et injectait un `.md` arbitraire du disque dans le contexte de l'agent **comme une consigne faisant autorité** (injection de prompt). Nouveau `isSafePathSegment()`, appliqué à TOUS les segments.
@@ -34,10 +34,10 @@
 
 ## 1.2.0
 
-- **Isolation décision/I/O** : logique décisionnelle extraite dans `lib-pure.js` (zéro fs/path/process, 66 tests unitaires purs) — `mcp-doc-inject.js`/`mcp-doc-reset.js` deviennent de purs points d'I/O.
+- **Isolation décision/I/O** : logique décisionnelle extraite dans `lib-pure.js` (zéro fs/path/process, 66 tests unitaires purs) — `legacy-mcp-inject.js`/`ctxroute-reset.js` deviennent de purs points d'I/O.
 - **Mutation testing Stryker** sur `lib-pure.js` : 99.15% (117/118 mutants tués, 1 survivant documenté comme équivalent — chaîne interne à Stryker non observable en usage réel). Break threshold 99, cliquet jamais baissé.
 - **Lock cross-process** (`lock.js`, `fs.mkdirSync` atomique) : corrige une race condition réelle sur `state/*.json` en cas d'appels MCP parallèles (Claude Code peut lancer des outils indépendants en parallèle). Prouvé par un test de charge (20 appels concurrents, aucune écriture perdue).
-- **Couplage implicite éliminé** : `stdin-json.js` extrait (duplication détectée par `jscpd` entre les 2 hooks) ; `sanitizeSessionId` centralisé dans `lib-pure.js` (était dupliqué dans `mcp-doc-reset.js`). `dependency-cruiser` + `jscpd` gatés en CI (0 violation, 0 clone).
+- **Couplage implicite éliminé** : `stdin-json.js` extrait (duplication détectée par `jscpd` entre les 2 hooks) ; `sanitizeSessionId` centralisé dans `lib-pure.js` (était dupliqué dans `ctxroute-reset.js`). `dependency-cruiser` + `jscpd` gatés en CI (0 violation, 0 clone).
 - 100 tests au total (66 unitaires + 34 intégration, dont 1 test de concurrence réelle).
 
 ## 1.1.0

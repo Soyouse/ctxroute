@@ -19,12 +19,12 @@ Un serveur MCP (Stripe, Odoo, SSH...) est une frontière à risque au même titr
     "PreToolUse": [
       {
         "matcher": "mcp__.*",
-        "hooks": [{ "type": "command", "command": "node /chemin/vers/ctxroute/mcp-doc-inject.js", "timeout": 5 }]
+        "hooks": [{ "type": "command", "command": "node /chemin/vers/ctxroute/legacy-mcp-inject.js", "timeout": 5 }]
       }
     ],
     "PreCompact": [
       {
-        "hooks": [{ "type": "command", "command": "node /chemin/vers/ctxroute/mcp-doc-reset.js", "timeout": 5 }]
+        "hooks": [{ "type": "command", "command": "node /chemin/vers/ctxroute/ctxroute-reset.js", "timeout": 5 }]
       }
     ]
   }
@@ -36,15 +36,15 @@ Un serveur MCP (Stripe, Odoo, SSH...) est une frontière à risque au même titr
 
 ## Comment ça marche
 
-Claude Code ne connaît que le chemin absolu du `command` déclaré dans `settings.json` — le dossier peut vivre n'importe où. La seule contrainte : les fichiers `mcp-doc-inject.js`, `mcp-doc-reset.js`, `mcp-doc-config.json`, `docs/mcp/` et `state/` utilisent des chemins **relatifs entre eux** (`__dirname`) — ils doivent rester ensemble comme un bloc.
+Claude Code ne connaît que le chemin absolu du `command` déclaré dans `settings.json` — le dossier peut vivre n'importe où. La seule contrainte : les fichiers `legacy-mcp-inject.js`, `ctxroute-reset.js`, `ctxroute-config.json`, `docs/mcp/` et `state/` utilisent des chemins **relatifs entre eux** (`__dirname`) — ils doivent rester ensemble comme un bloc.
 
-- **`mcp-doc-inject.js`** (hook `PreToolUse`, matcher `mcp__.*`) : au 1er appel d'un outil `mcp__{server}__*` de la session, injecte `docs/mcp/{server}.md` (si le fichier existe) en `additionalContext`.
-- **`mcp-doc-reset.js`** (hook `PreCompact`) : vide l'état de session à chaque compaction — le contexte étant réellement vidé, la doc doit pouvoir se réinjecter.
-- **`mcp-doc-config.json`** : configure le mode et les seuils.
+- **`legacy-mcp-inject.js`** (hook `PreToolUse`, matcher `mcp__.*`) : au 1er appel d'un outil `mcp__{server}__*` de la session, injecte `docs/mcp/{server}.md` (si le fichier existe) en `additionalContext`.
+- **`ctxroute-reset.js`** (hook `PreCompact`) : vide l'état de session à chaque compaction — le contexte étant réellement vidé, la doc doit pouvoir se réinjecter.
+- **`ctxroute-config.json`** : configure le mode et les seuils.
 
 Détails d'implémentation, format du store, invariants internes : voir `HOOK-INTERNALS.md`.
 
-## Configuration (`mcp-doc-config.json`)
+## Configuration (`ctxroute-config.json`)
 
 ```json
 {
@@ -101,7 +101,7 @@ Le repo sépare strictement la **décision** (pure, testable/mutable) de l'**I/O
 - `lib-pure.js` — logique décisionnelle pure, ZÉRO import fs/path/process. Testée par `lib-pure.test.js` (tests unitaires directs, pas de spawn) et mutée par Stryker.
 - `lock.js` — lock cross-process (`fs.mkdirSync` atomique) pour sérialiser les accès concurrents à `state/`. Testé par `lock.test.js`, y compris le scénario "checkout frais" (dossier parent inexistant) qui a réellement cassé en CI.
 - `stdin-json.js` — lecture stdin → JSON, partagée par tous les hooks (extrait après détection de duplication par `jscpd`).
-- `mcp-doc-inject.js` / `mcp-doc-reset.js` — les 2 hooks eux-mêmes, seuls points d'I/O, consomment `lib-pure.js`/`lock.js`/`stdin-json.js`/`paths.js`.
+- `legacy-mcp-inject.js` / `ctxroute-reset.js` — les 2 hooks eux-mêmes, seuls points d'I/O, consomment `lib-pure.js`/`lock.js`/`stdin-json.js`/`paths.js`.
 - `paths.js` — source unique des chemins (config/docs/state). Aucun `path.join(__dirname, ...)` ad-hoc ailleurs : deux copies d'un même chemin divergent en silence.
 - `doctor.js` — **dead-man switch**. Un hook mort est indiscernable d'un hook absent : aucune erreur, aucun log, juste plus de doc injectée. `doctor.js` spawne le vrai hook et vérifie qu'il injecte réellement, puis (avec `--settings`) que le câblage pointe vers des fichiers existants.
 
@@ -125,14 +125,14 @@ npm run doctor         # le framework est-il vivant, ici et maintenant ?
 
 - `lib-pure.test.js` — tests unitaires purs (appel direct des fonctions, zéro spawn).
 - `lock.test.js` — tests dédiés au lock (contention, lock stale forcé, propagation d'exception, ET la régression "checkout frais" trouvée en CI).
-- `mcp-doc-inject.test.js` — tests d'intégration (spawn les hooks en process enfant, y compris un test de **concurrence réelle** : 20 appels parallèles sur la même session, preuve empirique que le lock cross-process ne perd aucune écriture). Les fixtures de config vivent en tmpdir (`MCP_DOC_CONFIG_PATH`) : un test n'écrit **jamais** dans un fichier livré.
+- `legacy-mcp-inject.test.js` — tests d'intégration (spawn les hooks en process enfant, y compris un test de **concurrence réelle** : 20 appels parallèles sur la même session, preuve empirique que le lock cross-process ne perd aucune écriture). Les fixtures de config vivent en tmpdir (`CTXROUTE_CONFIG_PATH`) : un test n'écrit **jamais** dans un fichier livré.
 - `lib-pure.property.test.js` — **property-based** (`fast-check`) : invariants de sécurité (aucun chemin ne peut sortir de `docs/mcp/`, quel que soit l'input) et de totalité (aucune fonction ne lève). Un test par cas ne couvre que les entrées auxquelles l'auteur a pensé — pour un parseur, c'est précisément l'angle mort.
 - `config-gate.test.js` — la config **committée** doit couvrir tout serveur documenté. Une doc écrite mais jamais injectée est pire que pas de doc : c'est une fausse sécurité.
 - `doctor.test.js` — **negative-check** : sabote une copie du framework (tmpdir) et exige que `doctor.js` sorte en ≠ 0. Un dead-man switch qui ne se déclenche jamais ne prouve rien.
 
 ## Hygiène — purge automatique de `state/`
 
-Chaque session Claude Code produit un fichier `state/mcp-doc-seen-<session_id>.json`. Sans purge, ce dossier grossirait indéfiniment sur un usage long terme. Le hook `mcp-doc-inject.js` purge probabilistement (~1 appel sur 50, pour éviter un `readdir`/`stat` coûteux à chaque invocation) les fichiers dont le `mtime` dépasse 30 jours. Réglable via variables d'environnement (usage tests uniquement) : `MCP_DOC_GC_PROBABILITY`, `MCP_DOC_GC_TTL_MS`.
+Chaque session Claude Code produit un fichier `state/ctxroute-seen-<session_id>.json`. Sans purge, ce dossier grossirait indéfiniment sur un usage long terme. Le hook `legacy-mcp-inject.js` purge probabilistement (~1 appel sur 50, pour éviter un `readdir`/`stat` coûteux à chaque invocation) les fichiers dont le `mtime` dépasse 30 jours. Réglable via variables d'environnement (usage tests uniquement) : `CTXROUTE_GC_PROBABILITY`, `CTXROUTE_GC_TTL_MS`.
 
 ## Licence
 

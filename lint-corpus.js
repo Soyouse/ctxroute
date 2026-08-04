@@ -5,7 +5,7 @@
 //
 // ⚠️ SEUL point d'I/O de l'audit du parc. `lint.js` (pur) DÉCIDE, ce fichier
 //    ne fait que lui fournir un état. Même séparation que
-//    mcp-doc-inject.js / lib-pure.js — c'est la CONDITION pour muter la
+//    legacy-mcp-inject.js / lib-pure.js — c'est la CONDITION pour muter la
 //    décision sans bruit, pas un confort.
 //
 // ⚠️ LE POINT DE MAINTENABILITÉ CENTRAL — la NORMALISATION vit ICI :
@@ -40,7 +40,7 @@ const { rulesFromCorpus } = require('./loader');
 //    chemin du home de qui que ce soit. D'où l'env var + le défaut relatif.
 //    ⚠️ NE JAMAIS coder en dur un chemin du mainteneur ici.
 function hooksDir() {
-  return process.env.MCP_DOC_HOOKS_DIR || path.join(require('os').homedir(), '.claude', 'hooks');
+  return process.env.CTXROUTE_HOOKS_DIR || path.join(require('os').homedir(), '.claude', 'hooks');
 }
 
 function lireJSON(p) {
@@ -124,7 +124,7 @@ function serveursMCP(home) {
 function collecter() {
   const HOOKS = hooksDir();
   const DOCS = path.join(HOOKS, 'docs');
-  const home = process.env.MCP_DOC_HOME || require('os').homedir();
+  const home = process.env.CTXROUTE_HOME || require('os').homedir();
 
   // ⚠️ SOURCE UNIQUE = LES FRONTMATTERS (27/07/2026). `protected-paths.json` était
   //    la vérité de l'ANCIEN moteur (`protect-files.js`), remplacé par la porte
@@ -149,7 +149,7 @@ function collecter() {
   //    quelque chose, un résultat vert ne vaut RIEN.
   if (!regles.length) {
     console.error(`🚨 lint-corpus : AUCUNE règle chargée depuis les frontmatters de ${DOCS}`);
-    console.error('   Le lint ne peut RIEN prouver dans cet état (harnais creux). Vérifie MCP_DOC_HOOKS_DIR.');
+    console.error('   Le lint ne peut RIEN prouver dans cet état (harnais creux). Vérifie CTXROUTE_HOOKS_DIR.');
     process.exit(2);
   }
 
@@ -170,7 +170,7 @@ function collecter() {
   const surDisqueSet = new Set(surDisque);
   const docsFantomes = [...reglesParDoc.keys()].filter((d) => !surDisqueSet.has(d));
 
-  const config = lireJSON(path.join(__dirname, 'mcp-doc-config.json')) || {};
+  const config = lireJSON(path.join(__dirname, 'ctxroute-config.json')) || {};
   const docsMcpDir = path.join(__dirname, 'docs', 'mcp');
   let serveursDocumentes = [];
   try {

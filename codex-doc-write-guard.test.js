@@ -20,7 +20,7 @@ function run(payload) {
   return new Promise((resolve) => {
     const child = execFile(process.execPath, [HOOK], {
       encoding: 'utf8',
-      env: { ...process.env, MCP_DOC_FILEDOCS_DIR: FILEDOCS },
+      env: { ...process.env, CTXROUTE_FILEDOCS_DIR: FILEDOCS },
     }, (err, stdout) => resolve({ code: err ? err.code : 0, stdout }));
     child.stdin.end(JSON.stringify(payload));
   });

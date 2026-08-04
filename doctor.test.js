@@ -38,7 +38,7 @@ function runDoctor(cwdDoctor, args = []) {
 
 // Copie du framework dans un tmpdir jetable → terrain de sabotage sûr.
 function cloneFramework() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-sabotage-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-sabotage-'));
   for (const f of fs.readdirSync(import.meta.dirname)) {
     if (f.endsWith('.js') && !f.endsWith('.test.js')) fs.copyFileSync(path.join(import.meta.dirname, f), path.join(tmp, f));
   }
@@ -74,7 +74,7 @@ function cloneFrameworkWithSources() {
 {
   const tmp = cloneFramework();
   try {
-    fs.writeFileSync(path.join(tmp, 'mcp-doc-inject.js'), 'throw new Error("sabotage");\n');
+    fs.writeFileSync(path.join(tmp, 'legacy-mcp-inject.js'), 'throw new Error("sabotage");\n');
     const r = runDoctor(path.join(tmp, 'doctor.js'));
     ok('hook qui CRASHE → doctor exit ≠ 0', r.status !== 0);
     ok('hook qui CRASHE → doctor hurle sur stderr', r.stderr.includes('CASSÉ'));
@@ -89,7 +89,7 @@ function cloneFrameworkWithSources() {
 {
   const tmp = cloneFramework();
   try {
-    fs.writeFileSync(path.join(tmp, 'mcp-doc-inject.js'), 'process.exit(0);\n');
+    fs.writeFileSync(path.join(tmp, 'legacy-mcp-inject.js'), 'process.exit(0);\n');
     const r = runDoctor(path.join(tmp, 'doctor.js'));
     ok('hook SILENCIEUX (exit 0, aucune injection) → doctor exit ≠ 0', r.status !== 0);
     ok('hook SILENCIEUX → doctor nomme la mort silencieuse', r.stderr.includes('N\'INJECTE RIEN') || r.stderr.includes('stdout illisible ou vide'));
@@ -148,7 +148,7 @@ function cloneFrameworkWithSources() {
 {
   const tmp = cloneFrameworkWithSources();
   try {
-    fs.writeFileSync(path.join(tmp, 'mcp-doc-reset.js'), 'process.stdin.resume(); process.stdin.on("end", () => process.exit(0)); process.stdin.on("data", () => {});\n');
+    fs.writeFileSync(path.join(tmp, 'ctxroute-reset.js'), 'process.stdin.resume(); process.stdin.on("end", () => process.exit(0)); process.stdin.on("data", () => {});\n');
     const r = runDoctor(path.join(tmp, 'doctor.js'));
     ok('reset muet (exit 0 sans effacer) → doctor exit ≠ 0', r.status !== 0);
     ok('reset muet → doctor nomme les stores survivants', r.stderr.includes('SURVIVENT'));
@@ -196,7 +196,7 @@ function cloneFrameworkWithSources() {
 // ── Cas 7 — NEGATIVE : câblage CODEX incomplet / double injection ──
 // Le câblage Codex vit hors du repo (~/.codex) : seule couverture = --codex-hooks.
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-codex-wiring-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-codex-wiring-'));
   try {
     const repo = import.meta.dirname;
     // 7a — hooks.json Codex qui câble l'ANCIEN protect-files EN PLUS de la coquille
@@ -206,7 +206,7 @@ function cloneFrameworkWithSources() {
       { command: `node ${path.join(repo, 'codex-doc-inject.js')}` },
       { command: `node ${path.join(tmp, 'protect-files.js')}` },
       { command: `node ${path.join(repo, 'codex-doc-write-guard.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-reset.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
       { command: `node ${path.join(repo, 'session-inject.js')}` },
     ] }] } }));
     const r = runDoctor(DOCTOR, ['--codex-hooks', hooksPath]);
@@ -218,7 +218,7 @@ function cloneFrameworkWithSources() {
     fs.writeFileSync(hooksPath, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
       { command: `node ${path.join(repo, 'codex-doc-inject.js')}` },
       { command: `node ${path.join(repo, 'codex-doc-write-guard.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-reset.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
       { command: `node ${path.join(repo, 'session-inject.js')}` },
       { command: `node ${path.join(repo, 'turn-count.js')}` },
     ] }] } }));
@@ -229,7 +229,7 @@ function cloneFrameworkWithSources() {
     fs.writeFileSync(hooksPath, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
       { command: `node ${path.join(tmp, 'codex-doc-inject.js')}` },
       { command: `node ${path.join(repo, 'codex-doc-write-guard.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-reset.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
       { command: `node ${path.join(repo, 'session-inject.js')}` },
       { command: `node ${path.join(repo, 'turn-count.js')}` },
     ] }] } }));
@@ -242,12 +242,12 @@ function cloneFrameworkWithSources() {
 // ── Cas 4 — NEGATIVE : settings.json pointe vers un fichier inexistant ──
 // La mort silencieuse la plus probable : le câblage vit hors du repo.
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-wiring-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-wiring-'));
   try {
     const settings = path.join(tmp, 'settings.json');
     fs.writeFileSync(settings, JSON.stringify({
-      hooks: { PreToolUse: [{ hooks: [{ command: `node ${path.join(tmp, 'disparu', 'mcp-doc-inject.js')}` }] }],
-               PreCompact: [{ hooks: [{ command: `node ${path.join(tmp, 'disparu', 'mcp-doc-reset.js')}` }] }] },
+      hooks: { PreToolUse: [{ hooks: [{ command: `node ${path.join(tmp, 'disparu', 'legacy-mcp-inject.js')}` }] }],
+               PreCompact: [{ hooks: [{ command: `node ${path.join(tmp, 'disparu', 'ctxroute-reset.js')}` }] }] },
     }));
     const r = runDoctor(DOCTOR, ['--settings', settings]);
     ok('câblage vers un fichier INEXISTANT → doctor exit ≠ 0', r.status !== 0);
@@ -257,7 +257,7 @@ function cloneFrameworkWithSources() {
 
 // ── Cas 5 — NEGATIVE : settings.json ne câble pas le framework du tout ──
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-wiring2-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-wiring2-'));
   try {
     const settings = path.join(tmp, 'settings.json');
     fs.writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ command: 'node autre-hook.js' }] }] } }));
@@ -266,7 +266,7 @@ function cloneFrameworkWithSources() {
     // Depuis la fusion (17/07/2026) : il doit nommer les DEUX câblages manquants
     // (porte = injecteur unique, reset = réinjection post-compaction).
     ok('framework NON câblé → doctor nomme la porte absente', r.stderr.includes('doc-inject.js absent'));
-    ok('framework NON câblé → doctor nomme le reset absent', r.stderr.includes('mcp-doc-reset.js absent'));
+    ok('framework NON câblé → doctor nomme le reset absent', r.stderr.includes('ctxroute-reset.js absent'));
     ok('framework NON câblé → doctor nomme la porte session absente', r.stderr.includes('session-inject.js absent'));
     ok('framework NON câblé → doctor nomme la garde d\'écriture absente', r.stderr.includes('doc-write-guard.js absent'));
     ok('framework NON câblé → doctor nomme la porte TOUR absente', r.stderr.includes('turn-count.js absent'));
@@ -277,13 +277,13 @@ function cloneFrameworkWithSources() {
 // Depuis la bascule (17/07/2026), doc-inject.js injecte les docs FICHIER. Câbler le
 // reste sans la porte = plus aucune doc fichier, en silence. Le doctor DOIT hurler.
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-wiring3-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-wiring3-'));
   try {
     const settings = path.join(tmp, 'settings.json');
-    const repo = import.meta.dirname; // mcp-doc-inject/reset EXISTENT et sont CE repo → seul le check porte tombe.
+    const repo = import.meta.dirname; // legacy-mcp-inject/reset EXISTENT et sont CE repo → seul le check porte tombe.
     fs.writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
-      { command: `node ${path.join(repo, 'mcp-doc-inject.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-reset.js')}` },
+      { command: `node ${path.join(repo, 'legacy-mcp-inject.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
     ] }] } }));
     const r = runDoctor(DOCTOR, ['--settings', settings]);
     ok('PORTE non câblée → doctor exit ≠ 0', r.status !== 0);
@@ -291,18 +291,18 @@ function cloneFrameworkWithSources() {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
-// ── Cas 5c — NEGATIVE : mcp-doc-inject.js ENCORE câblé à côté de la porte ──
+// ── Cas 5c — NEGATIVE : legacy-mcp-inject.js ENCORE câblé à côté de la porte ──
 // Depuis la fusion (17/07/2026), la porte couvre aussi le MCP : laisser le
 // legacy câblé = docs MCP injectées EN DOUBLE (tokens brûlés). Doctor DOIT hurler.
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-wiring4-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-wiring4-'));
   try {
     const settings = path.join(tmp, 'settings.json');
     const repo = import.meta.dirname; // porte + reset câblés et valides → seul le check anti-double tombe.
     fs.writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
       { command: `node ${path.join(repo, 'doc-inject.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-inject.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-reset.js')}` },
+      { command: `node ${path.join(repo, 'legacy-mcp-inject.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
     ] }] } }));
     const r = runDoctor(DOCTOR, ['--settings', settings]);
     ok('legacy encore câblé → doctor exit ≠ 0', r.status !== 0);
@@ -314,13 +314,13 @@ function cloneFrameworkWithSources() {
 // Depuis le 17/07/2026, docs/session/ est injecté par session-inject.js en
 // SessionStart : l'oublier = plus de savoir de session, en silence.
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-wiring5-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-wiring5-'));
   try {
     const settings = path.join(tmp, 'settings.json');
     const repo = import.meta.dirname; // porte + reset câblés et valides → seul le check session tombe.
     fs.writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
       { command: `node ${path.join(repo, 'doc-inject.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-reset.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
     ] }] } }));
     const r = runDoctor(DOCTOR, ['--settings', settings]);
     ok('porte SESSION non câblée → doctor exit ≠ 0', r.status !== 0);
@@ -332,13 +332,13 @@ function cloneFrameworkWithSources() {
 // driftUnit 'turn' sans son capteur = compteur figé = docs jamais réinjectées,
 // en silence. Le doctor DOIT nommer précisément le câblage manquant.
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-doc-wiring6-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-wiring6-'));
   try {
     const settings = path.join(tmp, 'settings.json');
     const repo = import.meta.dirname; // porte + reset + session + garde câblés → seul le check turn tombe.
     fs.writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
       { command: `node ${path.join(repo, 'doc-inject.js')}` },
-      { command: `node ${path.join(repo, 'mcp-doc-reset.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
       { command: `node ${path.join(repo, 'session-inject.js')}` },
       { command: `node ${path.join(repo, 'doc-write-guard.js')}` },
     ] }] } }));
@@ -352,8 +352,8 @@ function cloneFrameworkWithSources() {
 // Config utilisateur gitignorée (19/07/2026) : réelle si présente (machine
 // installée), sinon le .example livré (clone vierge/CI) — même invariant.
 {
-  const real = path.join(import.meta.dirname, 'mcp-doc-config.json');
-  const cfg = fs.existsSync(real) ? real : path.join(import.meta.dirname, 'mcp-doc-config.json.example');
+  const real = path.join(import.meta.dirname, 'ctxroute-config.json');
+  const cfg = fs.existsSync(real) ? real : path.join(import.meta.dirname, 'ctxroute-config.json.example');
   const before = fs.readFileSync(cfg, 'utf8');
   runDoctor(DOCTOR);
   const after = fs.readFileSync(cfg, 'utf8');

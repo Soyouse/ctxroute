@@ -67,7 +67,7 @@ function driftUnitForDoc(config, decl) {
 /**
  * LA décision de la porte. PURE — ne mute AUCUN argument.
  *
- * @param {object} config  - mcp-doc-config.json (mode, defaultThreshold, confirm…)
+ * @param {object} config  - ctxroute-config.json (mode, defaultThreshold, confirm…)
  * @param {object} decls   - { [doc]: frontmatter } de TOUT le corpus (modes des
  *                           docs « étrangères » nécessaires aux compteurs smart).
  * @param {string[]} matched - docs matchées par la source, ORDRE = ordre d'injection.
@@ -89,7 +89,7 @@ function decide(config, decls, matched, toolName, state, turnCount) {
   const next = {};
   let changed = false;
 
-  // ⚠️ COMPTEURS INDÉPENDANTS PAR DOC (même doctrine que mcp-doc-inject.js par
+  // ⚠️ COMPTEURS INDÉPENDANTS PAR DOC (même doctrine que legacy-mcp-inject.js par
   //    serveur) : cet appel est « étranger » à toute doc déjà vue NON matchée
   //    ici — son compteur n'avance QUE si SON mode est smart.
   // ⚠️ PAS de garde `entry.sinceLastCall || 0` ni `entry.seen` ici : les entrées

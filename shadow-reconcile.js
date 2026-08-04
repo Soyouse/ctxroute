@@ -23,7 +23,7 @@ const os = require('os');
 const paths = require('./paths');
 const { legacyDocs } = require('./oracle');
 
-const LEGACY = process.env.MCP_DOC_LEGACY_PATH || path.join(os.homedir(), '.claude', 'hooks', 'protect-files.js');
+const LEGACY = process.env.CTXROUTE_LEGACY_PATH || path.join(os.homedir(), '.claude', 'hooks', 'protect-files.js');
 
 async function mapPool(items, limit, fn) {
   const out = new Array(items.length);

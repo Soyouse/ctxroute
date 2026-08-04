@@ -104,7 +104,7 @@ const mcpAdapter = {
       /* fail-open LOCAL — un corpus MCP illisible ne fait jamais taire les docs fichier */
     }
   },
-  // Badge '[ctxroute] server(+levels)' — parité mcp-doc-inject,
+  // Badge '[ctxroute] server(+levels)' — parité legacy-mcp-inject,
   // respecte showNotification (le badge fichier ne le lisait pas : parité).
   message(injected, ctx) {
     if (!lib.shouldShowNotification(ctx.config)) return '';

@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════
-// DIFFÉRENTIEL MCP — vieux moteur (mcp-doc-inject.js) vs porte unique
+// DIFFÉRENTIEL MCP — vieux moteur (legacy-mcp-inject.js) vs porte unique
 // (doc-inject.js, source sources/mcp.js), par SPAWN RÉEL sur corpus tmpdir.
 // ═══════════════════════════════════════════════════════════════════════
 //
-// ⚠️ Gate de parité du RETRAIT de mcp-doc-inject.js (fusion 17/07/2026) :
+// ⚠️ Gate de parité du RETRAIT de legacy-mcp-inject.js (fusion 17/07/2026) :
 //    pour chaque séquence d'appels, les DEUX moteurs doivent injecter aux
 //    MÊMES instants, avec le MÊME additionalContext (octet) et le MÊME
 //    systemMessage. Rouge ici = la fusion a changé le comportement MCP.
@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const REPO = import.meta.dirname;
-const OLD = path.join(REPO, 'mcp-doc-inject.js');
+const OLD = path.join(REPO, 'legacy-mcp-inject.js');
 const NEW = path.join(REPO, 'doc-inject.js');
 
 function mkTmp() {
@@ -40,7 +40,7 @@ function run(engine, payload, env) {
   const r = spawnSync(process.execPath, [engine], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
-    env: { ...process.env, ...env, MCP_DOC_GC_PROBABILITY: '0' },
+    env: { ...process.env, ...env, CTXROUTE_GC_PROBABILITY: '0' },
     timeout: 30000,
   });
   expect(r.status).toBe(0); // fail-open TOUJOURS exit 0
@@ -69,15 +69,15 @@ function differential(t, config, docs, sequence) {
     const configPath = path.join(base, 'config.json');
     fs.writeFileSync(configPath, JSON.stringify(config));
     const mkEnv = (stateDir) => ({
-      MCP_DOC_CONFIG_PATH: configPath,
-      MCP_DOC_DOCS_DIR: docsDir,
-      MCP_DOC_STATE_DIR: stateDir,
-      MCP_DOC_FILEDOCS_DIR: emptyFileDocs,
+      CTXROUTE_CONFIG_PATH: configPath,
+      CTXROUTE_DOCS_DIR: docsDir,
+      CTXROUTE_STATE_DIR: stateDir,
+      CTXROUTE_FILEDOCS_DIR: emptyFileDocs,
     });
     const envOld = mkEnv(path.join(base, 'state-old'));
     const envNew = mkEnv(path.join(base, 'state-new'));
-    fs.mkdirSync(envOld.MCP_DOC_STATE_DIR);
-    fs.mkdirSync(envNew.MCP_DOC_STATE_DIR);
+    fs.mkdirSync(envOld.CTXROUTE_STATE_DIR);
+    fs.mkdirSync(envNew.CTXROUTE_STATE_DIR);
 
     const outs = [];
     sequence.forEach((payload, i) => {
