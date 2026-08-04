@@ -112,17 +112,30 @@ test('NEGATIVE-CHECK : le gate SAIT rougir (sabotage sur une COPIE)', () => {
   // ⚠️ SABOTAGE SUR COPIE, JAMAIS EN PLACE : le 03/08/2026, un sabotage sur
   //    un fichier réel a fait tomber 38 tests d'autres suites qui le lisaient
   //    EN PARALLÈLE.
+  // ⚠️ LE TERME SABOTÉ EST FABRIQUÉ, JAMAIS TIRÉ DE L'ENVIRONNEMENT :
+  //    la 1re version utilisait le compte OS — sur la CI il s'appelle
+  //    « runner », donc écarté comme générique, donc RIEN n'était détecté et
+  //    le negative-check tombait (CI rouge, 04/08/2026). Un filet qui dépend
+  //    de l'environnement peut être DÉSARMÉ par un changement ailleurs.
   const bac = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-fuite-'));
+  const liste = path.join(bac, 'liste.json');
+  const TERME = 'zzfuitetemoin';
   try {
     execFileSync('git', ['init', '-q'], { cwd: bac });
-    // La fuite injectée est le compte OS COURANT, lu à l'exécution : aucune
-    // donnée personnelle n'est écrite dans ce fichier tracké.
-    fs.writeFileSync(path.join(bac, 'piege.md'), 'chemin : /home/' + os.userInfo().username + '/x\n');
+    fs.writeFileSync(path.join(bac, 'piege.md'), 'auteur : ' + TERME + '\n');
     execFileSync('git', ['add', 'piege.md'], { cwd: bac });
+    fs.writeFileSync(liste, JSON.stringify({ termes: [TERME], dossiersDerives: [] }));
 
-    const violations = scannerDepot(bac, motifs());
-    assert.ok(violations.length > 0, 'un dépôt saboté DOIT être détecté');
-    assert.match(violations[0], /piege\.md/);
+    const avant = process.env.CTXROUTE_FUITE_LISTE;
+    process.env.CTXROUTE_FUITE_LISTE = liste;
+    try {
+      const violations = scannerDepot(bac, motifs());
+      assert.ok(violations.length > 0, 'un dépôt saboté DOIT être détecté');
+      assert.match(violations[0], /piege\.md/);
+    } finally {
+      if (avant === undefined) delete process.env.CTXROUTE_FUITE_LISTE;
+      else process.env.CTXROUTE_FUITE_LISTE = avant;
+    }
   } finally {
     fs.rmSync(bac, { recursive: true, force: true });
   }
