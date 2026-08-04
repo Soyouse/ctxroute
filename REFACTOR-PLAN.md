@@ -389,7 +389,8 @@ tué le 31/07 sur `mcp:`, réapparu ailleurs.
 
 ---
 
-## 🔴 OUVERT — 4 manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
+## 🔴 3 OUVERTS sur 4 — manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
+> ③ FERMÉ le 04/08/2026 (et requalifié en PANNE, pas en doc inexacte). Restent ①, ②, ④.
 
 > ⚠️ Les 3 premiers sont des trous que J'AI CRÉÉS la nuit du 03→04/08 en posant le canari, et que
 > l'audit de session a d'abord RATÉS. Ils sont classés par gravité, pas par facilité.
@@ -415,7 +416,40 @@ aucun dialecte depuis le 03/08). Seule inconnue à MESURER : le format du transc
 marqueur d'appel d'outil équivalent à `"type":"tool_use"`. ⚠️ **Mesurer sur un payload/transcript
 RÉEL, jamais sur parole** (règle du portage).
 
-### ③ `additionalContextLimit` (Codex) n'est qu'un COMMENTAIRE
+### ③ ✅ LIVRÉ (04/08/2026) — et le diagnostic ci-dessous était TROP DOUX
+
+> 🛑 **CE N'ÉTAIT PAS « une doc qui ment » : c'était une PANNE SILENCIEUSE EN PROD.**
+> Le texte d'origine (conservé plus bas) concluait « ce n'est pas cassé, le plancher 8 000 est
+> conservateur donc sûr ». **FAUX** — le plancher 8 000 est le nôtre, il ne protège de rien côté
+> Codex : c'est **Codex** qui plafonnait, à **2500 TOKENS**, et qui spillait le reste sur disque en
+> n'envoyant qu'un aperçu. Le skill `ctxroute` (39 Ko ≈ 10 000 tokens) n'est donc **jamais arrivé
+> entier** sur Codex depuis le câblage du 19/07/2026. Exactement le défaut qui a motivé les paquets
+> côté Claude Code — resté grand ouvert sur l'autre harnais, sans que rien ne le signale.
+>
+> **Doc officielle (`learn.chatgpt.com/docs/hooks`, lue le 04/08/2026)** : le réglage se déclare
+> **PAR HANDLER**, à côté de `command`/`timeout` — donc **dans NOTRE câblage**. Il n'y a rien à
+> « lire » : on l'**ÉCRIT**. *« Omit additionalContextLimit to use the default 2500-token
+> threshold »* · *« 0 to pass the handler's complete additional context directly to the model »*.
+> ⇒ La formule « Codex expose une autorité qu'on LIT », écrite partout, était fausse sur le fond.
+>
+> **Fait** : `additionalContextLimit = 0` posé sur les **2 émetteurs** (`codex-doc-inject`
+> PreToolUse, `session-inject` SessionStart) dans `C:\ProgramData\OpenAI\Codex\requirements.toml`,
+> avec commentaire de scellement. **Gate** : `doctor.js --codex-hooks` l'EXIGE, vérifié **par BLOC**
+> (le réglage sur un seul émetteur laisserait l'autre muet — un match global l'aurait raté).
+> **Negative-check 7d**, 4 volets : absent partout · **présent sur un seul** · valeur non nulle ·
+> vert quand les deux sont à 0. Positif prouvé sur le câblage RÉEL (25 ok, 0 problème).
+>
+> ⚠️ **DEUX gardes que j'ai posées FAUSSES avant d'arriver là, à ne pas refaire** : (1) découpage
+> par `[[hooks.` = TOML-only ⇒ **inerte en JSON** ; (2) motif `= 0` sans guillemets ⇒ ne voit pas
+> `"additionalContextLimit":0`. Les deux corrigées par `"?` et un split sur `command`. Un gate qui
+> ne peut pas rougir dans un des formats acceptés est un gate décoratif — c'est la leçon du 03/08,
+> reproduite le lendemain.
+> ⚠️ **Ne PAS en conclure que Codex a besoin de paquets** : avec `0`, il n'a **aucun plafond**. La
+> fragmentation reste un contournement de Claude Code uniquement.
+
+<details><summary>Diagnostic d'origine (conservé — il montre comment on sous-estime un trou)</summary>
+
+#### ③ `additionalContextLimit` (Codex) n'est qu'un COMMENTAIRE
 **Constat mesuré** : la seule occurrence dans le code est `budget.js:213`, en commentaire. La doc
 injectable ET le skill affirment pourtant « Codex expose une autorité déclarée ⇒ on la LIT ».
 **Ce n'est pas cassé** (le plancher 8 000 est conservateur donc sûr) **mais la doc décrit une
@@ -423,6 +457,8 @@ intention comme un fait** — c'est une doc qui ment, la classe d'erreur que ce 
 **Cible** : la coquille Codex lit le réglage et le passe en `options.budget` (`0` = illimité).
 Tant que ce n'est pas fait, **corriger la doc** pour dire « plancher conservateur, lecture du
 réglage = BACKLOG », jamais l'inverse.
+
+</details>
 
 ### ④ Contrat de frontière canari ⟷ afficheur non scellé
 La frontière est le fichier `state/canari.json`. Vérifiée À LA MAIN le 03/08 (statusline), jamais

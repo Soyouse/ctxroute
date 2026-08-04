@@ -84,7 +84,7 @@ Plus : coupe sur **frontières de lignes** (RFC 2046) et **ordre strict, jamais 
 
 **LES DEUX POSTURES, selon ce que le harnais expose** — même principe, pas une exception :
 - **Claude Code** : plafond interne NON documenté + feature-gate DISTANT ⇒ on ne lit rien, on prend une **marge** (défaut 8 000 sous les 10 000 mesurés).
-- **Codex** : `additionalContextLimit` est **documenté et réglé par l'utilisateur** ⇒ on le **LIT**. C'est l'autorité déclarée, pas un interne deviné.
+- **Codex** : `additionalContextLimit` se **DÉCLARE dans NOTRE câblage**, par hook (doc officielle relue 04/08/2026) — rien à lire en amont : on l'écrit à **`0`** = *« pass the handler's complete additional context directly to the model »* ⇒ **aucune fragmentation nécessaire côté Codex**. ⚠️ **OMIS = défaut 2500 TOKENS, spill disque + aperçu, EN SILENCE** : c'était le cas jusqu'au 04/08/2026, donc les gros skills n'arrivaient JAMAIS entiers côté Codex. Scellé par `doctor.js --codex-hooks` (par BLOC, sur les 2 émetteurs). L'ancienne formule « on le LIT » était fausse.
 - **Gemini** : `PreToolUse` n'expose PAS le canal — trou de capacité, pas de taille ; aucune fragmentation n'y remédie.
 
 ⚠️ **SI UN HARNAIS ABAISSE SA LIMITE** : ça ne casse pas en silence (le sceau annonce le marqueur de fin ; s'il manque, l'agent SAIT qu'il a été tronqué). La correction est **UN nombre de config** (`budgetInjection`), zéro ligne de code — tout se re-découpe. C'est ça, résister aux mises à jour.

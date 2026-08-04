@@ -424,6 +424,38 @@ function checkCodexWiring(hooksPath) {
         `le câblage Codex pointe vers une copie/un fichier inexistant pour ${name} (ce repo : ${__dirname}).`);
     }
   }
+  // ── LE PLAFOND DE CONTEXTE CODEX (04/08/2026) ──────────────────────
+  // ⚠️ Codex SPILLE sur disque tout additionalContext dépassant son défaut de
+  //    2500 TOKENS et n'envoie qu'un aperçu, SANS le dire au hook : la panne
+  //    silencieuse que ce framework combat. Seul `additionalContextLimit = 0`
+  //    (doc officielle : « pass the handler's complete additional context
+  //    directly to the model ») garantit la livraison intégrale.
+  // ⚠️ Vérifié PAR BLOC, jamais sur le fichier entier : une seule occurrence
+  //    quelque part laisserait l'AUTRE émetteur muet — c'est précisément le
+  //    faux vert qu'un match global produirait.
+  // ⚠️ N'exiger le réglage QUE des voies qui ÉMETTENT du contexte : l'imposer
+  //    au reset/à la garde/au compteur (qui n'émettent rien) serait une
+  //    déclaration inerte, la classe d'erreur tuée le 31/07 et le 04/08.
+  // ⚠️ Découpage par `command` et NON par `[[hooks.` : le doctor accepte TOML
+  //    (requirements.toml, le terrain réel) ET JSON (hooks.json) — un split sur
+  //    la syntaxe TOML rendrait ce check MUET sur un câblage JSON, c'est-à-dire
+  //    inerte, exactement le défaut du 03/08. `command` existe dans les deux.
+  //    Contrat : le réglage vit dans le bloc de SON hook, après son `command`.
+  // ⚠️ GUILLEMETS OPTIONNELS obligatoires dans les 2 motifs : TOML écrit
+  //    `command = '...'`, JSON écrit `"command":"..."`. Un motif sans `"?`
+  //    ne voit RIEN en JSON — le check passait alors au vert par accident
+  //    (bloc unique) ou au rouge à tort. Mesuré ici même le 04/08/2026.
+  const blocs = raw.split(/(?="?command"?\s*[=:])/);
+  for (const emetteur of ['codex-doc-inject.js', 'session-inject.js']) {
+    if (!wired(emetteur)) continue;
+    const bloc = blocs.find((b) => b.includes(emetteur));
+    check(`${emetteur} declare additionalContextLimit = 0 (livraison INTEGRALE)`,
+      Boolean(bloc) && /additionalContextLimit"?\s*[=:]\s*0(?!\d)/.test(bloc),
+      `${emetteur} est cable SANS additionalContextLimit = 0 : Codex applique son defaut de 2500 tokens, `
+      + 'ecrit le surplus sur disque et n\'envoie qu\'un APERCU au modele, en SILENCE. '
+      + 'Les grosses docs et les skills n\'arrivent donc jamais entiers cote Codex.');
+  }
+
   // ⚠️ Match restreint aux lignes `command` : un COMMENTAIRE d'avertissement a
   //    le droit de nommer protect-files.js sans déclencher (faux positif vécu
   //    le 19/07/2026 sur le _comment du hooks.json fraîchement câblé).

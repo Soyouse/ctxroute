@@ -47,10 +47,24 @@ Deux standards résolvent exactement ce problème — un message trop gros pour 
 | Harnais | Plafond | Réglable ? | Notre posture |
 |---|---|---|---|
 | Claude Code | 10 000 caractères par chaîne | ❌ « no setting to configure or disable », + feature-gate DISTANT | **plancher** 8 000 (marge), on ne lit rien |
-| Codex | ~2 500 tokens | ✅ `additionalContextLimit` (`0` = illimité) | **on LIT le réglage** : documenté, dans la config de l'utilisateur, qui lui appartient |
+| Codex | ~2 500 **tokens** (défaut) | ✅ `additionalContextLimit` (`0` = illimité) | **on le DÉCLARE à `0` dans NOTRE câblage** ⇒ zéro fragmentation nécessaire |
 | Gemini CLI | non documenté | — | `PreToolUse` **n'a pas le canal** — problème de capacité, pas de taille |
 
 ⚠️ **Codex n'est pas une exception, c'est le même principe** : quand le produit expose une autorité déclarée, on la consulte au lieu de deviner. Quand il n'en expose pas (Claude Code), on prend une marge. Deviner un interne non documenté, c'est bâtir sur du sable — il peut changer sans mise à jour.
+
+⚠️ **CORRECTION DU 04/08/2026 — « on LIT le réglage » était FAUX, et le mot comptait.**
+Doc officielle (`learn.chatgpt.com/docs/hooks`, lue ce jour) : `additionalContextLimit` se déclare
+**PAR HANDLER**, à côté de `command`/`timeout`, dans le fichier de hooks — donc **dans NOTRE propre
+câblage**. Il n'y a aucune config amont à lire : on l'**ÉCRIT**. Valeurs : *« Omit
+additionalContextLimit to use the default 2500-token threshold »* · *« or 0 to pass the handler's
+complete additional context directly to the model »*.
+🛑 **Ce n'était donc pas « une doc qui ment » mais une PANNE SILENCIEUSE en prod** : le réglage était
+absent du câblage ⇒ défaut 2500 tokens ⇒ tout skill un peu gros (le skill `ctxroute` fait 39 Ko,
+~10 000 tokens) était écrit sur disque et remplacé par un APERÇU, sans que le hook en sache rien.
+Exactement le défaut qui a motivé les paquets côté Claude Code, resté ouvert côté Codex.
+⚠️ Posé le 04/08/2026 sur les **deux émetteurs** (`codex-doc-inject` PreToolUse, `session-inject`
+SessionStart) et **scellé par `doctor.js --codex-hooks`** (vérif PAR BLOC : le réglage sur un seul
+émetteur laisserait l'autre muet, et un match global le manquerait).
 
 ## Si un harnais ABAISSE sa limite demain
 

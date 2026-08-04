@@ -215,11 +215,15 @@ function cloneFrameworkWithSources() {
     ok('câblage CODEX sans turn-count → doctor le nomme', r.stderr.includes('turn-count.js absent'));
 
     // 7b — câblage COMPLET et propre → aucun problème côté Codex.
+    // ⚠️ « propre » INCLUT additionalContextLimit = 0 sur les deux ÉMETTEURS
+    //    (04/08/2026) : sans lui, Codex tronque en silence — un câblage qui
+    //    livre des aperçus n'est pas un câblage propre. Prouve aussi que le
+    //    check marche en JSON, pas seulement en TOML.
     fs.writeFileSync(hooksPath, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
-      { command: `node ${path.join(repo, 'codex-doc-inject.js')}` },
+      { command: `node ${path.join(repo, 'codex-doc-inject.js')}`, additionalContextLimit: 0 },
       { command: `node ${path.join(repo, 'codex-doc-write-guard.js')}` },
       { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
-      { command: `node ${path.join(repo, 'session-inject.js')}` },
+      { command: `node ${path.join(repo, 'session-inject.js')}`, additionalContextLimit: 0 },
       { command: `node ${path.join(repo, 'turn-count.js')}` },
     ] }] } }));
     const r2 = runDoctor(DOCTOR, ['--codex-hooks', hooksPath]);
@@ -236,6 +240,65 @@ function cloneFrameworkWithSources() {
     const r3 = runDoctor(DOCTOR, ['--codex-hooks', hooksPath]);
     ok('coquille CODEX câblée depuis une COPIE → doctor exit ≠ 0', r3.status !== 0);
     ok('coquille CODEX en copie → doctor nomme le fichier', r3.stderr.includes('codex-doc-inject.js'));
+
+    // ── 7d — NEGATIVE : le PLAFOND DE CONTEXTE CODEX (04/08/2026) ──────
+    // ⚠️ Sans `additionalContextLimit = 0`, Codex spille au-delà de 2500 tokens
+    //    et n'envoie qu'un aperçu SANS le dire : panne SILENCIEUSE. Ce bloc
+    //    prouve que le gate rougit vraiment — un gate jamais vu rouge est un
+    //    gate qu'on croit posé (classe d'erreur mesurée le 03/08 sur les
+    //    règles de pureté, toutes inertes pendant des mois).
+    // ⚠️ Format TOML : c'est le terrain RÉEL (hooks.json est IGNORÉ par
+    //    Codex 0.144, mesuré le 19/07/2026).
+    const toml = path.join(tmp, 'requirements.toml');
+    const bloc = (fichier, limite) => [
+      '[[hooks.PreToolUse.hooks]]',
+      'type = "command"',
+      `command = 'node ${path.join(repo, fichier)}'`,
+      'timeout = 10',
+      ...(limite === null ? [] : [`additionalContextLimit = ${limite}`]),
+      '',
+    ].join('\n');
+    const cablage = (limInject, limSession) => bloc('codex-doc-inject.js', limInject)
+      + bloc('codex-doc-write-guard.js', null)
+      + bloc('ctxroute-reset.js', null)
+      + bloc('session-inject.js', limSession)
+      + bloc('turn-count.js', null);
+
+    // 7d-1 — les DEUX émetteurs déclarent 0 → vert.
+    fs.writeFileSync(toml, cablage(0, 0));
+    ok('câblage CODEX TOML avec additionalContextLimit = 0 partout → doctor exit 0',
+      runDoctor(DOCTOR, ['--codex-hooks', toml]).status === 0);
+
+    // 7d-2 — réglage ABSENT partout → rouge, et le doctor nomme les DEUX.
+    fs.writeFileSync(toml, cablage(null, null));
+    const rNu = runDoctor(DOCTOR, ['--codex-hooks', toml]);
+    ok('câblage CODEX sans additionalContextLimit → doctor exit ≠ 0', rNu.status !== 0);
+    // ⚠️ Chercher la RAISON (`problems`), pas le libellé du check : seules les
+    //    raisons partent sur stderr. Attendre le libellé rendait l'assert
+    //    toujours faux — donc un negative-check qui ne prouve RIEN.
+    ok('sans additionalContextLimit → doctor nomme la coquille PreToolUse',
+      /codex-doc-inject\.js est cable SANS additionalContextLimit/.test(rNu.stderr));
+    ok('sans additionalContextLimit → doctor nomme AUSSI la porte SESSION',
+      /session-inject\.js est cable SANS additionalContextLimit/.test(rNu.stderr));
+    ok('sans additionalContextLimit → la raison dit la panne SILENCIEUSE',
+      rNu.stderr.includes('2500 tokens') && rNu.stderr.includes('SILENCE'));
+
+    // 7d-3 — ⚠️ LE PIÈGE : réglage présent sur UN SEUL émetteur. Un match
+    //        GLOBAL sur le fichier passerait au vert ici — c'est exactement le
+    //        faux vert que le découpage par bloc existe pour empêcher.
+    fs.writeFileSync(toml, cablage(0, null));
+    const rMoitie = runDoctor(DOCTOR, ['--codex-hooks', toml]);
+    ok('additionalContextLimit sur UN SEUL émetteur → doctor exit ≠ 0 (pas de match global)',
+      rMoitie.status !== 0);
+    ok('un seul émetteur réglé → seule la porte SESSION est nommée',
+      /session-inject\.js est cable SANS additionalContextLimit/.test(rMoitie.stderr)
+      && !/codex-doc-inject\.js est cable SANS additionalContextLimit/.test(rMoitie.stderr));
+
+    // 7d-4 — une valeur NON NULLE ne vaut pas 0 : elle laisse un plafond.
+    //        Garde aussi contre un `0` lu à l'intérieur de `2500`/`10`.
+    fs.writeFileSync(toml, cablage(5000, 0));
+    ok('additionalContextLimit = 5000 (plafond résiduel) → doctor exit ≠ 0',
+      runDoctor(DOCTOR, ['--codex-hooks', toml]).status !== 0);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
