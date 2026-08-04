@@ -223,20 +223,38 @@ sessions et un audit). **Gate posé** : tout bloc ```json du README est confront
 clé (1er niveau, `servers.*`, `defaults.*`), + negative-check sur l'exemple exact qui a menti.
 README corrigé ET complété (cascade 4 étages, `defaults`, `note`).
 
-### ② `note: |` perdait les lignes suivantes EN SILENCE
-Trouvé par **simulation adversariale** (pas par un test rouge) :
+### ② `note: |` perd les lignes suivantes EN SILENCE — 🔴 PIÈGE OUVERT, garde RETIRÉE
+Trouvé par **simulation adversariale** :
 ```yaml
 note: |
   ligne un
   ligne deux
 ```
-donnait `note === "|"`, **validation VERTE**, et les deux lignes PERDUES. L'auteur croit avoir écrit
-trois lignes ; il a écrit un tube. ⚠️ Et `note` est précisément le champ qui invite à écrire long.
-⚠️ **La réponse N'EST PAS de supporter le multi-ligne** (le parser est un sous-ensemble de YAML,
-délibérément — « vouloir juste ajouter le multi-ligne = la première marche vers un parser YAML »).
-La réponse est de rendre le piège BRUYANT : `|` et `>` sont REJETÉS **pour toutes les clés** (pas
-seulement `note` — `match: |` souffrait du même sort), avec un message qui donne la forme qui
-marche (`[ligne un, ligne deux]`). Mesuré avant de poser la garde : **0 doc du parc concernée**.
+donne `note === "|"`, **validation VERTE**, les deux lignes PERDUES. Et `note` est précisément le
+champ qui invite à écrire long.
+
+🛑 **UNE GARDE A ÉTÉ POSÉE DANS `validate()` PUIS RETIRÉE LE MÊME JOUR — ne pas la refaire.**
+Elle rejetait toute valeur égale à `|`/`>`. **La CI l'a mise en ROUGE en quelques minutes**
+(property-test ROUND-TRIP de `migrate` : « le migrateur produit un frontmatter INVALIDE :
+{"match":"|"} ») — `match: "|"` est un pattern **LÉGITIME**.
+⚠️ **CAUSE RACINE : garde posée à la MAUVAISE COUCHE.** Après `parse()`, `cle: |` (bloc YAML) et
+`cle: "|"` (pipe littéral) sont **rigoureusement indistinguables** — les deux valent la chaîne
+« | ». Vérifié en direct. Une garde incapable de distinguer interdit du SAIN, et une garde qui
+interdit du sain finit débranchée : c'est pire que le piège qu'elle prétend fermer.
+
+**CIBLE (le fix correct)** : la détection appartient à **`parse()`**, seul endroit qui voit le
+TEXTE — un bloc RÉEL = valeur `|`/`>` **ET** ligne suivante indentée. Reste à décider comment
+l'information remonte au validateur sans éclater la garde en N endroits (piste : `parse()` expose
+les clés concernées, `validate()` prend un 2ᵉ argument optionnel — comportement d'avant si absent).
+⚠️ **NE JAMAIS « régler » ça en supportant le multi-ligne** : ce parser est un sous-ensemble de
+YAML délibéré (« vouloir juste ajouter le multi-ligne = la première marche vers un parser YAML »).
+**En attendant** : le comportement est FIGÉ par un test (`frontmatter.test.js`) qui documente la
+perte, et la forme sûre est la liste inline `note: [ligne un, ligne deux]` (README).
+
+⚠️ **LEÇON DE MÉTHODE, la vraie valeur de l'épisode** : la simulation adversariale a trouvé le
+piège, mais mon premier réflexe de scellement était FAUX et 931 tests verts en local ne l'ont pas
+vu — c'est la **CI cross-OS** qui a tranché. Un gate écrit vite en fin de session doit passer la CI
+avant d'être présenté comme une protection.
 
 ### Vérifié CONFORME (preuves)
 `testTimeout: 30000` présent (suite à spawns) · arbo exhaustive (aucun fichier ajouté) · couplage
