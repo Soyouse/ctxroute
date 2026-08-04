@@ -134,8 +134,10 @@ const skillAdapter = {
           body = parse(fs.readFileSync(path.join(paths.skillsDir(), name + '.md'), 'utf8')).body;
         } catch { /* fichier illisible → fallback pointeur ci-dessous */ }
         acc.bodies[m.doc] = body && body.trim() !== '' ? body : skillSource.pointerBody(name);
-        // CASCADE : entrée du skill > config.skillDefaults (global) > défaut framework.
-        acc.decls[m.doc] = skillSource.declFor(config && config.skillDefaults, skills[name]);
+        // ⚠️ On POSE l'entrée du registre, on ne résout RIEN : la cascade complète
+        //    (defaults.skill > global > défaut framework 'once') vit dans gate.js,
+        //    point UNIQUE. `acc.owner` ci-dessous est ce qui la rend possible.
+        acc.decls[m.doc] = skillSource.declFor(skills[name]);
         acc.labels[m.doc] = m.doc; // 'skill/{nom}' — tag [source:] propre à la source
         acc.owner[m.doc] = this.id;
         acc.meta[m.doc] = { name };

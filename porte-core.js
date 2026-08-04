@@ -165,7 +165,7 @@ function run(data, emit, options) {
         return { r: { inject: cache.inject, decision: cache.decision }, paquets: decouper(cache.inject) };
       }
       const state = store.loadState(STORE_PREFIX, sessionId);
-      const r = gate.decide(config, decls, matched, toolName, state, turnCount);
+      const r = gate.decide(config, decls, matched, toolName, state, turnCount, acc.owner);
       const paquets = decouper(r.inject);
       // ⚠️ UNE DOC DIFFÉRÉE NE DOIT JAMAIS ÊTRE MARQUÉE « VUE ».
       //    `gate.decide` écrit `{seen:true, sinceLastCall:0}` pour TOUT ce qu'il
@@ -187,7 +187,7 @@ function run(data, emit, options) {
     }, { fallback: null });
     // Lock indisponible → décider SANS état (jamais se taire, cf en-tête).
     if (!res) {
-      const r = gate.decide(config, decls, matched, toolName, {}, turnCount);
+      const r = gate.decide(config, decls, matched, toolName, {}, turnCount, acc.owner);
       res = { r, paquets: decouper(r.inject) };
     }
 

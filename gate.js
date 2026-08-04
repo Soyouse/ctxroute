@@ -19,19 +19,55 @@
 'use strict';
 
 const { shouldInjectFor, confirmFor } = require('./lib-pure');
-const { DRIFT_UNITS } = require('./frontmatter');
+const { DRIFT_UNITS, MODES } = require('./frontmatter');
 
 // ⚠️ COPIE CONTRACTUELLE de la liste de protect-files.js (writeTools) — outils
 //    d'ÉCRITURE qui déclenchent une confirmation quand une doc `confirm: true`
 //    est injectée. Liste unifiée Claude + Codex. Épinglée EN DUR dans gate.test.js.
 const WRITE_TOOLS = ['mcp__ssh__ssh_edit_file', 'mcp__ssh__ssh_write_file', 'mcp__ssh__ssh_upload_file', 'Edit', 'Write', 'apply_patch'];
 
-// Mode effectif pour UNE doc : frontmatter (l'auteur propose) > mode global de
-// la config > 'smart'. ⚠️ PAS d'override config par-doc aujourd'hui : l'utilisateur
-// dispose via le mode GLOBAL et `confirm` — un `docs.{id}.mode` = feature sans
-// douleur mesurée derrière (décision 6 du plan), ne pas l'ajouter « au cas où ».
-function modeForDoc(config, decl) {
-  return (decl && decl.mode) || (config && config.mode) || 'smart';
+// ═══════════════════════════════════════════════════════════════════════
+// CASCADE DES AUTORITÉS — 4 ÉTAGES, UN SEUL POINT (ici). 04/08/2026.
+// ═══════════════════════════════════════════════════════════════════════
+//   ① entrée (frontmatter de la doc / entrée du registre skill) = dernier mot
+//   ② defaults.{source}  (JSON) — « toutes les docs de CETTE catégorie »
+//   ③ global mode/defaultThreshold/defaultDriftUnit (JSON) — tout le corpus
+//   ④ défaut FRAMEWORK, codé en dur (existe même sans aucun JSON)
+//
+// ⚠️ L'étage ② généralise l'ancien `skillDefaults`, qui n'ouvrait cet étage
+//    qu'aux skills. Deux mots pour un même étage = loi anti-synonyme violée :
+//    `skillDefaults` est SUPPRIMÉ, jamais gardé en alias (deux vérités dérivent).
+//
+// ⚠️ NE JAMAIS recopier cette cascade ailleurs (ni dans une source, ni dans une
+//    coquille) : une source POSE l'entrée, elle ne résout RIEN. C'est la règle
+//    qui existait déjà pour driftUnit — étendue à mode et threshold.
+//
+// ⚠️ ASYMÉTRIE VOLONTAIRE, mesurée, à NE PAS « corriger » : la source `skill`
+//    SAUTE l'étage ③ et son défaut framework est `once` (les docs : `smart`).
+//    Un skill est un savoir de projet — le charger une fois suffit ; une doc est
+//    un rappel de geste. Les uniformiser ferait basculer TOUS les skills à la
+//    première config globale posée = régression silencieuse (contrat §6).
+const DEFAUTS_FRAMEWORK = { skill: { mode: 'once', global: false }, '': { mode: 'smart', global: true } };
+function reglesDe(source) {
+  return DEFAUTS_FRAMEWORK[source] || DEFAUTS_FRAMEWORK[''];
+}
+
+// Étage ② : les défauts déclarés pour CETTE source. Absent = objet vide (fallback
+// total — une catégorie non déclarée se comporte exactement comme avant).
+function defaultsDe(config, source) {
+  const d = config && config.defaults;
+  const v = d && source ? d[source] : null;
+  return v || {};
+}
+
+// Mode effectif pour UNE doc — cascade complète ci-dessus.
+function modeForDoc(config, decl, source) {
+  const regles = reglesDe(source);
+  const cat = defaultsDe(config, source);
+  if (decl && MODES.includes(decl.mode)) return decl.mode;
+  if (MODES.includes(cat.mode)) return cat.mode;
+  if (regles.global && config && MODES.includes(config.mode)) return config.mode;
+  return regles.mode;
 }
 
 // Seuil effectif pour UNE doc : decl.threshold (posé par une SOURCE — ex. MCP,
@@ -47,8 +83,13 @@ function modeForDoc(config, decl) {
 //    ⚠️ `threshold` n'a d'effet QUE si `mode: smart` — en `dumb`/`once` le compteur
 //    n'est jamais consommé (cf plus bas), donc le seuil est MORT EN SILENCE.
 //    Cette incohérence n'est encore détectée par AUCUN gate (tracé EVAL-SESSIONS).
-function thresholdForDoc(config, decl) {
+// ⚠️ 04/08/2026 : étage ② (defaults.{source}) inséré — MÊME cascade que mode.
+//    Un threshold vaut à son étage s'il est un entier ≥ 1, sinon on DESCEND
+//    (fallback total : une valeur invalide ne fait jamais planter, elle s'ignore).
+function thresholdForDoc(config, decl, source) {
+  const cat = defaultsDe(config, source);
   if (decl && Number.isInteger(decl.threshold)) return decl.threshold;
+  if (Number.isInteger(cat.threshold) && cat.threshold >= 1) return cat.threshold;
   return Number.isInteger(config && config.defaultThreshold) ? config.defaultThreshold : 4;
 }
 
@@ -59,8 +100,10 @@ function thresholdForDoc(config, decl) {
 // sinceLastCall) — les différentiels de parité ne voient RIEN changer.
 // `turn` = compare le compteur de tours de session (porte turn-count.js).
 // ⚠️ Dégénéré hors de smart : dumb/once n'appellent jamais cette valeur.
-function driftUnitForDoc(config, decl) {
+function driftUnitForDoc(config, decl, source) {
+  const cat = defaultsDe(config, source);
   if (decl && DRIFT_UNITS.includes(decl.driftUnit)) return decl.driftUnit;
+  if (DRIFT_UNITS.includes(cat.driftUnit)) return cat.driftUnit;
   return DRIFT_UNITS.includes(config && config.defaultDriftUnit) ? config.defaultDriftUnit : 'tool';
 }
 
@@ -83,8 +126,12 @@ function driftUnitForDoc(config, decl) {
  * ⚠️ `changed` = le state a RÉELLEMENT bougé — un corpus 100% dumb ne produit
  *    JAMAIS d'écriture (parité perf avec protect-files, qui n'a aucun état).
  */
-function decide(config, decls, matched, toolName, state, turnCount) {
+function decide(config, decls, matched, toolName, state, turnCount, owners) {
   const prev = state || {};
+  // ⚠️ Source PROPRIÉTAIRE de chaque doc (acc.owner, posé par l'adaptateur) —
+  //    seule entrée de l'étage ② de la cascade. ABSENT = cascade d'AVANT à
+  //    l'identique (parité : les différentiels ne voient rien changer).
+  const src = (doc) => (owners ? owners[doc] : undefined);
   const matchedSet = new Set(matched);
   const next = {};
   let changed = false;
@@ -100,8 +147,8 @@ function decide(config, decls, matched, toolName, state, turnCount) {
   //    incrémenter ici) — l'incrémenter quand même = écritures disque mortes.
   for (const doc of Object.keys(prev)) {
     const entry = prev[doc];
-    if (!matchedSet.has(doc) && entry && modeForDoc(config, decls[doc]) === 'smart'
-      && driftUnitForDoc(config, decls[doc]) === 'tool') {
+    if (!matchedSet.has(doc) && entry && modeForDoc(config, decls[doc], src(doc)) === 'smart'
+      && driftUnitForDoc(config, decls[doc], src(doc)) === 'tool') {
       next[doc] = { seen: true, sinceLastCall: entry.sinceLastCall + 1 };
       changed = true;
     } else {
@@ -120,14 +167,14 @@ function decide(config, decls, matched, toolName, state, turnCount) {
     //    dans l'UNITÉ de la doc — 'tool' = compteur sinceLastCall (historique),
     //    'turn' = tours écoulés depuis la dernière livraison (turnCount - entry.turn).
     //    shouldInjectFor reste l'UNIQUE juge (jamais un smart dupliqué par unité).
-    const since = driftUnitForDoc(config, decls[doc]) === 'turn'
+    const since = driftUnitForDoc(config, decls[doc], src(doc)) === 'turn'
       ? (entry ? turnCount - entry.turn : 0)
       : (entry ? entry.sinceLastCall : 0);
-    if (shouldInjectFor(modeForDoc(config, decls[doc]), entry ? entry.seen : false, since, thresholdForDoc(config, decls[doc]))) inject.push(doc);
+    if (shouldInjectFor(modeForDoc(config, decls[doc], src(doc)), entry ? entry.seen : false, since, thresholdForDoc(config, decls[doc], src(doc)))) inject.push(doc);
     // ⚠️ N'écrire l'état QUE si le mode le consomme : une doc `dumb` injecte
     //    toujours et ne lit jamais seen/sinceLastCall — la tracker serait une
     //    écriture disque par appel pour rien (le corpus migré est 100% dumb).
-    if (modeForDoc(config, decls[doc]) !== 'dumb') {
+    if (modeForDoc(config, decls[doc], src(doc)) !== 'dumb') {
       // `turn` mémorisé à CHAQUE rappel = horodatage « dernière livraison »,
       // shape d'état UNIQUE (jamais 2 formes selon l'unité). En unité 'tool'
       // pur (turnCount=0 constant), `entry.turn !== turnCount` ne déclenche

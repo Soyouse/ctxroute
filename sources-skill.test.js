@@ -140,39 +140,43 @@ test('matchingSkills : 2 skills distincts, un par fichier un par serveur -> les 
   expect(hit).toEqual([{ doc: 'skill/f' }, { doc: 'skill/s' }]);
 });
 
-// ── declFor : CASCADE 3 étages (entrée > defaults globaux > framework once) ──
-test('declFor : sans rien -> défaut framework once', () => {
-  expect(declFor(undefined, undefined)).toEqual({ mode: 'once' });
-  expect(declFor({}, {})).toEqual({ mode: 'once' });
+// ── declFor : POSE l'entrée, ne résout AUCUNE cascade (04/08/2026) ──
+// ⚠️ CONTRAT CHANGÉ, couverture CONSERVÉE. Avant, declFor résolvait
+//    `config.skillDefaults` ET forçait `mode: 'once'` : c'était un SECOND point de
+//    cascade, en plus de gate.js. Le jour où un étage bougeait dans gate, celui-ci
+//    restait en arrière et les skills suivaient une autre règle que les docs, en
+//    SILENCE. Les 6 cas qui certifiaient ce comportement sont REMPLACÉS ici ; la
+//    cascade complète (defaults.skill > global > framework 'once') est prouvée
+//    dans gate.test.js, à son unique point de résolution.
+test('declFor : rien de déclaré -> objet VIDE (aucun défaut posé ici)', () => {
+  expect(declFor(undefined)).toEqual({});
+  expect(declFor({})).toEqual({});
 });
 
-test('declFor : entrée respectée, invalide DESCEND au framework', () => {
-  expect(declFor({}, { mode: 'dumb' })).toEqual({ mode: 'dumb' });
-  expect(declFor({}, { mode: 'smart' })).toEqual({ mode: 'smart' });
-  expect(declFor({}, { mode: 'once' })).toEqual({ mode: 'once' });
-  expect(declFor({}, { mode: 'bogus' })).toEqual({ mode: 'once' });
+test('declFor : une valeur valide de l\'entrée est POSÉE telle quelle', () => {
+  expect(declFor({ mode: 'dumb' })).toEqual({ mode: 'dumb' });
+  expect(declFor({ mode: 'smart' })).toEqual({ mode: 'smart' });
+  expect(declFor({ mode: 'once' })).toEqual({ mode: 'once' });
 });
 
-test('declFor : defaults globaux appliqués quand l\'entrée ne dit rien (étage du milieu)', () => {
-  expect(declFor({ mode: 'smart' }, {})).toEqual({ mode: 'smart' });
-  expect(declFor({ mode: 'dumb' }, undefined)).toEqual({ mode: 'dumb' });
-  expect(declFor({ mode: 'bogus' }, {})).toEqual({ mode: 'once' }); // defaults invalide -> framework
+test('declFor : une valeur INVALIDE est OMISE (jamais posée) -> la cascade tranchera', () => {
+  expect(declFor({ mode: 'bogus' })).toEqual({});
+  expect(declFor({ threshold: 0 })).toEqual({});
+  expect(declFor({ threshold: -1 })).toEqual({});
+  expect(declFor({ threshold: 2.5 })).toEqual({});
+  expect(declFor({ driftUnit: 'bogus' })).toEqual({});
 });
 
-test('declFor : l\'ENTRÉE écrase les defaults globaux (dernier mot)', () => {
-  expect(declFor({ mode: 'smart' }, { mode: 'dumb' })).toEqual({ mode: 'dumb' });
-  expect(declFor({ mode: 'once' }, { mode: 'smart' })).toEqual({ mode: 'smart' });
+test('declFor : threshold — borne 1 INCLUSE, entiers >= 1 posés', () => {
+  expect(declFor({ mode: 'smart', threshold: 1 })).toEqual({ mode: 'smart', threshold: 1 });
+  expect(declFor({ mode: 'smart', threshold: 5 })).toEqual({ mode: 'smart', threshold: 5 });
 });
 
-test('declFor : threshold — entrée > defaults > omis ; borne 1 ; invalides rejetés à chaque étage', () => {
-  expect(declFor({}, { mode: 'smart', threshold: 1 })).toEqual({ mode: 'smart', threshold: 1 });
-  expect(declFor({}, { mode: 'smart', threshold: 5 })).toEqual({ mode: 'smart', threshold: 5 });
-  expect(declFor({ threshold: 3 }, { mode: 'smart' })).toEqual({ mode: 'smart', threshold: 3 }); // defaults
-  expect(declFor({ threshold: 3 }, { mode: 'smart', threshold: 9 })).toEqual({ mode: 'smart', threshold: 9 }); // entrée écrase
-  expect(declFor({}, { mode: 'smart', threshold: 0 })).toEqual({ mode: 'smart' });
-  expect(declFor({}, { mode: 'smart', threshold: -1 })).toEqual({ mode: 'smart' });
-  expect(declFor({}, { mode: 'smart', threshold: 2.5 })).toEqual({ mode: 'smart' });
-  expect(declFor({ threshold: 0 }, { mode: 'smart' })).toEqual({ mode: 'smart' }); // defaults invalide -> omis
+// ⚠️ Ce cas est le GARDE-FOU anti-retour : si declFor se remettait un jour à lire
+//    un 2ᵉ argument, la double cascade renaîtrait sans bruit. Ici, elle ROUGIT.
+test('declFor : IGNORE tout second argument (plus aucune résolution de defaults ici)', () => {
+  expect(declFor({}, { mode: 'smart' })).toEqual({});
+  expect(declFor({ mode: 'dumb' }, { mode: 'smart', threshold: 9 })).toEqual({ mode: 'dumb' });
 });
 
 // ── skillNameFromDoc : inverse exact de skillRules ──
@@ -189,13 +193,14 @@ test('pointerBody : nomme le skill + ordonne le chargement', () => {
   expect(body).toContain('Skill');
 });
 
-// ── driftUnit (18/07/2026) : entrée > skillDefaults, sinon ABSENT (suite de la cascade = gate) ──
-test('declFor : driftUnit — entrée écrase skillDefaults, invalide DESCEND, absent = omis', () => {
-  expect(declFor({ driftUnit: 'tool' }, { driftUnit: 'turn' }).driftUnit).toBe('turn');
-  expect(declFor({ driftUnit: 'turn' }, {}).driftUnit).toBe('turn');
-  expect(declFor({ driftUnit: 'bogus' }, { driftUnit: 'bogus' })).toEqual({ mode: 'once' });
-  expect('driftUnit' in declFor({}, {})).toBe(false);
-  expect('driftUnit' in declFor(undefined, undefined)).toBe(false);
+// ── driftUnit : valide POSÉ, absent OMIS — la cascade (defaults.skill >
+//    defaultDriftUnit > 'tool') vit dans gate.driftUnitForDoc, point unique ──
+test('declFor : driftUnit — valide posé, invalide et absent OMIS', () => {
+  expect(declFor({ driftUnit: 'turn' }).driftUnit).toBe('turn');
+  expect(declFor({ driftUnit: 'tool' }).driftUnit).toBe('tool');
+  expect('driftUnit' in declFor({ driftUnit: 'bogus' })).toBe(false);
+  expect('driftUnit' in declFor({})).toBe(false);
+  expect('driftUnit' in declFor(undefined)).toBe(false);
 });
 
 // ── serverMatches : 3 GRAINS (18/07/2026) — serveur / outil / sous-outil ──

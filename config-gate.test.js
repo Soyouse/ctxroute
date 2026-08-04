@@ -147,3 +147,60 @@ if (config) {
     ok(`doc MCP ${rel} : frontmatter sain (${errs.join(' · ') || 'ok'})`, errs.length === 0);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// GATE — `defaults.{source}` : les clés admises sont DÉRIVÉES du registre
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ NÉ D'UNE ERREUR RÉELLE (04/08/2026, attrapée par le mainteneur et non
+//    par une machine — donc à sceller) : une clé `defaults.session` avait été
+//    écrite dans le schéma. Elle aurait été ACCEPTÉE et totalement INERTE :
+//    `docs/session/` n'est pas une source du moteur, elle est livrée par
+//    session-inject.js (SessionStart/PostCompact) qui ne consulte NI
+//    gate.decide NI aucune cadence. Régler un `mode` dessus n'aurait rien fait
+//    — c'est le FAUX VERT que ce repo a tué le 31/07 sur `mcp:`, réapparu
+//    ailleurs. Cause : le skill listait `session` parmi les sources (corrigé).
+//
+// ⚠️ DÉRIVÉ, JAMAIS RECOPIÉ : la liste vient des `id` d'ADAPTERS. Ajouter une
+//    source au registre ouvre sa clé automatiquement ; en retirer une ferme la
+//    sienne. Une liste écrite à la main ici serait un fantôme en devenir.
+{
+  const { createRequire } = await import('node:module');
+  const req = createRequire(import.meta.url);
+  const { ADAPTERS } = req('./source-adapters.js');
+  const schema = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'ctxroute-config.schema.json'), 'utf8'));
+
+  const sources = ADAPTERS.map((a) => a.id).sort();
+  const declarees = Object.keys(schema.properties.defaults.properties).sort();
+  ok(`gate defaults : registre non vide (${sources.join(',')})`, sources.length >= 1);
+  ok(`gate defaults : clés = exactement les sources du registre (${declarees.join(',')})`,
+    JSON.stringify(declarees) === JSON.stringify(sources));
+
+  // Le schéma refuse toute clé hors registre (sinon la dérivation ci-dessus
+  // serait cosmétique : une clé inconnue passerait quand même).
+  ok('gate defaults : additionalProperties false', schema.properties.defaults.additionalProperties === false);
+
+  // ⚠️ `skillDefaults` SUPPRIMÉ (généralisé en defaults.skill) : deux mots pour
+  //    le MÊME étage = loi anti-synonyme violée, et deux vérités qui dérivent.
+  ok('gate defaults : skillDefaults retiré (remplacé par defaults.skill)',
+    !('skillDefaults' in schema.properties));
+
+  // Chaque source pointe le MÊME vocabulaire de cadence (un concept = un mot).
+  for (const s of sources) {
+    ok(`gate defaults : ${s} -> definitions/cadence`,
+      schema.properties.defaults.properties[s].$ref === '#/definitions/cadence');
+  }
+
+  // ⚠️ NEGATIVE-CHECK OBLIGATOIRE — un gate jamais vu rougir est une fausse
+  //    confiance. On rejoue la MÊME comparaison sur une copie EN MÉMOIRE du
+  //    schéma, enrichie de la clé exacte qui a causé l'erreur du 04/08.
+  //    ⚠️ JAMAIS sur le fichier réel : d'autres suites le lisent EN PARALLÈLE
+  //    (38 tests tombés le 04/08 pour un sabotage sur fichier vivant).
+  const verdict = (declarees2) => JSON.stringify([...declarees2].sort()) === JSON.stringify(sources);
+  ok('gate defaults : NEGATIVE-CHECK — une clé hors registre (session) fait ROUGIR',
+    verdict([...declarees, 'session']) === false);
+  ok('gate defaults : NEGATIVE-CHECK — une source RETIRÉE du schéma fait ROUGIR',
+    verdict(declarees.slice(1)) === false);
+  ok('gate defaults : le même verdict est VERT sur les clés réelles (sinon le check ne prouve rien)',
+    verdict(declarees) === true);
+}

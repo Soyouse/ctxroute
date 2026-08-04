@@ -5,7 +5,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
-import { decide, docLabel, WRITE_TOOLS, modeForDoc, thresholdForDoc } from './gate.js';
+import { decide, docLabel, WRITE_TOOLS, modeForDoc, thresholdForDoc, driftUnitForDoc } from './gate.js';
 
 const DUMB = { mode: 'dumb', confirm: true };
 
@@ -265,4 +265,94 @@ test('decide : defaultDriftUnit turn GLOBAL s\'applique aux docs sans driftUnit 
   const state = { 'mcp/a.md': { seen: true, sinceLastCall: 0, turn: 1 } };
   assert.deepEqual(decide(config, decls, ['mcp/a.md'], 'Read', state, 1).inject, []);
   assert.deepEqual(decide(config, decls, ['mcp/a.md'], 'Read', state, 2).inject, ['mcp/a.md']);
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// CASCADE 4 ÉTAGES — `defaults.{source}` (04/08/2026)
+// ═══════════════════════════════════════════════════════════════════════
+// ⚠️ POINT UNIQUE de résolution. Ces cas sont le CONTRAT : entrée >
+//    defaults.{source} > global > défaut FRAMEWORK, avec fallback TOTAL
+//    (valeur invalide à un étage ⇒ on DESCEND, jamais d'erreur).
+// ⚠️ Valeurs attendues écrites EN DUR, jamais dérivées du code sous test.
+const eq = (a, b, m) => assert.strictEqual(a, b, m);
+
+test('cascade : SANS defaults, comportement d\'AVANT à l\'identique (parité)', () => {
+  eq(modeForDoc({}, {}, 'file'), 'smart');
+  eq(modeForDoc({ mode: 'once' }, {}, 'file'), 'once');
+  eq(modeForDoc({ mode: 'once' }, { mode: 'dumb' }, 'file'), 'dumb');
+  eq(modeForDoc({}, {}, 'skill'), 'once');
+});
+
+test('cascade : defaults.{source} s\'applique à SA catégorie et à elle seule', () => {
+  const c = { defaults: { mcp: { mode: 'dumb' }, skill: { mode: 'smart' } } };
+  eq(modeForDoc(c, {}, 'mcp'), 'dumb');
+  eq(modeForDoc(c, {}, 'skill'), 'smart');
+  eq(modeForDoc(c, {}, 'file'), 'smart');
+  eq(modeForDoc(c, {}, 'tool'), 'smart');
+});
+
+test('cascade : l\'ENTRÉE garde le dernier mot sur defaults.{source}', () => {
+  eq(modeForDoc({ defaults: { mcp: { mode: 'dumb' } } }, { mode: 'once' }, 'mcp'), 'once');
+});
+
+test('cascade : defaults.{source} écrase le GLOBAL (étage plus spécifique)', () => {
+  const c = { mode: 'once', defaults: { file: { mode: 'dumb' } } };
+  eq(modeForDoc(c, {}, 'file'), 'dumb');
+  eq(modeForDoc(c, {}, 'mcp'), 'once');
+});
+
+test('cascade : valeur INVALIDE à un étage -> on DESCEND (fallback total)', () => {
+  eq(modeForDoc({ defaults: { file: { mode: 'bogus' } }, mode: 'once' }, {}, 'file'), 'once');
+  eq(modeForDoc({ defaults: { file: { mode: 'bogus' } } }, {}, 'file'), 'smart');
+  eq(modeForDoc({ defaults: { file: { mode: 'dumb' } } }, { mode: 'bogus' }, 'file'), 'dumb');
+});
+
+test('cascade : source INCONNUE/absente -> règles génériques (jamais un plantage)', () => {
+  const c = { defaults: { file: { mode: 'dumb' } } };
+  eq(modeForDoc(c, {}, 'inexistante'), 'smart');
+  eq(modeForDoc(c, {}, undefined), 'smart');
+  eq(modeForDoc(null, null, null), 'smart');
+});
+
+// ⚠️ ASYMÉTRIE VOLONTAIRE — un skill NE consulte PAS le mode global. Sans ce cas,
+//    « uniformiser les sources » passerait vert et ferait basculer TOUS les skills
+//    à la première config globale posée (régression silencieuse).
+test('cascade : le GLOBAL ne touche JAMAIS les skills (asymétrie scellée)', () => {
+  eq(modeForDoc({ mode: 'dumb' }, {}, 'skill'), 'once');
+  eq(modeForDoc({ mode: 'smart' }, {}, 'skill'), 'once');
+  eq(modeForDoc({ mode: 'dumb', defaults: { skill: { mode: 'smart' } } }, {}, 'skill'), 'smart');
+});
+
+test('cascade : threshold — entrée > defaults.{source} > global > 4', () => {
+  eq(thresholdForDoc({}, {}, 'file'), 4);
+  eq(thresholdForDoc({ defaultThreshold: 7 }, {}, 'file'), 7);
+  eq(thresholdForDoc({ defaultThreshold: 7, defaults: { file: { threshold: 2 } } }, {}, 'file'), 2);
+  eq(thresholdForDoc({ defaults: { file: { threshold: 2 } } }, { threshold: 9 }, 'file'), 9);
+  eq(thresholdForDoc({ defaults: { file: { threshold: 1 } } }, {}, 'file'), 1);
+  eq(thresholdForDoc({ defaultThreshold: 7, defaults: { file: { threshold: 0 } } }, {}, 'file'), 7);
+  eq(thresholdForDoc({ defaults: { mcp: { threshold: 2 } } }, {}, 'file'), 4);
+});
+
+test('cascade : driftUnit — entrée > defaults.{source} > defaultDriftUnit > tool', () => {
+  eq(driftUnitForDoc({}, {}, 'file'), 'tool');
+  eq(driftUnitForDoc({ defaultDriftUnit: 'turn' }, {}, 'file'), 'turn');
+  eq(driftUnitForDoc({ defaultDriftUnit: 'turn', defaults: { file: { driftUnit: 'tool' } } }, {}, 'file'), 'tool');
+  eq(driftUnitForDoc({ defaults: { file: { driftUnit: 'turn' } } }, { driftUnit: 'tool' }, 'file'), 'tool');
+  eq(driftUnitForDoc({ defaults: { file: { driftUnit: 'bogus' } }, defaultDriftUnit: 'turn' }, {}, 'file'), 'turn');
+});
+
+// ⚠️ decide() DOIT transmettre la source à la cascade. Sans ce cas, `defaults`
+//    pourrait être accepté par le schéma et rester SANS EFFET — exactement le
+//    faux vert que ce repo combat. On prouve l'EFFET, pas la présence du param.
+test('cascade : decide() consomme owners — defaults.{source} a un EFFET réel', () => {
+  // `dumb` réinjecte TOUJOURS · `smart` (défaut d'avant) se tait tant que le
+  // seuil n'est pas atteint. Les deux branches DOIVENT donc différer — sinon le
+  // cas serait décoratif (piège vérifié : avec `once`, les deux se taisent).
+  const config = { defaults: { mcp: { mode: 'dumb' } } };
+  const decls = { 'mcp/x': {} };
+  const etat = () => ({ 'mcp/x': { seen: true, sinceLastCall: 0 } });
+  const avec = decide(config, decls, ['mcp/x'], 'Read', etat(), 0, { 'mcp/x': 'mcp' });
+  assert.deepStrictEqual(avec.inject, ['mcp/x'], 'defaults.mcp = dumb => réinjecte');
+  const sans = decide(config, decls, ['mcp/x'], 'Read', etat(), 0, undefined);
+  assert.deepStrictEqual(sans.inject, [], 'sans owners => cascade d\'avant (smart, seuil non atteint)');
 });

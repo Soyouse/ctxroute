@@ -126,25 +126,27 @@ function matchingSkills(config, payload) {
   return out;
 }
 
-// Cadence d'un skill — CASCADE 3 ÉTAGES (uniforme avec les docs) :
-//   entrée du skill  >  defaults globaux (config.skillDefaults)  >  défaut framework.
-// Défaut framework = 'once' (pointeur : chargé une fois suffit ; skills = source
-// neuve sans parité legacy, once/smart libres). Fallback TOTAL sur invalide à chaque
-// étage. Un threshold entier ≥ 1 vaut à son étage (borne 1 incluse), sinon on descend.
+// Cadence d'un skill — ⚠️ CETTE FONCTION NE RÉSOUT PLUS AUCUNE CASCADE (04/08/2026).
+// Elle POSE l'entrée du registre, rien d'autre : une clé déclarée et valide passe,
+// tout le reste est OMIS. Les étages suivants — `defaults.skill`, le global, puis le
+// défaut FRAMEWORK ('once' pour cette source) — vivent tous dans gate.js, UNIQUE
+// point de cascade.
+//
+// ⚠️ AVANT, elle résolvait `config.skillDefaults` ET forçait `mode: 'once'`. C'était
+//    un SECOND point de cascade : le jour où un étage change dans gate.js, celui-ci
+//    restait en arrière et les skills obéissaient à une autre règle que les docs,
+//    en silence. La règle « une source POSE, elle ne résout RIEN » n'existait que
+//    pour driftUnit — elle vaut maintenant pour les trois réglages.
+//
+// ⚠️ `defaults` n'est plus un paramètre : le supprimer est VOLONTAIRE, pas un oubli.
+//    Le garder « au cas où » rouvrirait exactement la double résolution ci-dessus.
 const validThreshold = (n) => (Number.isInteger(n) && n >= 1 ? n : null);
-function declFor(defaults, entry) {
-  const d = defaults || {};
+function declFor(entry) {
   const e = entry || {};
-  const mode = MODES.includes(e.mode) ? e.mode : MODES.includes(d.mode) ? d.mode : 'once';
-  const decl = { mode };
-  const threshold = validThreshold(e.threshold) != null ? e.threshold : validThreshold(d.threshold);
-  if (threshold != null) decl.threshold = threshold;
-  // ⚠️ `driftUnit` : entrée > skillDefaults, sinon ABSENT — les étages suivants
-  //    (`defaultDriftUnit` global puis framework 'tool') vivent dans gate.js
-  //    (driftUnitForDoc), UNIQUE point de cascade — même chemin que threshold.
-  const driftUnit = DRIFT_UNITS.includes(e.driftUnit) ? e.driftUnit
-    : DRIFT_UNITS.includes(d.driftUnit) ? d.driftUnit : null;
-  if (driftUnit != null) decl.driftUnit = driftUnit;
+  const decl = {};
+  if (MODES.includes(e.mode)) decl.mode = e.mode;
+  if (validThreshold(e.threshold) != null) decl.threshold = e.threshold;
+  if (DRIFT_UNITS.includes(e.driftUnit)) decl.driftUnit = e.driftUnit;
   return decl;
 }
 

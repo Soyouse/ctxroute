@@ -4,6 +4,18 @@
   "description": "Config GLOBALE du framework (décision mainteneur 17/07/2026 : le JSON ne fait QUE du global — la cadence par doc vit dans le frontmatter de la doc, jamais ici. Zéro doublon entre les deux). Cascade : frontmatter de la doc > défauts globaux ici.",
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "cadence": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Réglages de cadence — MÊME vocabulaire que l'entrée (loi anti-synonyme : un concept = un mot, quel que soit l'étage). Toutes les clés facultatives.",
+      "properties": {
+        "mode": { "enum": ["dumb", "once", "smart"] },
+        "threshold": { "type": "integer", "minimum": 1 },
+        "driftUnit": { "enum": ["tool", "turn"] }
+      }
+    }
+  },
   "properties": {
     "$schema": { "type": "string" },
     "enabled": {
@@ -66,14 +78,15 @@
       "description": "SKILLS VOLONTAIREMENT SANS PÉRIMÈTRE + INTERRUPTEUR de la discipline zéro-silence (19/07/2026 — miroir de `inject: never`). OPT-IN EXPLICITE : la présence de CETTE clé (même []) active le sens inverse du skill-registry-gate ; absente = aucune exhaustivité exigée (utiliser `skills` n'impose RIEN — un langage n'impose jamais une politique). Tout skill du harnais DOIT être SOIT enregistré dans `skills` (auto-injection par périmètre) SOIT listé ICI (référence/on-demand, invocation manuelle). Un skill dans AUCUNE des deux listes = ROUGE (skill-registry-gate, sens inverse) — un périmètre OUBLIÉ et un skill volontairement muet sont indiscernables sans cette déclaration.",
       "uniqueItems": true
     },
-    "skillDefaults": {
+    "defaults": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Étage GLOBAL de la cascade des skills (18/07/2026) — défaut appliqué à TOUS les skills sans réglage propre. Cascade : entrée du skill > skillDefaults > défaut framework (once). DISTINCT du mode/defaultThreshold global (ceux-là = docs ; les skills ont leur sémantique propre — un pointeur veut once, pas smart).",
+      "description": "DÉFAUTS PAR SOURCE — 3ᵉ étage de la cascade (04/08/2026). Généralise l'ancien `skillDefaults`, qui n'offrait cet étage qu'aux skills : entre le global (« tout le corpus ») et l'entrée (« cette doc-là »), il manquait « toutes les docs de CETTE catégorie ». Cascade complète, 4 étages : entrée (frontmatter/registre) > defaults.{source} > global (mode/defaultThreshold/defaultDriftUnit) > défaut FRAMEWORK. Fallback TOTAL à chaque étage : clé absente ou valeur invalide ⇒ on descend, jamais d'erreur. TOUT est facultatif — `defaults` absent = comportement d'avant, à l'identique. ⚠️ ASYMÉTRIE VOLONTAIRE, ne pas « corriger » : la source `skill` ne consulte PAS le global (son défaut framework est `once`, celui des docs `smart`) — un skill est un savoir de projet, une doc un rappel de geste. Les uniformiser changerait le comportement de tous les skills à la première config globale posée. ⚠️ PAS de clé `session` ICI, et ce n'est pas un oubli : les docs de docs/session/ sont livrées par session-inject.js (SessionStart/PostCompact), qui ne consulte NI gate.decide NI aucune cadence — elles s'injectent une fois par contexte, par construction. Une clé `session` serait ACCEPTÉE et INERTE, c'est-à-dire le faux vert que ce repo a tué le 31/07 (`mcp:` dans une doc de docs/). Les clés admises ici sont exactement les `id` du registre source-adapters.js — scellé par un gate.",
       "properties": {
-        "mode": { "enum": ["dumb", "once", "smart"], "description": "Cadence par défaut de tous les skills." },
-        "threshold": { "type": "integer", "minimum": 1, "description": "Threshold smart par défaut de tous les skills." },
-        "driftUnit": { "enum": ["tool", "turn"], "description": "Unité smart par défaut de tous les skills (cascade : entrée > skillDefaults > defaultDriftUnit > 'tool')." }
+        "file": { "$ref": "#/definitions/cadence", "description": "Défaut des docs déclenchées par CHEMIN (frontmatter match/rules)." },
+        "mcp": { "$ref": "#/definitions/cadence", "description": "Défaut des docs docs/mcp/{serveur}[/{outil}].md." },
+        "skill": { "$ref": "#/definitions/cadence", "description": "Défaut des skills à périmètre (ex-`skillDefaults`, même sémantique)." },
+        "tool": { "$ref": "#/definitions/cadence", "description": "Défaut des docs déclenchées par NOM D'OUTIL natif (frontmatter tool:)." }
       }
     },
     "skills": {

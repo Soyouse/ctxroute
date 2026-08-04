@@ -206,6 +206,44 @@ Le risque de bascule est donc borné aux cas qui, sans ça, étaient DÉJÀ cass
 ⚠️ **N est un cliquet, DÉRIVÉ d'une mesure sur le plus gros contenu réel — jamais deviné.** Trop
 petit = l'éviction revient ; trop grand = des spawns pour rien sur un poste sujet à la saturation.
 
+## ✅ LIVRÉ — `defaults.{source}` : la cascade passe de 3 à 4 ÉTAGES (04/08/2026)
+
+**Le manque, formulé par le mainteneur** : on pouvait régler le global (« tout le corpus »)
+ou l'entrée (« cette doc-là »), mais rien entre les deux — impossible de dire « tous les skills
+en `once`, tous les MCP en `smart` » sans recopier le réglage dans chaque entrée (duplication,
+donc dérive).
+
+**Ce qui existait déjà à 25 %** : `skillDefaults` ouvrait cet étage… aux seuls skills. Deux mots
+pour un même étage = loi anti-synonyme ⇒ **`skillDefaults` SUPPRIMÉ**, généralisé en
+`defaults.{source}`. Aucun alias gardé : deux vérités dérivent.
+
+**Cascade finale, POINT UNIQUE (`gate.js`)** : entrée > `defaults.{source}` > global > défaut
+FRAMEWORK. Fallback total à chaque étage. `defaults` absent ⇒ comportement d'avant à l'identique.
+
+**Dette de conception fermée en chemin** : `sources/skill.js#declFor` résolvait SA propre cascade
+en plus de `gate.js` — deux points de résolution qui pouvaient diverger en silence. `declFor(entry)`
+ne fait plus que POSER l'entrée ; un cas de test rougit si un 2ᵉ argument réapparaît.
+
+**Ce qui rend l'étage vivant** : `decide()` reçoit `owners` (= `acc.owner`, déjà posé par chaque
+adaptateur). Sans lui, `defaults` aurait été accepté par le schéma et **sans aucun effet**.
+
+### ⚠️ ERREUR RÉELLE DE LA SESSION, à ne pas réintroduire
+Une clé **`defaults.session`** avait été écrite au schéma. Elle aurait été **acceptée et INERTE** :
+`docs/session/` n'est PAS une source du moteur (livrée par `session-inject.js` sur
+SessionStart/PostCompact, sans passer par `gate.decide`, donc **sans cadence**). C'est le faux vert
+tué le 31/07 sur `mcp:`, réapparu ailleurs.
+- **Cause racine** : le skill affirmait §2 « sources (fichier, MCP, **session**, skill), même moteur
+  (matcher + gate + cadence) » — **faux pour session**. Une doc qui ment pousse à l'erreur ; ce
+  n'est pas un défaut de vigilance. **Corrigé** (skill + miroir, nouveau §2bis).
+- **Gate posé** : les clés admises de `defaults` sont **DÉRIVÉES des `id` d'ADAPTERS**, jamais
+  recopiées, avec negative-check dans les deux sens (clé en trop / source retirée).
+- Trouvée par le MAINTENEUR, pas par une machine ⇒ scellée mécaniquement le jour même.
+
+**Preuves** : 923 tests verts (48 fichiers) · **mutation 100,00 %, 0 survivant** (cache purgé —
+`gate.js` 140 mutants) · 0 clone jscpd · doctor vert sur les DEUX câblages (Claude + Codex).
+
+---
+
 ## 🔴 OUVERT — 4 manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
 
 > ⚠️ Les 3 premiers sont des trous que J'AI CRÉÉS la nuit du 03→04/08 en posant le canari, et que
