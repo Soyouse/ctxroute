@@ -499,3 +499,26 @@ test('une doc SANS enforce n\'écrit jamais `denied` (shape d\'état inchangée,
   const r = decide({}, { 'd/x': { mode: 'once' } }, ['d/x'], 'Read', {}, 0, { 'd/x': 'file' });
   assert.strictEqual('denied' in r.state['d/x'], false);
 });
+
+// ⚠️ SYMÉTRIE DES SOURCES — gate DÉRIVÉ du registre, jamais une liste écrite.
+//    Une source future naîtra donc AVEC `enforce`, ou ce test rougira. Sans lui,
+//    la 5ᵉ source serait muette au blocage et personne ne le verrait : c'est la
+//    classe « déclaration inerte » que ce repo tue depuis le 31/07/2026.
+test('enforce fonctionne sur TOUTES les sources du registre (dérivé d\'ADAPTERS)', async () => {
+  const { ADAPTERS } = await import('./source-adapters.js');
+  const ids = ADAPTERS.map((a) => a.id);
+  assert.ok(ids.length >= 4, 'registre suspect');
+  for (const src of ids) {
+    // ① déclaré sur l'ENTRÉE
+    const parEntree = decide({}, { d: { mode: 'once', enforce: true } }, ['d'], 'Read', {}, 0, { d: src });
+    assert.strictEqual(parEntree.decision, 'deny', `source ${src} : enforce d'entrée ignoré`);
+    // ② hérité de defaults.{source}
+    const parDefaut = decide({ defaults: { [src]: { enforce: true, mode: 'once' } } },
+      { d: {} }, ['d'], 'Read', {}, 0, { d: src });
+    assert.strictEqual(parDefaut.decision, 'deny', `source ${src} : defaults.${src}.enforce inerte`);
+    // ③ désinscription explicite
+    const desinscrit = decide({ defaults: { [src]: { enforce: true, mode: 'once' } } },
+      { d: { enforce: false } }, ['d'], 'Read', {}, 0, { d: src });
+    assert.strictEqual(desinscrit.decision, 'allow', `source ${src} : \`false\` ne désinscrit pas`);
+  }
+});
