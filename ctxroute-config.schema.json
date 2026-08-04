@@ -147,6 +147,11 @@
             "enum": ["tool", "turn"],
             "description": "Unité du compteur smart pour CE skill : tool (appels d'outils) ou turn (tours de conversation). Dernier mot de la cascade."
           },
+          "note": {
+            "type": ["string", "array"],
+            "items": { "type": "string" },
+            "description": "COMMENTAIRE D'AUTEUR (04/08/2026) — le SEUL champ que le moteur ne lit JAMAIS. Destinataire = qui vient MODIFIER cette entrée (« pourquoi ce mode », « pourquoi ce scope », « re-vérifier après telle version »), pas l'agent qui agit. Miroir exact de la clé `note` du frontmatter des docs : un concept = un mot, quel que soit le corpus. 🛑 BORNE : JAMAIS le pourquoi d'un INVARIANT — celui-là reste dans le corps, visible de l'agent qui agit ; un invariant privé de sa raison dérive."
+          },
           "exclude": {
             "type": "array",
             "items": { "type": "string" },

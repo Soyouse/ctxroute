@@ -120,7 +120,8 @@ test('validate : toutes les clés COMPATIBLES acceptées ensemble', () => {
   //    corpus fichier (§A) — l'y laisser reviendrait à re-certifier le faux vert.
   assert.deepStrictEqual(validate({ match: 'a', scope: ['s'], exclude: ['e'], mode: 'dumb', confirm: true, rank: 1, threshold: 3 }), []);
   // ⚠️ Contrat écrit EN DUR — ne JAMAIS le dériver de KNOWN (il muterait avec le code).
-  assert.deepStrictEqual(KNOWN, ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit']);
+  // ⚠️ `note` AJOUTÉE le 04/08/2026 — commentaire d'auteur, JAMAIS lue par le moteur.
+  assert.deepStrictEqual(KNOWN, ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note']);
   // ⚠️ Contrat EN DUR aussi pour DRIFT_UNITS (source unique du vocabulaire d'unité).
   assert.deepStrictEqual(DRIFT_UNITS, ['tool', 'turn']);
   // ⚠️ Contrat EN DUR des DÉCLENCHEURS (4 depuis 19/07/2026 : + `tool`).
@@ -376,4 +377,34 @@ test('toolList : lecture de `tool:` — chaîne, liste, absent, mal typé', () =
   assert.deepStrictEqual(toolList({}), []);
   assert.deepStrictEqual(toolList({ tool: 42 }), []);
   assert.deepStrictEqual(toolList({ tool: null }), []);
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// `note` — commentaire d'auteur, INVISIBLE à l'agent qui agit (04/08/2026)
+// ═══════════════════════════════════════════════════════════════════════
+test('note : admise dans une doc FICHIER, texte ou liste de textes', () => {
+  assert.deepStrictEqual(validate({ match: 'x.js', note: 'dumb car garde-fou' }), []);
+  assert.deepStrictEqual(validate({ match: 'x.js', note: ['a', 'b'] }), []);
+});
+
+test('note : admise dans une doc MCP (parité de vocabulaire)', () => {
+  assert.deepStrictEqual(validateMcp({ mode: 'dumb', note: 'paiement reel' }), []);
+});
+
+test('note : FORME validée, jamais le contenu (valider le sens en ferait de la config)', () => {
+  assert.strictEqual(validate({ match: 'x.js', note: 42 }).length, 1);
+  assert.strictEqual(validate({ match: 'x.js', note: ['ok', 7] }).length, 1);
+  assert.strictEqual(validateMcp({ note: {} }).length, 1);
+});
+
+// ⚠️ LE CAS QUI PORTE TOUTE LA FEATURE. Si la note atteignait le corps injecté,
+//    elle deviendrait du bruit réinjecté à chaque geste — l'inverse exact du but.
+//    Elle est invisible PAR CONSTRUCTION (parse() retire tout le frontmatter),
+//    mais « par construction » sans test = une promesse. Ici, c'est un contrat.
+test('note : N\'ATTEINT JAMAIS le corps injecté', () => {
+  const r = parse('---\nmatch: x.js\nnote: SECRET_DE_REGLAGE\n---\ncorps visible\n');
+  assert.strictEqual(r.data.note, 'SECRET_DE_REGLAGE');
+  assert.strictEqual(r.body.includes('SECRET_DE_REGLAGE'), false);
+  assert.strictEqual(r.body.includes('note'), false);
+  assert.strictEqual(r.body.trim(), 'corps visible');
 });

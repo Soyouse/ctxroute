@@ -206,6 +206,38 @@ Le risque de bascule est donc borné aux cas qui, sans ça, étaient DÉJÀ cass
 ⚠️ **N est un cliquet, DÉRIVÉ d'une mesure sur le plus gros contenu réel — jamais deviné.** Trop
 petit = l'éviction revient ; trop grand = des spawns pour rien sur un poste sujet à la saturation.
 
+## ✅ LIVRÉ — `note:` — le commentaire d'auteur, invisible à l'agent qui agit (04/08/2026)
+
+**Le besoin (mainteneur)** : « un agent qui veut modifier une doc doit savoir à quoi s'attendre
+s'il touche aux paramètres ». Une doc a DEUX publics : qui AGIT (rappel court, réinjecté à chaque
+geste) et qui la MAINTIENT (pourquoi ce `mode`, pourquoi ce `scope`). Le second coûtait des tokens
+à chaque injection sans rien apprendre sur le geste en cours.
+
+**Ce qui rendait ça presque gratuit** : le frontmatter est DÉJÀ retiré du corps injecté. Il ne
+manquait qu'une clé admise — sans elle, `note:` tombait sous la règle « clé inconnue = ERREUR »
+(règle voulue : `mach:` = doc morte en silence).
+
+- Clé `note` admise dans les 3 corpus (doc fichier, doc MCP, entrée de registre skill) — MÊME mot
+  partout, loi anti-synonyme. Texte, ou liste de textes.
+- **FORME validée, jamais le CONTENU** : en valider le sens reviendrait à lui donner un rôle, donc
+  à en faire de la config.
+- **Le moteur ne la lit JAMAIS** — aucune décision, aucun matching, aucun tri. Le jour où une source
+  la lirait, ce serait un champ de config déguisé en commentaire (2ᵉ vérité à synchroniser).
+- Test dédié : `note` n'atteint JAMAIS le corps injecté. Invisible « par construction » sans test =
+  une promesse ; ici c'est un contrat.
+
+🛑 **BORNE CONSERVÉE TELLE QUELLE (décision du 03/08)** : `note` ne porte QUE du méta sur le RÉGLAGE.
+**JAMAIS le pourquoi d'un INVARIANT** — celui-là reste dans le corps, visible de l'agent qui agit :
+un invariant privé de sa raison DÉRIVE. Le risque est GRAVITATIONNEL : dès qu'une zone invisible
+existe, le « pourquoi » y migre parce qu'il est long et « encombre ».
+
+**Trouvé en chemin** : deux docs affirmaient encore « doc MCP = `mode`/`threshold` seulement » —
+PÉRIMÉ (`driftUnit` admis depuis le 18/07). Corrigées.
+
+**Preuves** : 927 tests verts · mutation **100,00 %** (1764 mutants, `frontmatter.js` 315).
+
+---
+
 ## ✅ LIVRÉ — `defaults.{source}` : la cascade passe de 3 à 4 ÉTAGES (04/08/2026)
 
 **Le manque, formulé par le mainteneur** : on pouvait régler le global (« tout le corpus »)

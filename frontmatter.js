@@ -112,7 +112,25 @@ const DRIFT_UNITS = ['tool', 'turn'];
 //    dispose (même philosophie que `mode`). Lu par gate.thresholdForDoc (fichier)
 //    et sources/mcp.declFor (MCP). Entier ≥ 1 : un seuil 0 = réinjection
 //    permanente déguisée (c'est le rôle de `mode: dumb`, pas d'un seuil).
-const KNOWN = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit'];
+// ⚠️ `note` (04/08/2026) — LE SEUL CHAMP QUE LE MOTEUR NE LIT JAMAIS.
+//    Destinataire = l'agent (ou l'humain) qui vient MODIFIER cette doc, pas
+//    celui qui agit : « pourquoi ce `mode`, pourquoi ce `scope`, à re-vérifier
+//    après telle version ». Il est invisible à l'injection PAR CONSTRUCTION —
+//    le frontmatter entier est retiré du corps émis (scellé par un test dédié,
+//    jamais par la seule bonne volonté).
+//
+// 🛑 BORNE, à ne JAMAIS franchir : `note` ne porte QUE du méta sur le RÉGLAGE.
+//    JAMAIS le POURQUOI D'UN INVARIANT — celui-là doit rester dans le corps,
+//    visible de l'agent qui agit : un invariant privé de sa raison DÉRIVE (le
+//    suivant ne voit pas ce qu'il casse et le contourne). Le risque n'est pas
+//    technique, il est GRAVITATIONNEL : dès qu'une zone invisible existe, le
+//    « pourquoi » y migre parce qu'il est long et « encombre ». Décision
+//    mainteneur du 03/08/2026, conservée telle quelle.
+//
+// ⚠️ Le moteur ne DOIT jamais en dépendre : aucune décision, aucun matching,
+//    aucun tri. Le jour où une source la lirait, ce serait un champ de config
+//    déguisé en commentaire — donc une 2ᵉ vérité.
+const KNOWN = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note'];
 
 // ⚠️ `inject: never` — LE SILENCE DEVIENT UNE DÉCLARATION, jamais un oubli.
 //    MESURÉ le 15/07/2026 : 14 docs sur 306 ne sont visées par AUCUNE règle.
@@ -303,6 +321,7 @@ function validate(data) {
     if (k in data && !Array.isArray(data[k])) errs.push(`\`${k}\` doit être une liste [a, b]`);
   }
   for (const e of cadenceErrors(data)) errs.push(e);
+  for (const e of noteErrors(data)) errs.push(e);
   if ('confirm' in data && typeof data.confirm !== 'boolean') {
     errs.push('`confirm` doit être true ou false');
   }
@@ -324,12 +343,13 @@ function validate(data) {
 function validateMcp(data) {
   // ⚠️ Const LOCALE (pas module-level) : un tableau au niveau module = mutant
   //    STATIQUE hors du mapping perTest → survivant garanti. Ici, couvert.
-  const MCP_KEYS = ['mode', 'threshold', 'driftUnit'];
+  const MCP_KEYS = ['mode', 'threshold', 'driftUnit', 'note'];
   const errs = [];
   for (const k of Object.keys(data)) {
     if (!MCP_KEYS.includes(k)) errs.push(`clé inconnue pour une doc MCP: \`${k}\` (admises: ${MCP_KEYS.join(', ')})`);
   }
   for (const e of cadenceErrors(data)) errs.push(e);
+  for (const e of noteErrors(data)) errs.push(e);
   return errs;
 }
 // Stryker restore StringLiteral
@@ -339,6 +359,17 @@ function validateMcp(data) {
 //    18/07/2026 sur signal jscpd : deux copies de ce jugement = divergence
 //    garantie (la classe de bug que ce repo tue).
 // Stryker disable StringLiteral: libellés = communication (cf validate).
+// ⚠️ `note` = commentaire d'AUTEUR, jamais du contrôle. Validé sur la FORME
+//    seulement (texte, ou liste de textes pour plusieurs remarques) : en valider
+//    le CONTENU reviendrait à lui donner un sens, donc à en faire de la config.
+function noteErrors(data) {
+  if (!('note' in data)) return [];
+  const v = data.note;
+  if (typeof v === 'string') return [];
+  if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return [];
+  return ['`note` doit etre un texte, ou une liste de textes'];
+}
+
 function cadenceErrors(data) {
   const errs = [];
   if ('mode' in data && !MODES.includes(data.mode)) {
