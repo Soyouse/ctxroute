@@ -979,38 +979,49 @@ chantier « INJECTION INTÉGRALE » — découverte du plafond, fragmentation, d
 
 ---
 
-## 🔴 OUVERT — RENOMMAGE `ctxroute` → `ctxroute` (décidé 04/08/2026, GO en attente)
+## ✅ FAIT — RENOMMAGE `mcp-doc-hooks` → `ctxroute` (décidé ET exécuté le 04/08/2026)
 
-**Pourquoi le nom actuel est FAUX** (deux mensonges, pas un) : ① le framework n'injecte plus
+> ⚠️ **L'ancien nom ci-dessous est ÉCHAPPÉ à dessein** : le codemod du renommage a réécrit ce
+> paragraphe et produit un « RENOMMAGE ctxroute → ctxroute » absurde. Leçon générale : **un codemod
+> de renommage détruit le récit HISTORIQUE qui cite l'ancien nom** — relire les documents de
+> pilotage APRÈS tout renommage de masse.
+
+**Pourquoi l'ancien nom était FAUX** (deux mensonges, pas un) : ① le framework n'injecte plus
 seulement des docs **MCP** — fichier, session, skill, outil natif sont des sources de plein droit ;
-② « **hooks** » nomme la plomberie d'UN harnais, alors que l'ambition écrite (§2bis) est d'être un
+② « **hooks** » nommait la plomberie d'UN harnais, alors que l'ambition écrite (§2bis) est d'être un
 standard **multi-harnais**. Un nom qui décrit l'implémentation d'un seul consommateur interdit le
 standard qu'on vise.
 
-**Pourquoi `ctxroute` et pas autre chose.** L'idée directrice est **l'ACHEMINEMENT** : livrer le bon
-savoir au bon geste. C'est l'analogie déjà écrite dans le skill (« SQL / CSS / **table de
-routage** »). ⚠️ **`ctxlang` a été ÉCARTÉ, ne pas le rouvrir** : `lang` promet une SYNTAXE, or on
-n'écrit ici que du frontmatter YAML et du JSON — personne n'apprend un langage. Le nom aurait menti
-sur ce qu'est le produit, exactement le défaut que ce repo combat. (Écartés aussi : `Trame`, qui ne
-nomme que le transport, soit la moitié basse ; `Aiguillage`, juste mais non exportable ; `Relais`,
-passe-partout.)
+**Pourquoi `ctxroute`.** L'idée directrice est **l'ACHEMINEMENT** : livrer le bon savoir au bon
+geste — l'analogie déjà écrite dans le skill (« SQL / CSS / **table de routage** »).
+⚠️ **`ctxlang` ÉCARTÉ, ne pas le rouvrir** : `lang` promet une SYNTAXE, or on n'écrit ici que du
+frontmatter YAML et du JSON — personne n'apprend un langage. Le nom aurait menti sur ce qu'est le
+produit, exactement le défaut que ce repo combat. (Écartés aussi : `Trame`, qui ne nomme que le
+transport, soit la moitié basse ; `Aiguillage`, juste mais non exportable ; `Relais`, passe-partout.)
 
-**AMPLEUR MESURÉE avant de décider** : **1 081 occurrences dans 175 fichiers**, plus le chemin
-ABSOLU du dossier câblé dans `settings.json` (12 déclarations), `requirements.toml` (Codex) et la
-config Gemini. ⇒ **prod vivante : GO explicite requis, à un moment où aucun autre agent ne tourne.**
+**CE QUI A ÉTÉ FAIT** — expand/contract, fenêtre de casse nulle :
+1. **EXPAND** — dossier déplacé vers `~/Desktop/ctxroute` + **jonction Windows** sur l'ancien chemin
+   (les deux chemins répondent, aucun agent en cours ne voit la différence).
+2. **MIGRER** — `settings.json` (19 refs) · `requirements.toml` Codex (9) · **`protected-paths.json`
+   (160)**, source de l'ORACLE du différentiel : oubliée d'abord, **3 tests de parité rouges**
+   jusqu'à sa migration · 110 fichiers par codemod · skill → `.claude/commands/ctxroute.md` ·
+   docs injectables → `.claude/hooks/docs/ctxroute/` · clé `skills` de la config · arbo.
+   ⚠️ **Gemini ne référençait RIEN** — la mention initiale d'une config Gemini était FAUSSE
+   (corrigée par mesure avant d'agir).
+3. **CONTRACT** — jonction retirée après preuves, dépôt GitHub renommé (`Soyouse/ctxroute`,
+   redirection auto de l'ancienne URL), remote local mis à jour et joignable.
 
-**MÉTHODE OBLIGATOIRE = expand/contract, fenêtre de casse NULLE** (renommer le dossier d'abord
-casserait les 12 hooks jusqu'à la mise à jour des configs) :
-1. **EXPAND** — copier/déplacer vers `~/Desktop/ctxroute`, puis poser une **jonction Windows**
-   `mklink /J ~/Desktop/ctxroute ~/Desktop/ctxroute` : **les deux chemins fonctionnent**, aucun
-   agent en cours ne voit la différence.
-2. **MIGRER LES CONSOMMATEURS** — `settings.json`, `requirements.toml`, config Gemini, puis les
-   1 081 occurrences par codemod (jamais à la main), puis les docs injectables + le skill (renommé
-   `.claude/commands/ctxroute.md`) + `mcp-doc-config.json` (clé du skill) + `ARBORESCENCE.md`.
-3. **CONTRACT** — retirer la jonction **seulement** après `npm test` + `doctor` + injection réelle
-   vérifiée par spawn. Le retrait est l'étape qui exige un second GO.
-⚠️ **Filet déjà en place** : `skill-registry-gate` rougit si le skill nommé n'existe pas, le doctor
-vérifie le câblage réel, et le **canari** dirait que le canal est mort. Le renommage est donc
-l'opération la mieux surveillée du repo — à condition de ne pas sauter l'étape 1.
-⚠️ **Ne PAS renommer l'opérateur `match`** au passage (~532 règles le portent) : décision maintenue,
-cf. §C. Un renommage à la fois.
+**Preuves** : 866 tests · doctor VERT sur les DEUX harnais (avant ET après retrait de la jonction) ·
+couplage vert · périmètre du skill re-prouvé par spawn réel, cas positif ET négatif.
+
+⚠️ **DEUX PIÈGES PAYÉS, ne pas les refaire** :
+① `cmd //c "mklink /J …"` depuis Git Bash **n'exécute RIEN** (cmd démarre en interactif et avale la
+ligne suivante) — l'ancien chemin est resté MORT quelques secondes. Utiliser
+`New-Item -ItemType Junction` en PowerShell.
+② `Get-Content`/`Set-Content` en **PowerShell 5.1 lisent en ANSI** : ils ont DOUBLE-ENCODÉ tous les
+accents du fichier Codex. Un remplacement de texte sur un fichier UTF-8 se fait en **octets bruts**
+(`sed`), jamais via PowerShell 5.1.
+
+⚠️ **RESTE OUVERT** : le worktree périmé `~/Desktop/mcp-doc-hooks-paquets` (branche
+`chantier-paquets`, 8 règles de pureté inertes) porte encore l'ancien nom — décision du mainteneur
+en attente.
