@@ -447,3 +447,113 @@ test('`enforce` est admis AUSSI dans une doc MCP (même vocabulaire partout)', (
   assert.deepStrictEqual(validateMcp({ mode: 'once', enforce: true }), []);
   assert.ok(validateMcp({ enforce: 3 }).some((e) => e.includes('`enforce`')));
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// VOCABULAIRE PAR CORPUS — gate de SYMÉTRIE (05/08/2026).
+// ⚠️ Fige QUELLE clé vit dans QUEL corpus. Toute divergence future devient une
+//    DÉCISION explicite (ce test rougit) au lieu d'un écart qui s'installe.
+//    Né d'une vraie question : « tout est-il symétrique ? » — la réponse était
+//    NON pour `confirm`, et personne ne l'avait écrit nulle part.
+// ═══════════════════════════════════════════════════════════════════════
+test('SYMÉTRIE : la cadence est IDENTIQUE dans les 2 corpus de docs', () => {
+  // Ces 5 clés ont le MÊME sens partout ⇒ elles DOIVENT être partout.
+  for (const k of ['mode', 'threshold', 'driftUnit', 'note', 'enforce']) {
+    assert.ok(KNOWN.includes(k), `\`${k}\` absent des docs fichier`);
+  }
+  assert.deepStrictEqual(validateMcp({ mode: 'once', threshold: 2, driftUnit: 'turn', note: 'x', enforce: true }), [],
+    'une doc MCP doit accepter TOUTE la cadence, enforce compris');
+});
+
+test('ASYMÉTRIE ASSUMÉE : `confirm` n\'existe QUE dans les docs fichier', () => {
+  // 🛑 CE N'EST PAS UN OUBLI — mesuré le 05/08/2026 avant de trancher :
+  //    · 363 des 379 docs du parc portent `confirm: true` (convention recopiée) ;
+  //    · l'interrupteur GLOBAL est à `false` ⇒ elles ne déclenchent RIEN ;
+  //    · Codex ne supporte pas `ask` : il y est dégradé en simple injection ;
+  //    · `ask` remet un HUMAIN dans la boucle = contraire au 0-human.
+  //    Il vient de protect-files.js, repris tel quel pour la parité de bascule
+  //    du 17/07/2026, et n'a jamais été rejugé depuis.
+  // ⚠️ NE PAS « corriger » cette asymétrie en étendant `confirm` aux docs MCP,
+  //    aux skills ou à `defaults` : ce serait généraliser un mot éteint et
+  //    contraire à la doctrine. `enforce` couvre le besoin en mieux (autonome,
+  //    identique sur les 2 harnais, livre le savoir avec le refus).
+  //    Sort en sursis : cf REFACTOR-PLAN « confirm — ce mot devait-il exister ? ».
+  assert.ok(KNOWN.includes('confirm'), 'confirm reste admis en doc fichier (prod)');
+  assert.ok(validateMcp({ confirm: true }).length > 0, 'confirm doit RESTER refusé en doc MCP');
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// GATE DE SYMÉTRIE DU VOCABULAIRE (05/08/2026) — anti-décalage PERMANENT.
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ POURQUOI : le framework a 4 corpus (doc fichier · doc MCP · entrée skill ·
+//    defaults.{source}). Une clé de COMPORTEMENT qui n'atterrit que dans l'un
+//    d'eux crée un décalage que PERSONNE ne voit — c'est arrivé à `confirm`,
+//    resté fichier-only depuis le 1er commit sans que ce soit une décision.
+//
+// ⚠️ PRINCIPE : **symétrie par DÉFAUT, exception DÉCLARÉE.** Aucune liste de
+//    clés en dur ici : les clés de comportement sont DÉRIVÉES (vocabulaire
+//    moins les opérateurs de matching, qui sont propres à chaque corpus par
+//    nature). Une asymétrie non déclarée = ROUGE. Une déclaration devenue
+//    fausse = ROUGE aussi (sinon les justifications périmées s'accumulent).
+//
+// ⚠️ Les corpus sont SONDÉS, jamais lus dans une constante : on appelle le vrai
+//    validateur et on lit le vrai schéma. Un gate qui lit une liste au lieu de
+//    tester le comportement peut rester vert sur un moteur cassé.
+
+// Opérateurs de MATCHING — propres au corpus par nature (un skill n'a pas de
+// `rank`, une doc MCP se déclenche par son CHEMIN). Contrat écrit en dur : les
+// dériver du code testé les ferait muter avec lui.
+const MATCHING = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'rank'];
+
+// Échantillon VALIDE par clé de comportement. Toute clé sans échantillon = ROUGE
+// (volet ⓪) : impossible d'ajouter une clé en la rendant invisible au gate.
+const ECHANTILLON = { mode: 'once', threshold: 2, driftUnit: 'turn', note: 'x', enforce: true, confirm: true };
+
+// 🛑 LES SEULES ASYMÉTRIES ADMISES — chacune avec sa RAISON MESURÉE.
+//    Ajouter une entrée ici est une DÉCISION, jamais un contournement.
+const ASYMETRIES_JUSTIFIEES = {
+  confirm: "héritage de protect-files.js repris pour la parité de bascule du 17/07/2026, jamais rejugé. "
+    + "Mesuré le 05/08/2026 : 363 des 379 docs du parc le portent (convention recopiée) MAIS l'interrupteur "
+    + "global est à `false` — elles ne déclenchent RIEN ; Codex ne supporte pas `ask` (dégradé en injection) ; "
+    + "et `ask` remet un HUMAIN dans la boucle, contraire au 0-human. NE PAS l'étendre aux autres corpus : "
+    + "ce serait généraliser un mot éteint. `enforce` couvre le besoin en mieux. Sort en sursis (REFACTOR-PLAN).",
+};
+
+test('GATE SYMÉTRIE ⓪ : toute clé de comportement a un échantillon (rien ne peut se cacher)', () => {
+  const comportement = KNOWN.filter((k) => !MATCHING.includes(k));
+  for (const k of comportement) {
+    assert.ok(k in ECHANTILLON,
+      `\`${k}\` est une clé de COMPORTEMENT sans échantillon : ajoute-la à ECHANTILLON, sinon le gate de symétrie ne la voit pas.`);
+  }
+  assert.ok(comportement.length >= 5, 'vocabulaire de comportement suspect');
+});
+
+test('GATE SYMÉTRIE ① : une clé présente dans un corpus et absente d\'un autre DOIT être justifiée', async () => {
+  const sch = (await import('./ctxroute-config.schema.json', { with: { type: 'json' } })).default;
+  const skillProps = sch.properties.skills.additionalProperties.properties;
+  const cadenceProps = sch.definitions.cadence.properties;
+
+  for (const [k, v] of Object.entries(ECHANTILLON)) {
+    // Les 4 corpus, SONDÉS (validateur réel + schéma réel).
+    const presence = {
+      'doc fichier': validate({ match: 'x', [k]: v }).length === 0,
+      'doc MCP': validateMcp({ [k]: v }).length === 0,
+      'entrée skill': Object.prototype.hasOwnProperty.call(skillProps, k),
+      'defaults.{source}': Object.prototype.hasOwnProperty.call(cadenceProps, k),
+    };
+    const absents = Object.keys(presence).filter((c) => !presence[c]);
+    const justif = ASYMETRIES_JUSTIFIEES[k];
+
+    if (absents.length === 0) {
+      // ⚠️ Volet INVERSE : une justification qui ne correspond plus à rien doit
+      //    disparaître, sinon on garde des excuses pour des problèmes réglés.
+      assert.ok(!justif,
+        `\`${k}\` est SYMÉTRIQUE partout : retire son entrée de ASYMETRIES_JUSTIFIEES (justification périmée).`);
+    } else {
+      assert.ok(typeof justif === 'string' && justif.trim().length > 40,
+        `DÉCALAGE NON JUSTIFIÉ — \`${k}\` manque dans : ${absents.join(', ')}.\n`
+        + `   Soit tu l'ajoutes à ces corpus (symétrie = le défaut), soit tu écris POURQUOI dans `
+        + `ASYMETRIES_JUSTIFIEES avec une raison MESURÉE. Le silence n'est pas une option.`);
+    }
+  }
+});

@@ -13,6 +13,11 @@
         "mode": { "enum": ["dumb", "once", "smart"] },
         "threshold": { "type": "integer", "minimum": 1 },
         "driftUnit": { "enum": ["tool", "turn"] },
+        "note": {
+          "type": ["string", "array"],
+          "items": { "type": "string" },
+          "description": "COMMENTAIRE D'AUTEUR — jamais lu par le moteur. Ici : « pourquoi ce défaut pour TOUTE cette catégorie ». ⚠️ AJOUTÉ le 05/08/2026 par le gate de symétrie du vocabulaire, qui a trouvé ce décalage au premier run : `note` existait dans les docs fichier, les docs MCP et les entrées skill, mais PAS dans `defaults.{source}` — un oubli, pas une décision. La symétrie est le DÉFAUT ; toute exception doit être justifiée par écrit."
+        },
         "enforce": {
           "type": "boolean",
           "description": "REFUSER le geste au lieu de l'informer (05/08/2026). ⚠️ N'a de sens QUE pour une catégorie dont TOUTES les docs sont en `mode: once` — le moteur n'honore `enforce` que sur un mode EFFECTIF `once` (garantie anti-boucle dans gate.js), sinon il informe. Poser `enforce` sur une catégorie entière est DÉCONSEILLÉ : chaque première action de session serait refusée, et un système qu'on subit finit débranché. Réservé aux gestes irréversibles, doc par doc. Une entrée peut s'en désinscrire avec `enforce: false`."
