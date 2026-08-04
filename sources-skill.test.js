@@ -285,3 +285,17 @@ test('skillRules/rules : PRÉCÉDENCE sur match/scope/exclude (déterministe, ja
   expect(matchingSkills(config, { toolName: 'Read', toolInput: { file_path: 'C:/via-rules/x.js' } })).toEqual([{ doc: 'skill/a' }]);
   expect(matchingSkills(config, { toolName: 'Read', toolInput: { file_path: 'C:/via-match/x.js' } })).toEqual([]);
 });
+
+// ── `enforce` (05/08/2026) : POSÉ tel quel, `false` COMPRIS ──
+test('declFor : enforce booléen posé tel quel, `false` conservé (désinscription)', () => {
+  // ⚠️ `false` NE DOIT PAS être filtré comme une valeur « vide » : c'est lui qui
+  //    permet à un skill de se désinscrire d'un `defaults.skill.enforce: true`.
+  //    Sans ce cas, la désinscription serait impossible et personne ne le verrait.
+  expect(declFor({ match: ['x'], enforce: true })).toEqual({ enforce: true });
+  expect(declFor({ match: ['x'], enforce: false })).toEqual({ enforce: false });
+});
+test('declFor : enforce NON booléen => clé OMISE (jamais un blocage deviné)', () => {
+  for (const v of ['oui', 1, 0, null, [], {}]) {
+    expect(declFor({ match: ['x'], enforce: v })).toEqual({});
+  }
+});

@@ -39,7 +39,7 @@ require('./deadline').arm();
 // ⚠️ Corps commun EXTRAIT dans porte-core.js (19/07/2026, portage Codex) :
 //    cette coquille ne garde que le dialecte Claude Code — stdin + emit.
 //    Toute évolution d'orchestration se fait DANS porte-core.js, jamais ici.
-const { run } = require('./porte-core');
+const { run, sortieDeny } = require('./porte-core');
 const { parsePaquetArgs } = require('./lib-pure');
 const { readStdinJson } = require('./stdin-json');
 
@@ -49,6 +49,21 @@ const { readStdinJson } = require('./stdin-json');
 // '[ctxroute]', parité legacy-mcp-inject), mixte = les deux joints ' · '
 // (avant la fusion, DEUX hooks émettaient DEUX messages — on les garde tous).
 function emit(decision, fullDoc, systemMessage) {
+  // ⚠️ `deny` (05/08/2026) — le SEUL cas où la porte arrête le geste.
+  //    Doc officielle : « blocks the tool call, and shows Claude the reason ».
+  //    Le savoir part donc en `permissionDecisionReason`, PAS en
+  //    `additionalContext` : ce dernier n'arrive qu'à côté du RÉSULTAT, donc
+  //    trop tard pour l'appel refusé. Aucune interaction utilisateur.
+  // ⚠️ La décision vient de gate.js et de LUI SEUL (contrat : une coquille ne
+  //    décide rien, elle traduit). Elle est déjà garantie compatible `once`,
+  //    donc le 2ᵉ appel de l'agent passera — pas de boucle.
+  if (decision === 'deny') {
+    // ⚠️ SORTIE PARTAGÉE : le JSON de refus est identique sur les 2 harnais.
+    //    Le dupliquer ici serait un CLONE — jscpd l'a vu le 05/08/2026, et le
+    //    contrat de portage l'interdit. La DÉCISION, elle, vient de gate.js.
+    console.log(JSON.stringify(sortieDeny(fullDoc)));
+    process.exit(0);
+  }
   if (decision === 'ask') {
     console.log(JSON.stringify({
       hookSpecificOutput: {

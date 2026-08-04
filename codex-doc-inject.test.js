@@ -107,3 +107,35 @@ test('enabled: false → silence total même sur match', async () => {
   const { stdout } = await run({ tool_name: 'Bash', tool_input: { command: 'cat C:/proj/server.js' }, session_id: 'cx1' });
   assert.strictEqual(stdout.trim(), '');
 });
+
+// ── `enforce` (05/08/2026) : dialecte IDENTIQUE à Claude Code ──
+// ⚠️ Contrairement à `ask` (parsé mais non supporté par Codex, donc DÉGRADÉ),
+//    `deny` existe VRAIMENT ici : vérifié dans le binaire installé 0.144.6 —
+//    permissionDecision ×5, permissionDecisionReason ×4, "deny" ×4.
+//    C'est ce qui fait de `enforce` un mot du LANGAGE et non une astuce Claude.
+test('DENY CODEX : l\'outil est refusé, la doc part dans permissionDecisionReason', async () => {
+  writeDoc('paiement.md', '---\nmatch: server.js\nmode: once\nenforce: true\n---\nNE JAMAIS cliquer un bouton de paiement.\n');
+  const { code, stdout } = await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'cdx-enf1' });
+  assert.strictEqual(code, 0);
+  const out = JSON.parse(stdout);
+  assert.strictEqual(out.hookSpecificOutput.permissionDecision, 'deny');
+  assert.ok(out.hookSpecificOutput.permissionDecisionReason.includes('NE JAMAIS cliquer'));
+  assert.strictEqual(out.hookSpecificOutput.additionalContext, undefined);
+});
+
+test('DENY CODEX : le geste REFAIT passe (alternance identique aux deux harnais)', async () => {
+  writeDoc('paiement.md', '---\nmatch: server.js\nmode: once\nenforce: true\n---\ncontenu\n');
+  const payload = { tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'cdx-enf2' };
+  const r1 = await run(payload);
+  assert.strictEqual(JSON.parse(r1.stdout).hookSpecificOutput.permissionDecision, 'deny');
+  const r2 = await run(payload);
+  assert.strictEqual(r2.stdout.trim(), '', '2e appel : silence, l\'outil s\'exécute');
+});
+
+test('NEGATIVE CODEX : sans enforce, JAMAIS de permissionDecision (parité 19/07)', async () => {
+  writeDoc('normale.md', '---\nmatch: server.js\nmode: once\n---\ncontenu\n');
+  const { stdout } = await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'cdx-enf3' });
+  const out = JSON.parse(stdout);
+  assert.strictEqual(out.hookSpecificOutput.permissionDecision, undefined);
+  assert.ok(out.hookSpecificOutput.additionalContext.includes('contenu'));
+});

@@ -12,7 +12,11 @@
       "properties": {
         "mode": { "enum": ["dumb", "once", "smart"] },
         "threshold": { "type": "integer", "minimum": 1 },
-        "driftUnit": { "enum": ["tool", "turn"] }
+        "driftUnit": { "enum": ["tool", "turn"] },
+        "enforce": {
+          "type": "boolean",
+          "description": "REFUSER le geste au lieu de l'informer (05/08/2026). ⚠️ N'a de sens QUE pour une catégorie dont TOUTES les docs sont en `mode: once` — le moteur n'honore `enforce` que sur un mode EFFECTIF `once` (garantie anti-boucle dans gate.js), sinon il informe. Poser `enforce` sur une catégorie entière est DÉCONSEILLÉ : chaque première action de session serait refusée, et un système qu'on subit finit débranché. Réservé aux gestes irréversibles, doc par doc. Une entrée peut s'en désinscrire avec `enforce: false`."
+        }
       }
     }
   },
@@ -146,6 +150,10 @@
           "driftUnit": {
             "enum": ["tool", "turn"],
             "description": "Unité du compteur smart pour CE skill : tool (appels d'outils) ou turn (tours de conversation). Dernier mot de la cascade."
+          },
+          "enforce": {
+            "type": "boolean",
+            "description": "REFUSER le geste au lieu de l'informer (05/08/2026) — MÊME mot, MÊME sens que le frontmatter des docs (loi anti-synonyme). ⚠️ N'a d'effet qu'avec un mode EFFECTIF `once` (défaut framework des skills) : gate.js n'honore JAMAIS `enforce` sur `dumb`/`smart`, sinon l'agent bloqué réessaie et se fait rebloquer SANS FIN. `false` explicite ANNULE l'héritage de `defaults.skill`."
           },
           "note": {
             "type": ["string", "array"],

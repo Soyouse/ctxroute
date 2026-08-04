@@ -356,3 +356,146 @@ test('cascade : decide() consomme owners — defaults.{source} a un EFFET réel'
   const sans = decide(config, decls, ['mcp/x'], 'Read', etat(), 0, undefined);
   assert.deepStrictEqual(sans.inject, [], 'sans owners => cascade d\'avant (smart, seuil non atteint)');
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// `enforce` (05/08/2026) — ARRÊTER le geste, pas seulement l'informer.
+// ⚠️ Pourquoi ce mot existe : doc officielle Claude Code (re-lue 05/08/2026),
+//    l'additionalContext d'un PreToolUse arrive « next to the tool result ».
+//    Une injection ne peut donc PAS empêcher le geste qu'elle vise. Seul un
+//    refus le fait — et il est autonome (aucune interaction utilisateur).
+// ═══════════════════════════════════════════════════════════════════════
+
+const declEnf = (extra) => ({ 'd/x': Object.assign({ mode: 'once' }, extra) });
+
+test('enforce ABSENT => comportement d\'AVANT, aucun deny (contrat de parité)', () => {
+  const r = decide({}, declEnf({}), ['d/x'], 'Read', {}, 0, { 'd/x': 'file' });
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('enforce: true + once => deny au 1er geste', () => {
+  const r = decide({}, declEnf({ enforce: true }), ['d/x'], 'Read', {}, 0, { 'd/x': 'file' });
+  assert.strictEqual(r.decision, 'deny');
+  assert.deepStrictEqual(r.inject, ['d/x'], 'le savoir est livré AVEC le refus — jamais un mur muet');
+});
+
+test('2e appel : once a consommé la doc => plus rien à injecter, donc PAS de deny (anti-boucle)', () => {
+  const decls = declEnf({ enforce: true });
+  const un = decide({}, decls, ['d/x'], 'Read', {}, 0, { 'd/x': 'file' });
+  assert.strictEqual(un.decision, 'deny');
+  const deux = decide({}, decls, ['d/x'], 'Read', un.state, 0, { 'd/x': 'file' });
+  assert.deepStrictEqual(deux.inject, [], 'rien à livrer au 2e tour');
+  assert.strictEqual(deux.decision, 'none', 'l\'agent qui refait son appel PASSE — sinon boucle infinie');
+});
+
+test('🛑 ALTERNANCE : un blocage n\'est JAMAIS suivi d\'un blocage — les 3 modes', () => {
+  // C'est LA garantie anti-boucle du framework. Elle ne dépend pas du mode :
+  // après un refus, le geste que l'agent refait passe TOUJOURS.
+  for (const mode of ['dumb', 'once', 'smart']) {
+    const decls = { 'd/x': { mode, enforce: true } };
+    const own = { 'd/x': 'file' };
+    const t1 = decide({}, decls, ['d/x'], 'Read', {}, 0, own);
+    assert.strictEqual(t1.decision, 'deny', `${mode} : 1er geste bloqué`);
+    const t2 = decide({}, decls, ['d/x'], 'Read', t1.state, 0, own);
+    assert.notStrictEqual(t2.decision, 'deny', `${mode} : le geste REFAIT doit passer`);
+  }
+});
+
+test('enforce + dumb : blocage / passage / blocage… en alternance RÉGULIÈRE', () => {
+  // ⚠️ `dumb` reste utilisable (décision mainteneur 05/08/2026) : il réinjecte
+  //    à chaque appel, mais seul le REFUS alterne. Une première version
+  //    l'interdisait — c'était amputer le langage sans rien protéger.
+  const decls = { 'd/x': { mode: 'dumb', enforce: true } };
+  const own = { 'd/x': 'file' };
+  let etat = {};
+  const vus = [];
+  for (let i = 0; i < 5; i++) {
+    const r = decide({}, decls, ['d/x'], 'Read', etat, 0, own);
+    vus.push(r.decision === 'deny' ? 'X' : '.');
+    assert.deepStrictEqual(r.inject, ['d/x'], 'dumb réinjecte TOUJOURS, même quand il ne bloque pas');
+    etat = r.state;
+  }
+  assert.deepStrictEqual(vus, ['X', '.', 'X', '.', 'X'], 'alternance stricte');
+});
+
+test('enforce + smart : bloque → repasse → REBLOQUE après N (la cadence, rien d\'autre)', () => {
+  // ⚠️ Ce cas prouve que `smart` est LÉGITIME (corrigé le 05/08/2026 : une
+  //    première version l'interdisait à tort, en croyant à une boucle).
+  const decls = { 'd/x': { mode: 'smart', threshold: 4, enforce: true } };
+  const own = { 'd/x': 'file' };
+
+  const t1 = decide({}, decls, ['d/x'], 'Read', {}, 0, own);
+  assert.strictEqual(t1.decision, 'deny', '1er geste : bloqué, savoir livré');
+
+  // L'agent REFAIT son appel immédiatement : la doc vient d'être livrée,
+  // son compteur est à 0 ⇒ rien à injecter ⇒ ça PASSE. Aucune boucle.
+  const t2 = decide({}, decls, ['d/x'], 'Read', t1.state, 0, own);
+  assert.deepStrictEqual(t2.inject, []);
+  assert.strictEqual(t2.decision, 'none', 'le retry immédiat passe TOUJOURS');
+
+  // 4 appels d'AUTRES outils : le compteur de la doc monte.
+  let etat = t2.state;
+  for (let i = 0; i < 4; i++) etat = decide({}, decls, ['autre'], 'Read', etat, 0, { autre: 'file' }).state;
+
+  const t3 = decide({}, decls, ['d/x'], 'Read', etat, 0, own);
+  assert.strictEqual(t3.decision, 'deny', 'la doc revient => elle rebloque, une fois');
+});
+
+test('enforce hérite de defaults.{source} — et `false` ANNULE cet héritage', () => {
+  const config = { defaults: { mcp: { enforce: true, mode: 'once' } } };
+  const herite = decide(config, { 'mcp/x': {} }, ['mcp/x'], 'Read', {}, 0, { 'mcp/x': 'mcp' });
+  assert.strictEqual(herite.decision, 'deny', 'la catégorie impose le blocage');
+  const desinscrit = decide(config, { 'mcp/x': { enforce: false } }, ['mcp/x'], 'Read', {}, 0, { 'mcp/x': 'mcp' });
+  assert.strictEqual(desinscrit.decision, 'allow', 'sans `false` explicite, une entrée serait INDÉSINSCRIPTIBLE');
+});
+
+test('deny PRIME sur ask (un geste à arrêter ne se dégrade pas en confirmation)', () => {
+  const decls = { 'd/x': { mode: 'once', enforce: true, confirm: true } };
+  const r = decide({}, decls, ['d/x'], 'Write', {}, 0, { 'd/x': 'file' });
+  assert.strictEqual(r.decision, 'deny');
+});
+
+test('AUCUN étage global pour enforce : un `enforce` racine ne bloque RIEN', () => {
+  // ⚠️ Volontaire : un blocage global refuserait le 1er geste de chaque session
+  //    sur chaque doc — le système qu'on finit par débrancher.
+  const r = decide({ enforce: true, mode: 'once' }, { 'd/x': {} }, ['d/x'], 'Read', {}, 0, { 'd/x': 'file' });
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('une doc enforce NON matchée ne contamine JAMAIS un autre appel', () => {
+  // ⚠️ Le blocage se juge sur les docs RÉELLEMENT injectées, jamais sur le
+  //    corpus : sinon une seule doc `enforce` gèlerait toute la session.
+  const decls = declEnf({ enforce: true });
+  const un = decide({}, decls, ['d/x'], 'Read', {}, 0, { 'd/x': 'file' });
+  assert.strictEqual(un.decision, 'deny');
+  const deux = decide({}, decls, ['autre'], 'Read', un.state, 0, { autre: 'file' });
+  assert.deepStrictEqual(deux.inject, ['autre'], 'l\'autre doc est bien livrée');
+  assert.strictEqual(deux.decision, 'allow', 'et le geste PASSE — aucun deny hérité');
+});
+
+test('defaults.{source}.enforce INVALIDE => on DESCEND (fallback total, jamais de blocage devine)', () => {
+  // ⚠️ Une valeur non booléenne ne doit JAMAIS être prise pour un « oui ».
+  //    Sans ce cas, une chaîne truthy bloquerait l'outil — un refus né d'une
+  //    faute de frappe est le pire des faux positifs.
+  const config = { defaults: { mcp: { enforce: 'oui', mode: 'once' } } };
+  const r = decide(config, { 'mcp/x': {} }, ['mcp/x'], 'Read', {}, 0, { 'mcp/x': 'mcp' });
+  assert.strictEqual(r.decision, 'allow');
+});
+
+test('`changed` ne ment pas : il ne repasse à true QUE si l\'état bouge vraiment', () => {
+  // ⚠️ `changed` commande l'ÉCRITURE DISQUE. Toujours vrai = une écriture par
+  //    appel d'outil pour rien ; toujours faux = l'alternance ne survit pas au
+  //    process suivant (donc blocages en série). Les deux sont des bugs réels.
+  const decls = { 'd/x': { mode: 'once', enforce: true } };
+  const own = { 'd/x': 'file' };
+  const t1 = decide({}, decls, ['d/x'], 'Read', {}, 0, own);
+  assert.strictEqual(t1.changed, true, 'le refus doit être MÉMORISÉ');
+  const t2 = decide({}, decls, ['d/x'], 'Read', t1.state, 0, own);
+  assert.strictEqual(t2.changed, true, 'la levée du refus aussi (denied true -> false)');
+  const t3 = decide({}, decls, ['d/x'], 'Read', t2.state, 0, own);
+  assert.strictEqual(t3.changed, false, 'plus rien ne bouge => AUCUNE écriture');
+});
+
+test('une doc SANS enforce n\'écrit jamais `denied` (shape d\'état inchangée, parité)', () => {
+  const r = decide({}, { 'd/x': { mode: 'once' } }, ['d/x'], 'Read', {}, 0, { 'd/x': 'file' });
+  assert.strictEqual('denied' in r.state['d/x'], false);
+});

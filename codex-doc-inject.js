@@ -29,10 +29,25 @@
 //    même classe de risque sur Codex : stdin jamais fermé = process éternel).
 require('./deadline').arm();
 
-const { run } = require('./porte-core');
+const { run, sortieDeny } = require('./porte-core');
 const { readStdinJson } = require('./stdin-json');
 
 function emit(decision, fullDoc, systemMessage) {
+  // ⚠️ `deny` (05/08/2026) — DIALECTE IDENTIQUE à Claude Code, contrairement à
+  //    `ask`. Doc officielle Codex : même forme JSON, « fully automatic —
+  //    without requiring approval prompts » (aucune interaction utilisateur).
+  //    VÉRIFIÉ DANS LE BINAIRE INSTALLÉ (0.144.6, 05/08/2026) :
+  //    `permissionDecision` 5 occurrences, `permissionDecisionReason` 4,
+  //    `"deny"` 4 — contrairement à `additionalContextLimit` (0 occurrence).
+  //    Une clé documentée n'est pas forcément dans la version installée : on
+  //    mesure, on ne suppose pas.
+  if (decision === 'deny') {
+    // ⚠️ SORTIE PARTAGÉE avec Claude Code (porte-core.sortieDeny) — contrairement
+    //    à `ask`, qui reste DÉGRADÉ ici. C'est le seul point où les deux harnais
+    //    parlent le même dialecte au mot près, donc le seul à mutualiser.
+    console.log(JSON.stringify(sortieDeny(fullDoc)));
+    process.exit(0);
+  }
   const context = decision === 'ask'
     ? '[FICHIER DOCUMENTE — MODIFICATION] Confirmer avant de modifier.\n\n' + fullDoc
     : fullDoc;

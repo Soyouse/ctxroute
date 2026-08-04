@@ -222,4 +222,30 @@ function run(data, emit, options) {
   }
 }
 
-module.exports = { run };
+/**
+ * SORTIE `deny` — DIALECTE COMMUN aux deux harnais (05/08/2026).
+ *
+ * ⚠️ POURQUOI ICI ET PAS DANS CHAQUE COQUILLE : le JSON de refus est
+ *    RIGOUREUSEMENT IDENTIQUE sur Claude Code et Codex (doc officielle des
+ *    deux + chaînes vérifiées dans le binaire Codex 0.144.6). Le dupliquer
+ *    dans les 2 coquilles était un CLONE de 22 lignes — jscpd l'a vu, et le
+ *    contrat de portage l'interdit (« JAMAIS de copie »). Précédent identique :
+ *    `decision: block` de guard-core.js.
+ * ⚠️ Le jour où un harnais divergerait sur CE point, il reprendrait son propre
+ *    emit — c'est la règle : on partage ce qui est MESURÉ identique, jamais ce
+ *    qu'on suppose identique.
+ * ⚠️ La doc part en `permissionDecisionReason`, JAMAIS en `additionalContext` :
+ *    ce dernier n'arrive qu'à côté du RÉSULTAT de l'outil, donc trop tard pour
+ *    l'appel qu'on refuse. C'est tout le sens de `enforce`.
+ */
+function sortieDeny(fullDoc) {
+  return {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: '[GESTE REFUSÉ — lis ceci, puis recommence]\n\n' + fullDoc,
+    },
+  };
+}
+
+module.exports = { run, sortieDeny };

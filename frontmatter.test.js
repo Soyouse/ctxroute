@@ -121,7 +121,10 @@ test('validate : toutes les clés COMPATIBLES acceptées ensemble', () => {
   assert.deepStrictEqual(validate({ match: 'a', scope: ['s'], exclude: ['e'], mode: 'dumb', confirm: true, rank: 1, threshold: 3 }), []);
   // ⚠️ Contrat écrit EN DUR — ne JAMAIS le dériver de KNOWN (il muterait avec le code).
   // ⚠️ `note` AJOUTÉE le 04/08/2026 — commentaire d'auteur, JAMAIS lue par le moteur.
-  assert.deepStrictEqual(KNOWN, ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note']);
+  // ⚠️ MISE À JOUR DÉLIBÉRÉE (05/08/2026) : `enforce` ajouté. Ce test a rougi
+  //    en premier — c'est son rôle : le vocabulaire ne s'étend jamais par
+  //    accident. Ajouter une clé DOIT coûter une décision explicite ici.
+  assert.deepStrictEqual(KNOWN, ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note', 'enforce']);
   // ⚠️ Contrat EN DUR aussi pour DRIFT_UNITS (source unique du vocabulaire d'unité).
   assert.deepStrictEqual(DRIFT_UNITS, ['tool', 'turn']);
   // ⚠️ Contrat EN DUR des DÉCLENCHEURS (4 depuis 19/07/2026 : + `tool`).
@@ -431,4 +434,16 @@ test('bloc YAML `|` : valeur « | » et lignes suivantes PERDUES (piège figé)'
   assert.deepStrictEqual(validateMcp({ mode: 'dumb', note: '|' }), []);
   // La forme SÛRE, à préférer toujours :
   assert.deepStrictEqual(validate({ match: 'x.js', note: ['ligne un', 'ligne deux'] }), []);
+});
+
+test('`enforce` non booléen = REJETÉ (jamais interprété comme un oui)', () => {
+  const errs = validate({ match: 'x', enforce: 'oui' });
+  assert.ok(errs.some((e) => e.includes('`enforce` doit être true ou false')), JSON.stringify(errs));
+  assert.deepStrictEqual(validate({ match: 'x', enforce: true, mode: 'once' }), []);
+  assert.deepStrictEqual(validate({ match: 'x', enforce: false }), []);
+});
+
+test('`enforce` est admis AUSSI dans une doc MCP (même vocabulaire partout)', () => {
+  assert.deepStrictEqual(validateMcp({ mode: 'once', enforce: true }), []);
+  assert.ok(validateMcp({ enforce: 3 }).some((e) => e.includes('`enforce`')));
 });

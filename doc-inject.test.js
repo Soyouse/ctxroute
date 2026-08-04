@@ -391,3 +391,35 @@ test('PAQUETS : indice hors bornes → trame unique, JAMAIS le contenu d\'un aut
   const ctx = parseOut(stdout).hookSpecificOutput.additionalContext;
   assert.ok(!ctx.includes('PAQUET '), 'déclaration incohérente ⇒ repli sûr sur la trame unique');
 });
+
+// ── `enforce` (05/08/2026) : ARRÊTER le geste, prouvé par SPAWN RÉEL ──
+// ⚠️ Doc officielle Claude Code : « permissionDecision: deny … blocks the tool
+//    call, and shows Claude the reason ». Le savoir part donc en
+//    permissionDecisionReason, JAMAIS en additionalContext (qui n'arrive qu'à
+//    côté du RÉSULTAT — trop tard pour l'appel qu'on veut empêcher).
+test('DENY : doc enforce → l\'outil est REFUSÉ et la doc part dans la RAISON', async () => {
+  writeDoc('paiement.md', '---\nmatch: server.js\nmode: once\nenforce: true\n---\nNE JAMAIS cliquer un bouton de paiement.\n');
+  const { code, stdout } = await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'enf1' });
+  assert.strictEqual(code, 0, 'exit 0 : le refus passe par le JSON, pas par un code d\'erreur');
+  const out = parseOut(stdout);
+  assert.strictEqual(out.hookSpecificOutput.permissionDecision, 'deny');
+  assert.ok(out.hookSpecificOutput.permissionDecisionReason.includes('NE JAMAIS cliquer'),
+    'le savoir DOIT être livré avec le refus — un mur muet n\'apprend rien');
+  assert.strictEqual(out.hookSpecificOutput.additionalContext, undefined,
+    'jamais additionalContext sur un deny : il arriverait après le geste refusé');
+});
+
+test('DENY : le geste REFAIT juste après PASSE (alternance, zéro boucle infinie)', async () => {
+  writeDoc('paiement.md', '---\nmatch: server.js\nmode: once\nenforce: true\n---\ncontenu\n');
+  const payload = { tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'enf2' };
+  const r1 = await run(payload);
+  assert.strictEqual(parseOut(r1.stdout).hookSpecificOutput.permissionDecision, 'deny');
+  const r2 = await run(payload);
+  assert.strictEqual(parseOut(r2.stdout), null, '2e appel : silence total, l\'outil s\'exécute');
+});
+
+test('NEGATIVE : une doc SANS enforce ne bloque JAMAIS (contrat de parité)', async () => {
+  writeDoc('normale.md', '---\nmatch: server.js\nmode: once\n---\ncontenu\n');
+  const { stdout } = await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'enf3' });
+  assert.strictEqual(parseOut(stdout).hookSpecificOutput.permissionDecision, 'allow');
+});

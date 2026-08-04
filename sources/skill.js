@@ -147,6 +147,11 @@ function declFor(entry) {
   if (MODES.includes(e.mode)) decl.mode = e.mode;
   if (validThreshold(e.threshold) != null) decl.threshold = e.threshold;
   if (DRIFT_UNITS.includes(e.driftUnit)) decl.driftUnit = e.driftUnit;
+  // ⚠️ `enforce` (05/08/2026) : POSÉ, jamais résolu — comme les autres. Le
+  //    booléen est repris TEL QUEL, `false` compris : c'est lui qui permet à un
+  //    skill de se DÉSINSCRIRE d'un `defaults.skill.enforce`. Le filtrer comme
+  //    une valeur « vide » rendrait la désinscription impossible.
+  if (typeof e.enforce === 'boolean') decl.enforce = e.enforce;
   return decl;
 }
 

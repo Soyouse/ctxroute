@@ -270,7 +270,47 @@ avant d'être présenté comme une protection.
 
 ---
 
-## 🔴 PROCHAIN CHANTIER — `enforce` : ARRÊTER le geste, pas seulement l'informer (ouvert 04/08/2026)
+## ✅ LIVRÉ — `enforce` : ARRÊTER le geste (ouvert 04/08, **LIVRÉ le 05/08/2026**)
+
+> **GO du mainteneur donné le 05/08/2026.** Livré : mot `enforce` (booléen) admis dans les docs
+> fichier, les docs MCP et les entrées `skills` — même mot, même sens, cascade identique.
+> `false` explicite annule l'héritage de `defaults.{source}`. **Pas d'étage global** (volontaire).
+> Absent = comportement d'avant à l'octet (contrat de parité §6).
+>
+> ### 🛑 CE QUE J'AI EU FAUX, ET QUE LE MAINTENEUR A CORRIGÉ
+> J'ai empilé **trois restrictions successives** pour un problème qui n'existait pas :
+> interdire `smart`, puis exiger `mode: once` ÉCRIT, puis interdire `dumb`. Le mainteneur a
+> vu la bonne mécanique : **un blocage n'est jamais suivi d'un blocage**. Le geste refait passe
+> TOUJOURS, puis la cadence reprend son cours.
+> ⇒ Les 3 restrictions ont été SUPPRIMÉES et remplacées par UN drapeau d'état (`denied`).
+> Résultat : **aucun mode interdit** (`dumb` = bloque/passe/bloque), moins de code, plus de cas
+> couverts. **NE JAMAIS réintroduire une interdiction de mode ici.**
+> ⚠️ Une doc `enforce` écrit son état MÊME en `dumb` (sinon rien ne se souvient du refus) ; sans
+> `enforce`, la shape d'état ne bouge pas d'un octet.
+> ⚠️ J'ai aussi proposé un cran `warn` (repris de Kubernetes/CSP) : **inutile ici**, il ne
+> faisait RIEN de plus que le défaut — un synonyme de `false`, donc une violation de la loi
+> anti-synonyme. Retiré avant d'être écrit. `dryrun` écarté aussi (aucune valeur avec l'alternance).
+>
+> ### ⚠️ DETTE ASSUMÉE, MESURÉE — 1 clone jscpd de 19 lignes entre les 2 coquilles
+> `codex-doc-inject.js:32` ⇔ `doc-inject.js:43`, **0,28 %** (seuil du gate : 1 % → VERT).
+> Le repo était à **0 clone** avant : c'est moi qui l'ai introduit en écrivant `deny` deux fois.
+> La LOGIQUE a été factorisée (`porte-core.sortieDeny`, dialecte identique MESURé sur les 2
+> harnais — même précédent que `decision: block` de guard-core). Ce qui reste identique = les
+> `require` + la signature de `emit` + la branche `deny` de 3 lignes.
+> 🛑 **NE PAS le faire disparaître en réécrivant des commentaires** : ce serait maquiller une
+> mesure. Et deux coquilles minces DOIVENT se ressembler — le jour où elles divergent, c'est
+> qu'on y a remis de la logique. Ce clone est un signal SAIN, pas une dette à rembourser.
+>
+> ### PREUVES
+> 960+ tests verts · **mutation 100,00 %** (10 survivants tués, cliquet tenu) · **spawn RÉEL sur
+> LES DEUX harnais** (refus effectif + raison reçue + negative-check « sans enforce, jamais de
+> blocage » + alternance prouvée) · doc injectable + skill + schéma à jour.
+> ⚠️ **Aucune doc du parc n'utilise `enforce` à ce jour** : le mot existe, le comportement réel
+> du parc est INCHANGÉ. L'activer sur une doc = décision humaine, geste par geste.
+
+<details><summary>Plan d'origine (04/08/2026) — conservé pour les faits datés</summary>
+
+#### `enforce` : ARRÊTER le geste, pas seulement l'informer (ouvert 04/08/2026)
 
 > ⚠️ **DÉCISION DU MAINTENEUR REQUISE avant de coder** : c'est un retour sur le retrait du
 > deny/ask du 17/07/2026 — mais pris, cette fois, en connaissance du fait ci-dessous.
@@ -311,6 +351,8 @@ Codex le parse sans le supporter.
   noyau — `porte-core` décide « bloquer ou informer », chaque harnais l'exprime.
 - Preuves exigées : spawn réel par harnais (blocage effectif + raison reçue), negative-check
   (une doc sans `enforce` ne bloque JAMAIS), mutation 100 %, doctor probe.
+
+</details>
 
 ### CE QUI RESTE VRAI ET NE CHANGE PAS
 « L'injection informe, ne bloque jamais » demeure le DÉFAUT. `enforce` est l'exception déclarée,

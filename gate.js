@@ -107,6 +107,54 @@ function driftUnitForDoc(config, decl, source) {
   return DRIFT_UNITS.includes(config && config.defaultDriftUnit) ? config.defaultDriftUnit : 'tool';
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// `enforce` (05/08/2026) — ARRÊTER le geste, au lieu de seulement l'informer.
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ POURQUOI CE MOT EXISTE — fait de doc officielle, mesuré le 04/08/2026 :
+//    l'`additionalContext` d'un PreToolUse arrive « next to the tool result »,
+//    donc APRÈS l'exécution. Une injection NE PEUT PAS empêcher le geste
+//    qu'elle vise, elle protège le suivant. L'incident fondateur du framework
+//    (un clic de paiement réel) n'aurait PAS été évité par une doc injectée.
+//    Seul un refus le fait. C'est le seul trou que la cadence ne bouchait pas.
+//
+// ⚠️ RESTE L'EXCEPTION, JAMAIS LA RÈGLE : « l'injection informe, ne bloque
+//    jamais » demeure le DÉFAUT (absent ⇒ comportement d'avant à l'octet).
+//    Un rappel de confort qui bloque rend le système insupportable, et un
+//    système qu'on subit finit débranché — on perdrait TOUTES les règles.
+//
+// ⚠️ CE N'EST PAS UNE SÉCURITÉ, c'est un GARDE-FOU. La porte est fail-open par
+//    contrat : hook mort ⇒ l'outil passe. Ça protège d'un agent distrait,
+//    jamais d'un adversaire. Ne jamais le présenter autrement.
+//
+// Cascade IDENTIQUE aux autres réglages (entrée > defaults.{source} > défaut
+// framework `false`). ⚠️ PAS d'étage GLOBAL : un `enforce` global bloquerait le
+// premier geste de chaque session sur chaque doc — le système qu'on débranche.
+// `false` explicite ANNULE l'héritage : sans lui, une catégorie passée en
+// enforce serait INDÉSINSCRIPTIBLE (impasse classique des cascades).
+function enforceForDoc(config, decl, source) {
+  const cat = defaultsDe(config, source);
+  if (decl && typeof decl.enforce === 'boolean') return decl.enforce;
+  if (typeof cat.enforce === 'boolean') return cat.enforce;
+  return false;
+}
+
+// `enforce` SUIT LA CADENCE — il n'a AUCUN rythme à lui (05/08/2026).
+// Le blocage a lieu quand la doc s'injecte : même condition, un seul axe.
+// C'est ce qui garde le mot minuscule, et TOUS les modes utilisables :
+//   `once`  → un blocage, puis plus rien de la session.
+//   `smart` → un blocage, passage, puis un nouveau blocage après N appels.
+//   `dumb`  → blocage / passage / blocage / passage… en alternance.
+//
+// ⚠️ AUCUN mode n'est interdit, et ce n'est PAS un oubli : la garantie
+//    anti-boucle ne vient pas d'un filtre sur le mode mais de l'ALTERNANCE
+//    (drapeau `denied`, cf `decide`). Un blocage n'est jamais suivi d'un
+//    blocage — donc l'agent peut TOUJOURS refaire son geste au coup suivant.
+//    Filtrer `dumb` ici serait redondant ET amputerait le langage.
+function bloqueForDoc(config, decl, source) {
+  return enforceForDoc(config, decl, source);
+}
+
 /**
  * LA décision de la porte. PURE — ne mute AUCUN argument.
  *
@@ -159,6 +207,8 @@ function decide(config, decls, matched, toolName, state, turnCount, owners) {
   // Décision PAR DOC sur l'état d'AVANT (non affecté par cet appel), puis
   // remise à zéro de son compteur — matchée = « rappelée », injectée ou pas.
   const inject = [];
+  // Docs qui REFUSENT le geste à CET appel (alternance : cf plus bas).
+  const bloquees = [];
   for (const doc of matched) {
     // ⚠️ Pas d'objet par défaut `|| { seen: false, … }` : mutant ObjectLiteral
     //    équivalent ({} donne les mêmes falsy). Les ternaires sur `entry` suffisent.
@@ -170,27 +220,54 @@ function decide(config, decls, matched, toolName, state, turnCount, owners) {
     const since = driftUnitForDoc(config, decls[doc], src(doc)) === 'turn'
       ? (entry ? turnCount - entry.turn : 0)
       : (entry ? entry.sinceLastCall : 0);
-    if (shouldInjectFor(modeForDoc(config, decls[doc], src(doc)), entry ? entry.seen : false, since, thresholdForDoc(config, decls[doc], src(doc)))) inject.push(doc);
+    const injecte = shouldInjectFor(modeForDoc(config, decls[doc], src(doc)), entry ? entry.seen : false, since, thresholdForDoc(config, decls[doc], src(doc)));
+    if (injecte) inject.push(doc);
+    // ── ALTERNANCE DU BLOCAGE (05/08/2026) ────────────────────────────
+    // 🛑 RÈGLE UNIVERSELLE : **un blocage n'est JAMAIS suivi d'un blocage.**
+    //    Le geste que l'agent refait juste après passe TOUJOURS, quel que soit
+    //    le mode ; ensuite la cadence reprend son cours normal.
+    //    C'est ça, et rien d'autre, qui rend la boucle infinie impossible —
+    //    donc `dumb` devient légitime lui aussi (bloque, passe, bloque, passe).
+    // ⚠️ Ne pas confondre avec « la doc n'est plus injectée » : en `dumb` elle
+    //    est réinjectée à chaque appel, c'est seulement le REFUS qui alterne.
+    if (injecte && bloqueForDoc(config, decls[doc], src(doc)) && !(entry && entry.denied === true)) {
+      bloquees.push(doc);
+    }
     // ⚠️ N'écrire l'état QUE si le mode le consomme : une doc `dumb` injecte
     //    toujours et ne lit jamais seen/sinceLastCall — la tracker serait une
     //    écriture disque par appel pour rien (le corpus migré est 100% dumb).
-    if (modeForDoc(config, decls[doc], src(doc)) !== 'dumb') {
+    // ⚠️ Une doc `enforce` DOIT écrire son état MÊME en `dumb` : c'est le
+    //    drapeau `denied` qui garantit l'alternance. Sans lui, dumb rebloquerait
+    //    sans fin. Les docs sans `enforce` gardent le comportement d'AVANT à
+    //    l'octet (aucune écriture en dumb) — parité intacte, différentiels verts.
+    const enf = enforceForDoc(config, decls[doc], src(doc));
+    if (modeForDoc(config, decls[doc], src(doc)) !== 'dumb' || enf) {
       // `turn` mémorisé à CHAQUE rappel = horodatage « dernière livraison »,
       // shape d'état UNIQUE (jamais 2 formes selon l'unité). En unité 'tool'
       // pur (turnCount=0 constant), `entry.turn !== turnCount` ne déclenche
       // JAMAIS d'écriture supplémentaire — parité perf intacte.
       next[doc] = { seen: true, sinceLastCall: 0, turn: turnCount };
-      if (!entry || entry.sinceLastCall !== 0 || entry.turn !== turnCount) changed = true;
+      // ⚠️ `denied` n'existe QUE sur les docs enforce : la shape des autres ne
+      //    bouge pas d'un octet (les différentiels de parité comparent l'état).
+      if (enf) next[doc].denied = bloquees.includes(doc);
+      if (!entry || entry.sinceLastCall !== 0 || entry.turn !== turnCount
+        || (enf && entry.denied !== next[doc].denied)) changed = true;
     }
   }
 
   // ask UNIQUEMENT si un outil d'écriture ET au moins une doc INJECTÉE demande
   // confirmation (confirmFor : config.confirm === false = rush → tout allow).
+  // ⚠️ `deny` PRIME sur tout : une doc qui doit ARRÊTER le geste ne peut pas être
+  //    dégradée en simple demande de confirmation. L'ordre est deny > ask > allow.
+  //    Et il n'y a rien à décider quand rien n'est injecté : bloquer sans livrer
+  //    le savoir serait un mur muet — le pire des deux mondes.
   const decision = inject.length === 0
     ? 'none'
-    : WRITE_TOOLS.includes(toolName) && inject.some((doc) => confirmFor(config, decls[doc] || {}))
-      ? 'ask'
-      : 'allow';
+    : bloquees.length > 0
+      ? 'deny'
+      : WRITE_TOOLS.includes(toolName) && inject.some((doc) => confirmFor(config, decls[doc] || {}))
+        ? 'ask'
+        : 'allow';
 
   return { decision, inject, state: next, changed };
 }
@@ -210,4 +287,4 @@ function docLabel(doc) {
   return title ? title[1].slice(0, 40) : '';
 }
 
-module.exports = { decide, docLabel, WRITE_TOOLS, modeForDoc, thresholdForDoc, driftUnitForDoc };
+module.exports = { decide, docLabel, WRITE_TOOLS, modeForDoc, thresholdForDoc, driftUnitForDoc, enforceForDoc, bloqueForDoc };

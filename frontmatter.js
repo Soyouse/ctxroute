@@ -130,7 +130,7 @@ const DRIFT_UNITS = ['tool', 'turn'];
 // ⚠️ Le moteur ne DOIT jamais en dépendre : aucune décision, aucun matching,
 //    aucun tri. Le jour où une source la lirait, ce serait un champ de config
 //    déguisé en commentaire — donc une 2ᵉ vérité.
-const KNOWN = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note'];
+const KNOWN = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note', 'enforce'];
 
 // ⚠️ `inject: never` — LE SILENCE DEVIENT UNE DÉCLARATION, jamais un oubli.
 //    MESURÉ le 15/07/2026 : 14 docs sur 306 ne sont visées par AUCUNE règle.
@@ -343,7 +343,7 @@ function validate(data) {
 function validateMcp(data) {
   // ⚠️ Const LOCALE (pas module-level) : un tableau au niveau module = mutant
   //    STATIQUE hors du mapping perTest → survivant garanti. Ici, couvert.
-  const MCP_KEYS = ['mode', 'threshold', 'driftUnit', 'note'];
+  const MCP_KEYS = ['mode', 'threshold', 'driftUnit', 'note', 'enforce'];
   const errs = [];
   for (const k of Object.keys(data)) {
     if (!MCP_KEYS.includes(k)) errs.push(`clé inconnue pour une doc MCP: \`${k}\` (admises: ${MCP_KEYS.join(', ')})`);
@@ -399,6 +399,30 @@ function cadenceErrors(data) {
   if ('driftUnit' in data && !DRIFT_UNITS.includes(data.driftUnit)) {
     errs.push(`\`driftUnit\` invalide: ${data.driftUnit} (attendu: ${DRIFT_UNITS.join('|')})`);
   }
+  // ── `enforce` (05/08/2026) : la doc REFUSE l'outil au lieu de l'informer ──
+  // ⚠️ BOOLÉEN à TROIS effets, et `false` n'est PAS du bruit : absent = HÉRITE
+  //    de l'étage supérieur (defaults.{source}), `false` = ANNULE cet héritage.
+  //    Sans valeur explicite, une catégorie passée en `enforce` serait
+  //    INDÉSINSCRIPTIBLE — l'impasse classique de tout système à cascade.
+  if ('enforce' in data && typeof data.enforce !== 'boolean') {
+    errs.push('`enforce` doit être true ou false');
+  }
+  // ⚠️ `enforce` SUIT LA CADENCE — il n'a PAS de rythme à lui (décision
+  //    mainteneur 05/08/2026, et il avait raison contre ma première version).
+  //    Le blocage se produit exactement QUAND la doc s'injecte, parce que c'est
+  //    la même condition. Et il n'y a PAS de boucle : injecter marque la doc vue
+  //    ET remet son compteur à zéro, donc l'appel que l'agent refait juste après
+  //    n'a plus rien à livrer et PASSE.
+  //      `once`  → bloque une fois par session, puis plus jamais.
+  //      `smart` → bloque, repasse aussitôt, puis rebloque une fois après N
+  //                appels d'autres outils. Parfaitement cohérent, PAS un piège.
+  //
+  //      `dumb`  → blocage / passage / blocage / passage… en alternance.
+  // ⚠️ AUCUNE combinaison n'est interdite, et ce n'est PAS un oubli : la
+  //    garantie anti-boucle vit dans `gate.js` sous forme d'ALTERNANCE (un
+  //    blocage n'est jamais suivi d'un blocage), pas sous forme d'interdit.
+  //    Une règle d'écriture qui rejetterait `dumb` amputerait le langage sans
+  //    rien protéger de plus. NE PAS en réintroduire une.
   return errs;
 }
 // Stryker restore StringLiteral
