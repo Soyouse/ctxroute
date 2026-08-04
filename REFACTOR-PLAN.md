@@ -86,7 +86,7 @@
   possible plus tard (payload réel capturé), pas bloquante.
 
   **Reste (CONTENU, pas moteur)** : scinder les 3 skills > budget (agent-social 79 516,
-  webzenon-infra 69 017, ctxroute 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
+  acme-infra 69 017, ctxroute 51 480) en tier-1 + `*-reference.md`. Ils sont désormais
   ANNONCÉS au lieu d'être amputés en silence — la dette est visible et bornée par le volet ⑤.
 
 ## ✅ PAQUETS — CONSTRUIT ET PROUVÉ (03/08/2026) · ⏸️ EN ATTENTE DE GO POUR LA BASCULE
@@ -490,7 +490,7 @@ qu'un fichier critique » et que le défaut est « documenter ». Zéro code : u
 - Port vitest complet : 398 tests / 35 s, mutation **100,00% en 30 s** (0 survivant : 2 tués, 2 équivalents `Stryker disable` justifiés dans sources/file.js), break 99 (marge délibérée — ne PAS monter).
 - **#8** : `~/.claude/hooks/protect-files.js` retire le frontmatter avant injection (`FRONTMATTER_RE` = copie de FM_RE) → la migration frontmatter ne polluera plus le contexte. Prouvé rouge/vert sur copie avant prod.
 - **#12** : 0 doc orpheline (7 réf `inject: never` + 7 règles ajoutées). **#6** : 5 faux positifs exclus. **#13** : lint-corpus --quiet en SessionStart. **#11** : protect-files.js a sa doc (`docs/protect-files.md`). **#5** : `ctxroute-config.schema.json` + drift-test dans config-gate.
-- ⚠️ Découverte : `scope` = OR (`some`) — un scope large (ex. `zenon-infra` du modèle bookings) sur-matche. Scopes précis obligatoires.
+- ⚠️ Découverte : `scope` = OR (`some`) — un scope large (ex. `acme-infra` du modèle bookings) sur-matche. Scopes précis obligatoires.
 
 **FAIT session fusion partie 1 (16/07/2026 après-midi)** :
 - **#2** : rank mesuré (75 374 vrais chemins) puis CONSERVÉ — cf § mesures. Trou découvert au passage : 31/103 docs multi-règles à scopes divergents → clé `rules:` (JSON par-entrée) dans frontmatter.js + migrate.js, mutation 100,00%.
@@ -940,7 +940,7 @@ qu'elle documente). ⚠️ Ne couvre que les affirmations CITABLES, jamais la pr
 ce qui a menti trois fois sur trois.
 
 **CHIFFRES DE ① (mesurés 03/08/2026) — la cause n'est PAS « un peu juste » :**
-budget `DEFAUT_BUDGET` = **8000**. En face : skill `agent-social` **83 160** · `webzenon-infra`
+budget `DEFAUT_BUDGET` = **8000**. En face : skill `agent-social` **83 160** · `acme-infra`
 **77 670** · `ctxroute` **28 402** · doc `pw-mcp-tests.md` **6 808** (85 % du budget à elle
 seule).
 🛑 **Un skill fait 3,5 à 10× le budget ENTIER : il ne peut JAMAIS être livré**, et comme les

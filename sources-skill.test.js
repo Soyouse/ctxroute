@@ -20,10 +20,10 @@ test('MODES = contrat exact des cadences valides', () => {
 
 // ── skillRules : registre config -> règles plates ──
 test('skillRules : 1 règle par pattern de périmètre, doc préfixée', () => {
-  const rules = skillRules({ skills: { 'webzenon-infra': { match: ['infra-mcp', 'zenon-infra'] } } });
+  const rules = skillRules({ skills: { 'acme-infra': { match: ['infra-mcp', 'acme-infra'] } } });
   expect(rules).toEqual([
-    { pattern: 'infra-mcp', doc: 'skill/webzenon-infra' },
-    { pattern: 'zenon-infra', doc: 'skill/webzenon-infra' },
+    { pattern: 'infra-mcp', doc: 'skill/acme-infra' },
+    { pattern: 'acme-infra', doc: 'skill/acme-infra' },
   ]);
 });
 
@@ -71,13 +71,13 @@ test('skillRules : match absent/non-tableau = 0 règle ; skills absent = []', ()
 
 // ── matchingSkills : réutilise le matcher fichier ──
 test('matchingSkills : périmètre touché -> skill déclenché', () => {
-  const config = { skills: { 'webzenon-infra': { match: ['infra-mcp'] } } };
+  const config = { skills: { 'acme-infra': { match: ['infra-mcp'] } } };
   const hit = matchingSkills(config, { toolName: 'Read', toolInput: { file_path: 'C:/Users/x/Desktop/infra-mcp/server.js' } });
-  expect(hit).toEqual([{ doc: 'skill/webzenon-infra' }]);
+  expect(hit).toEqual([{ doc: 'skill/acme-infra' }]);
 });
 
 test('matchingSkills : hors périmètre -> rien', () => {
-  const config = { skills: { 'webzenon-infra': { match: ['infra-mcp'] } } };
+  const config = { skills: { 'acme-infra': { match: ['infra-mcp'] } } };
   expect(matchingSkills(config, { toolName: 'Read', toolInput: { file_path: 'C:/autre/projet/index.js' } })).toEqual([]);
 });
 
@@ -88,16 +88,16 @@ test('matchingSkills : 2 patterns du MÊME skill matchent -> 1 seul pointeur (d�
 });
 
 test('matchingSkills : matche aussi une commande Bash (cd &&)', () => {
-  const config = { skills: { a: { match: ['zenon-infra'] } } };
-  const hit = matchingSkills(config, { toolName: 'Bash', toolInput: { command: 'cd /root/zenon-infra && ls scripts' } });
+  const config = { skills: { a: { match: ['acme-infra'] } } };
+  const hit = matchingSkills(config, { toolName: 'Bash', toolInput: { command: 'cd /root/acme-infra && ls scripts' } });
   expect(hit).toEqual([{ doc: 'skill/a' }]);
 });
 
 // ── serverMatches : dimension MCP, réutilise lib.serverName ──
 test('serverMatches : appel MCP d\'un serveur listé -> skill déclenché', () => {
-  const config = { skills: { 'webzenon-infra': { match: ['x'], servers: ['infra', 'blog'] } } };
-  expect(serverMatches(config, { toolName: 'mcp__infra__infra_call', toolInput: {} })).toEqual([{ doc: 'skill/webzenon-infra' }]);
-  expect(serverMatches(config, { toolName: 'mcp__blog__blog_call', toolInput: {} })).toEqual([{ doc: 'skill/webzenon-infra' }]);
+  const config = { skills: { 'acme-infra': { match: ['x'], servers: ['infra', 'blog'] } } };
+  expect(serverMatches(config, { toolName: 'mcp__infra__infra_call', toolInput: {} })).toEqual([{ doc: 'skill/acme-infra' }]);
+  expect(serverMatches(config, { toolName: 'mcp__blog__blog_call', toolInput: {} })).toEqual([{ doc: 'skill/acme-infra' }]);
 });
 
 test('serverMatches : serveur NON listé -> rien', () => {
@@ -118,8 +118,8 @@ test('serverMatches : servers absent/non-tableau -> rien', () => {
 
 // ── matchingSkills : UNION fichier + serveur, dédupée ──
 test('matchingSkills : déclenché par le SERVEUR même sans toucher de fichier', () => {
-  const config = { skills: { 'webzenon-infra': { match: ['infra-mcp'], servers: ['infra'] } } };
-  expect(matchingSkills(config, { toolName: 'mcp__infra__infra_call', toolInput: {} })).toEqual([{ doc: 'skill/webzenon-infra' }]);
+  const config = { skills: { 'acme-infra': { match: ['infra-mcp'], servers: ['infra'] } } };
+  expect(matchingSkills(config, { toolName: 'mcp__infra__infra_call', toolInput: {} })).toEqual([{ doc: 'skill/acme-infra' }]);
 });
 
 test('matchingSkills : fichier ET serveur matchent le même skill -> 1 SEUL pointeur (dédup)', () => {
@@ -177,14 +177,14 @@ test('declFor : threshold — entrée > defaults > omis ; borne 1 ; invalides re
 
 // ── skillNameFromDoc : inverse exact de skillRules ──
 test('skillNameFromDoc : retire le préfixe skill/', () => {
-  expect(skillNameFromDoc('skill/webzenon-infra')).toBe('webzenon-infra');
+  expect(skillNameFromDoc('skill/acme-infra')).toBe('acme-infra');
   expect(skillNameFromDoc('skill/a')).toBe('a');
 });
 
 // ── pointerBody : pointeur, jamais le corps du skill ──
 test('pointerBody : nomme le skill + ordonne le chargement', () => {
-  const body = pointerBody('webzenon-infra');
-  expect(body).toContain('webzenon-infra');
+  const body = pointerBody('acme-infra');
+  expect(body).toContain('acme-infra');
   expect(body).toContain('charge');
   expect(body).toContain('Skill');
 });

@@ -19,6 +19,7 @@ export default defineConfig({
       'deps-criticite-pure.test.js',
       'lib-pure.test.js',
       'canari.test.js',
+      'fuite-pure.test.js',
       'sources-file.test.js',
       'sources-tool.test.js',
       'sources-mcp.test.js',
