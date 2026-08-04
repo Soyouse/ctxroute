@@ -9,7 +9,7 @@
 //    prénom à protéger SERAIT la fuite qu'il prétend empêcher.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { motifsInterdits, scanner, echapper, dernierSegment } from './fuite-pure.js';
+import { motifsInterdits, scanner, echapper, dernierSegment, COMPTES_GENERIQUES } from './fuite-pure.js';
 
 // ⚠️ ON N'ÉCRIT JAMAIS UNE IP DU BLOC CGNAT EN CLAIR ICI : ce fichier est
 //    TRACKÉ, et le gate de ce même fichier l'interdit — à raison (il a
@@ -175,4 +175,45 @@ test('chaque motif porte un LIBELLÉ qui dit ce qui a été trouvé', () => {
     scanner('dupont', motifsInterdits(undefined, undefined, ['dupont']))[0].nom,
     'donnée personnelle : dupont'
   );
+});
+
+// ── COMPTES GÉNÉRIQUES (régression CI du 04/08/2026) ────────────────────
+test('un compte SYSTÈME/CI n\'est jamais traité comme une identité', () => {
+  // ⚠️ RÉGRESSION RÉELLE : sur GitHub Actions le compte s'appelle `runner`.
+  //    Dérivé tel quel, il matchait « test runner », « tap-runner »,
+  //    « commandRunner »… → 13 faux positifs, CI ROUGE au premier push.
+  //    Un gate rouge sur du sain finit débranché : ces noms sont ÉCARTÉS.
+  //    Risque inverse nul — personne ne s'appelle « root » ni « runner ».
+  const m = motifsInterdits('runner', '/home/runner', []);
+  assert.equal(m.length, 2, 'aucun motif tiré d\'un compte générique');
+  assert.deepEqual(scanner('le test runner vitest', m), []);
+  assert.deepEqual(scanner('/home/runner/work/projet', m), []);
+});
+
+test('la casse ne contourne PAS le filtre des comptes génériques', () => {
+  assert.equal(motifsInterdits('Runner', '/home/ROOT', []).length, 2);
+});
+
+test('un compte NON générique reste protégé (le filtre ne désarme pas tout)', () => {
+  // ⚠️ Sans ce cas, écarter TOUS les comptes passerait vert : le gate
+  //    n'aurait plus qu'email + IP et personne ne le verrait.
+  const m = motifsInterdits('jdupont', '/home/jdupont', []);
+  assert.equal(m.length, 3);
+  assert.equal(scanner('/home/jdupont/x', m).length, 1);
+});
+
+test('un terme DÉCLARÉ générique est écarté lui aussi', () => {
+  // Le filtre porte sur le littéral, jamais sur sa provenance.
+  assert.equal(motifsInterdits('', '', ['runner', 'jdupont']).length, 3);
+});
+
+test('la liste des comptes génériques est un CONTRAT écrit en dur', () => {
+  // ⚠️ Écrite EN DUR, jamais dérivée du code testé : un attendu qui mute AVEC
+  //    le code rendrait chaque mutant invisible (précédent du parc, cf
+  //    quality-configs). Ajouter un compte ici = choix DÉLIBÉRÉ, car chaque
+  //    entrée DÉSARME une protection — la liste doit rester courte et justifiée.
+  assert.deepEqual([...COMPTES_GENERIQUES].sort(), [
+    'admin', 'administrator', 'build', 'builder', 'docker', 'github', 'home',
+    'jenkins', 'root', 'runner', 'ubuntu', 'user', 'users', 'vagrant',
+  ]);
 });

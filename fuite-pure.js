@@ -49,6 +49,17 @@ const IP_CGNAT = /\b100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}\b/
 //    (RFC 2606) — les seuls emails admis.
 const EMAIL_REEL = /[a-z0-9._%+-]+@(?!example\.|test\.)[a-z0-9.-]+\.[a-z]{2,}/i;
 
+// ⚠️ COMPTES SYSTÈME / CI — JAMAIS une identité, TOUJOURS un mot générique.
+//    Sur GitHub Actions le compte s'appelle `runner` : dérivé tel quel, il
+//    matchait « test runner », « tap-runner », « commandRunner »… → 13 faux
+//    positifs et CI ROUGE (mesuré le 04/08/2026, au premier push du gate).
+//    Un gate rouge sur du sain finit débranché : ces noms sont donc ÉCARTÉS.
+//    Le risque inverse est nul — personne ne s'appelle « root » ou « runner ».
+const COMPTES_GENERIQUES = new Set([
+  'runner', 'root', 'user', 'users', 'admin', 'administrator', 'build',
+  'builder', 'ubuntu', 'vagrant', 'docker', 'jenkins', 'github', 'home',
+]);
+
 /**
  * Construit les motifs interdits À PARTIR DE L'EXTÉRIEUR.
  * @param {string} utilisateur - nom de compte OS (jamais écrit en dur)
@@ -72,7 +83,10 @@ function motifsInterdits(utilisateur, dossierPerso, supplementaires) {
     }
   }
   // Dédup : le compte OS est en général AUSSI le nom du dossier personnel.
-  for (const l of [...new Set(litteraux)]) {
+  // ⚠️ Le filtre des comptes génériques s'applique aux littéraux DÉRIVÉS DE
+  //    L'ENVIRONNEMENT **ET** aux termes déclarés : quelle que soit sa
+  //    provenance, « runner » reste un mot, pas une identité.
+  for (const l of [...new Set(litteraux)].filter((x) => !COMPTES_GENERIQUES.has(x.toLowerCase()))) {
     // ⚠️ FRONTIÈRES DE MOT, JAMAIS un sous-chaîne : un prénom court est un
     //    sous-mot de mots courants (un prénom court ⊂ un mot courant, mesuré le
     //    04/08/2026 sur 2 fichiers). Un gate qui crie sur du sain cesse
@@ -104,4 +118,4 @@ function scanner(texte, motifs) {
   return trouves;
 }
 
-module.exports = { motifsInterdits, scanner, echapper, dernierSegment };
+module.exports = { motifsInterdits, scanner, echapper, dernierSegment, COMPTES_GENERIQUES };
