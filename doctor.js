@@ -51,6 +51,8 @@ const SESSION_PORTE = path.join(__dirname, 'session-inject.js');
 const WRITE_GUARD = path.join(__dirname, 'doc-write-guard.js');
 // Porte TOUR (UserPromptSubmit) : compteur de tours pour driftUnit 'turn'.
 const TURN_PORTE = path.join(__dirname, 'turn-count.js');
+// CANARI (UserPromptSubmit) : le seul témoin qui regarde l'AUTRE bout du tuyau.
+const CANARI = path.join(__dirname, 'canari-check.js');
 // Coquilles CODEX (19/07/2026) : mêmes cœurs (porte-core/guard-core), dialecte
 // Codex CLI. reset/turn-count/session-inject se câblent TELS QUELS côté Codex.
 const CODEX_PORTE = path.join(__dirname, 'codex-doc-inject.js');
@@ -283,6 +285,60 @@ function probe() {
     check('la GARDE CODEX signale une doc invalide écrite via apply_patch',
       rgc.status === 0 && outGC && outGC.decision === 'block',
       'codex-doc-write-guard.js ne signale PAS une doc invalide dans un patch — écritures Codex sans filet.');
+
+    // ── Probe 9 — LE CANARI (canari-check.js, UserPromptSubmit) ──────────
+    // ⚠️ POSÉE LE 05/08/2026, APRÈS DEUX JOURS EN PROD SANS SONDE. Le canari
+    //    est le témoin qui surveille l'AUTRE BOUT du tuyau — mais rien ne
+    //    surveillait LE CANARI. Un dead-man switch que personne ne regarde
+    //    donne pire que rien : de la fausse confiance. C'était le trou le
+    //    plus grave du framework, et il était de mon fait.
+    //
+    // ⚠️ ON PROUVE LES DEUX VERDICTS, jamais un seul : un canari bloqué sur
+    //    une constante ('vivant' en dur, ou 'mort' en dur) passerait un test
+    //    à un seul cas — et serait aussi inutile qu'un canari absent. C'est
+    //    la même leçon que les gates de pureté INERTES du 03/08/2026.
+    //
+    // ⚠️ Le transcript est FABRIQUÉ ici : le canari lit un fichier réel, donc
+    //    on lui en donne un. On ne touche JAMAIS le transcript vivant.
+    const trans = (injecte) => {
+      const f = path.join(tmp, `transcript-${injecte ? 'vivant' : 'mort'}.jsonl`);
+      // SEUIL_APPELS = 25 → il en faut au moins autant pour que le canari OSE
+      // trancher. En dessous, son verdict est 'indecidable' (échantillon trop
+      // petit) — c'est voulu, et ça ne prouverait rien ici.
+      const lignes = [];
+      for (let i = 0; i < 30; i++) lignes.push('{"type":"tool_use","id":"t' + i + '"}');
+      if (injecte) lignes.push('{"text":"[source: .claude/hooks/docs/probe.md]"}');
+      fs.writeFileSync(f, lignes.join('\n') + '\n');
+      return f;
+    };
+    const passeCanari = (injecte) => {
+      const sante = path.join(stateDir, 'canari.json');
+      try { fs.rmSync(sante, { force: true }); } catch { /* premier passage */ }
+      const r9 = spawnSync(process.execPath, [CANARI], {
+        input: JSON.stringify({
+          hook_event_name: 'UserPromptSubmit',
+          session_id: 'doctor-probe',
+          transcript_path: trans(injecte),
+        }),
+        encoding: 'utf8',
+        env,
+      });
+      let verdict = null;
+      try { verdict = JSON.parse(fs.readFileSync(sante, 'utf8')).verdict; } catch { /* reste null */ }
+      // MUET PAR CONTRAT : sur UserPromptSubmit, stdout est injecté dans le
+      // contexte et un exit≠0 BLOQUE le prompt de l'utilisateur.
+      return { verdict, muet: r9.status === 0 && (r9.stdout || '').trim() === '' };
+    };
+    const cMort = passeCanari(false);
+    const cVivant = passeCanari(true);
+    check('le CANARI détecte un canal MORT (30 appels, 0 injection atterrie) et reste MUET',
+      cMort.verdict === 'mort' && cMort.muet,
+      'canari-check.js n\'écrit pas le verdict `mort` dans state/canari.json (ou il parle sur stdout / sort ≠ 0) : '
+      + 'le seul témoin capable de voir le harnais cesser de consommer nos injections est AVEUGLE — et il le serait EN SILENCE.');
+    check('le CANARI dit `vivant` dès UNE injection atterrie (il ne crie pas sur du sain)',
+      cVivant.verdict === 'vivant' && cVivant.muet,
+      'canari-check.js ne repasse pas à `vivant` alors qu\'une injection a atterri : verdict FIGÉ. '
+      + 'Une alarme permanente devient un décor qu\'on ne lit plus — donc un témoin mort, mais vert.');
   } finally {
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* tmpdir OS, jamais bloquant */ }
   }
@@ -376,6 +432,27 @@ function checkWiring(settingsPath) {
   check('la porte TOUR (turn-count.js) est câblée en UserPromptSubmit',
     commands.some((c) => c.includes('turn-count')),
     'turn-count.js absent de settings.json : driftUnit turn mort — docs jamais réinjectées, en silence.');
+
+  // ── CANARI (canari-check.js, UserPromptSubmit) ──────────────────────
+  // ⚠️ C'est le SEUL témoin qui regarde l'AUTRE bout du tuyau : que le
+  //    HARNAIS consomme encore nos injections. Tout le reste du framework se
+  //    teste lui-même et resterait VERT si Claude Code cessait de lire
+  //    `additionalContext`. Décâblé, il ne « dégrade » donc rien de visible —
+  //    il rend juste ce mode de panne INDÉTECTABLE, définitivement.
+  const canaris = commands.filter((c) => c.includes('canari-check'));
+  check('le CANARI (canari-check.js) est câblé en UserPromptSubmit', canaris.length >= 1,
+    'canari-check.js absent de settings.json : plus AUCUN témoin ne vérifie que le harnais consomme '
+    + 'encore nos injections. Le jour où il cessera, tout restera vert et plus rien n\'arrivera à l\'agent.');
+  for (const c of canaris) {
+    const m = /([A-Za-z]:[\\/][^"]*?|\/[^"]*?)canari-check\.js/.exec(c);
+    if (!m) continue;
+    const file = `${m[1]}canari-check.js`;
+    check('le fichier câblé existe : canari-check.js', fs.existsSync(file),
+      `settings.json pointe vers un fichier INEXISTANT : ${file} — le témoin est mort avant d'avoir servi.`);
+    check('le fichier câblé est bien CE repo : canari-check.js',
+      path.resolve(file) === path.resolve(path.join(__dirname, 'canari-check.js')),
+      `settings.json pointe vers une AUTRE copie du framework : ${file} (ce repo : ${__dirname}).`);
+  }
 }
 
 // ── 2bis. CÂBLAGE CODEX (~/.codex/hooks.json ou config.toml) ─────────

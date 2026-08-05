@@ -37,11 +37,21 @@ framework — et la raison de ne JAMAIS remplacer un gate par une consigne en pr
 
 ## 🔴 CHANTIERS OUVERTS — par ordre de priorité (session suivante)
 
-### ① CANARI SANS SONDE DOCTOR — LE PLUS GRAVE (ouvert depuis le 03/08, repoussé 2×)
-`grep -c canari doctor.js` = **0**. Le canari est câblé en PROD (`UserPromptSubmit`) sans aucune
-preuve qu'il fonctionne. **Un dead-man switch non surveillé donne la FAUSSE CONFIANCE** — pire que
-pas de filet. C'est MON trou (je l'ai câblé sans sonde), et il viole le contrat du framework
-(« preuves obligatoires avant de câbler »). Détail complet plus bas, section ①.
+### ① CANARI SANS SONDE DOCTOR — ✅ FERMÉ (05/08/2026)
+`grep -c canari doctor.js` était à **0** : le canari tournait en PROD depuis le 03/08 sans aucune
+preuve qu'il fonctionne. C'était MON trou (câblé sans sonde, en violation du contrat « preuves
+OBLIGATOIRES avant de câbler ») et il est resté ouvert **deux jours, repoussé deux fois**.
+**LIVRÉ** : probe 9 (spawn réel, transcript FABRIQUÉ, verdict lu dans `state/canari.json`) +
+check de câblage (`UserPromptSubmit`, fichier existe, bien CE repo) + **3 negative-checks**
+(3i muet · 3j FIGÉ sur `vivant` · 5f non câblé).
+⚠️ **LES DEUX VERDICTS SONT EXIGÉS, jamais un seul.** Une sonde à un cas aurait validé un canari
+figé sur une constante — un fichier valide, un verdict plausible, et zéro capacité à voir la panne
+qu'il existe pour détecter. C'est la leçon EXACTE des gates de pureté inertes du 03/08/2026,
+appliquée cette fois AVANT de payer : `mort` sur 30 appels sans injection, `vivant` dès UNE
+injection atterrie. Le negative-check 3j sabote précisément ce cas.
+**MESURES** : doctor **66 ok / 0 problème** sur les 2 câblages réels (contre 61 avant) ·
+`doctor.test.js` **61 tests** (6 neufs) · le canari de prod était bien câblé — mais c'était une
+SUPPOSITION jusqu'à aujourd'hui, c'est maintenant vérifié à chaque session.
 
 ### ② CODEX N'A AUCUN CANARI
 Filet mono-harnais. Si OpenAI change son contrat de hooks, ça meurt en SILENCE. Seule inconnue à

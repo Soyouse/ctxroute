@@ -170,6 +170,50 @@ function cloneFrameworkWithSources() {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
+// ── Cas 3i — NEGATIVE : le CANARI ne rend plus aucun verdict ──────────
+// ⚠️ Le canari est le SEUL témoin qui regarde l'AUTRE bout du tuyau. Il a
+//    tourné DEUX JOURS en prod sans aucune sonde (trou posé le 03/08/2026,
+//    fermé le 05/08). Un dead-man switch que personne ne surveille est PIRE
+//    que pas de switch : il fabrique de la confiance sans rien garantir.
+{
+  const tmp = cloneFrameworkWithSources();
+  try {
+    // Stub PLAUSIBLE : exit 0, muet — exactement ce qu'un canari SAIN doit
+    // faire côté sortie (il est muet par contrat). Seul le FICHIER de verdict
+    // le distingue d'un mort. C'est pour ça que la sonde lit le fichier.
+    fs.writeFileSync(path.join(tmp, 'canari-check.js'), 'process.exit(0);\n');
+    const r = runDoctor(path.join(tmp, 'doctor.js'));
+    ok('canari muet (n\'écrit aucun verdict) → doctor exit ≠ 0', r.status !== 0);
+    ok('canari muet → doctor nomme le canari', r.stderr.includes('canari-check.js'));
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+// ── Cas 3j — NEGATIVE : le CANARI est FIGÉ sur un verdict constant ────
+// ⚠️ LE SABOTAGE LE PLUS VICIEUX, et celui qu'une sonde à UN SEUL CAS aurait
+//    laissé passer : un canari qui écrit toujours `vivant` produit un fichier
+//    valide, un verdict plausible, et ne détectera JAMAIS la panne qu'il
+//    existe pour voir. C'est la leçon EXACTE des gates de pureté inertes du
+//    03/08/2026 — un gate qui ne peut pas rougir est une décoration.
+{
+  const tmp = cloneFrameworkWithSources();
+  try {
+    const fige = `
+const fs = require('fs'); const path = require('path'); const paths = require('./paths');
+let d = ''; process.stdin.on('data', (c) => { d += c; });
+process.stdin.on('end', () => {
+  const dir = paths.stateDir(); fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'canari.json'), JSON.stringify({ verdict: 'vivant', appels: 0, injections: 0 }));
+  process.exit(0);
+});
+`;
+    fs.writeFileSync(path.join(tmp, 'canari-check.js'), fige);
+    const r = runDoctor(path.join(tmp, 'doctor.js'));
+    ok('canari FIGÉ sur `vivant` → doctor exit ≠ 0', r.status !== 0);
+    ok('canari FIGÉ → doctor dit qu\'il ne détecte plus un canal MORT',
+      r.stderr.includes('MORT') || r.stderr.includes('mort'));
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 // ── Cas 3g — NEGATIVE : la coquille CODEX tourne mais N'INJECTE RIEN ──
 // Même classe de mort silencieuse que le cas 3, sur le dialecte Codex.
 {
@@ -408,6 +452,28 @@ function cloneFrameworkWithSources() {
     const r = runDoctor(DOCTOR, ['--settings', settings]);
     ok('porte TOUR non câblée → doctor exit ≠ 0', r.status !== 0);
     ok('porte TOUR non câblée → doctor la nomme', r.stderr.includes('turn-count.js absent'));
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+// ── Cas 5f — NEGATIVE : tout est câblé SAUF le CANARI ────────────────
+// Décâbler le canari ne dégrade RIEN de visible — c'est exactement ce qui le
+// rend dangereux : on perd le seul témoin capable de voir le harnais cesser
+// de consommer nos injections, et on le perd sans aucun symptôme.
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-wiring7-'));
+  try {
+    const settings = path.join(tmp, 'settings.json');
+    const repo = import.meta.dirname; // tout le reste câblé → seul le check canari tombe.
+    fs.writeFileSync(settings, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [
+      { command: `node ${path.join(repo, 'doc-inject.js')}` },
+      { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
+      { command: `node ${path.join(repo, 'session-inject.js')}` },
+      { command: `node ${path.join(repo, 'doc-write-guard.js')}` },
+      { command: `node ${path.join(repo, 'turn-count.js')}` },
+    ] }] } }));
+    const r = runDoctor(DOCTOR, ['--settings', settings]);
+    ok('canari non câblé → doctor exit ≠ 0', r.status !== 0);
+    ok('canari non câblé → doctor le nomme', r.stderr.includes('canari-check.js absent'));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
