@@ -77,6 +77,29 @@ vue sans un run RÉEL — c'est l'argument entier du canari, appliqué à la mai
 rollout comme message `developer`, scellée, `[source: …]` présent). Mais la preuve VOLUMÉTRIQUE
 n'est PAS faite — voir le chantier ⑨ ci-dessous, qu'elle a révélé.
 
+### ⑩ GATE ANTI-DÉPRÉCIATION MULTI-HARNAIS — 3 PISTES MESURÉES, 2 FERMÉES (05/08/2026)
+**Question posée (mainteneur)** : « y a-t-il un gate pour détecter les *deprecated* sur tous les
+harnais ? » **Réponse : non — et détecter l'ANNONCE n'est pas automatisable gratuitement.**
+Mesures, pour ne PAS refaire ces essais :
+1. 🛑 **Grep du binaire = FAUX** (piste la plus tentante, mesurée et ÉCARTÉE) : `codex_hooks`
+   est **ENCORE PRÉSENT** dans le binaire 0.146 (3 occurrences) — un flag déprécié y reste
+   justement pour pouvoir avertir. Témoins validant la mesure : flags valides tous > 0
+   (`unified_exec` 69, `multi_agent` 96, `shell_tool` 7), témoin bidon = 0. **Présence ≠ validité.**
+2. 🛑 **Écouter une trace persistée = IMPOSSIBLE** : le warning n'est NI dans le rollout JSONL
+   (0 occurrence sur les 2 sessions du jour), NI dans `~/.codex/log/` (fichier daté d'oct. 2025).
+   Il n'existe que sur **stderr, en direct**.
+3. 🛑 **Commande légère qui charge la config = INEXISTANTE** : `--version`, `exec --help`,
+   `hooks list`, `debug` ne crient PAS avec un `codex_hooks` déprécié posé dans un `CODEX_HOME`
+   jetable. Seul un `codex exec` RÉEL déclenche l'avertissement ⇒ coût en tokens à chaque passage.
+   (⚠️ `CODEX_HOME` refuse un dossier sous `%TEMP%` — utiliser un dossier hors temp.)
+**⇒ CONCLUSION ARCHITECTURALE : le gate anti-dépréciation, c'est le CANARI.** Il ne détecte pas
+l'ANNONCE (personne ne le peut gratuitement), il détecte l'**EFFET** — le jour où le flag est
+retiré et où l'injection meurt. C'est gratuit, universel par construction, et déjà conçu pour ça.
+**Cela fait du chantier ② (canari Codex) la PRIORITÉ n°1**, plus une simple symétrie manquante.
+Piste restante si un jour l'annonce doit être vue AVANT la mort : un `codex exec` trivial en
+**nightly** (jamais au pre-push — cf CLAUDE.md « gate JAMAIS bloquant »), scannant stderr sur
+`deprecat`. À ne poser que si une 2ᵉ dépréciation fait réellement mal.
+
 ### ⑨ 🔴 CODEX 0.146 = « CODE MODE » : le skill n'atteint plus l'agent (NOUVEAU, 05/08/2026)
 **Mesuré, pas supposé.** Sur un run réel visant `Desktop/ctxroute/paths.js` :
 · la porte Codex a bien tourné (état de session créé) ;
