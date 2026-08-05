@@ -77,6 +77,19 @@ vue sans un run RÉEL — c'est l'argument entier du canari, appliqué à la mai
 rollout comme message `developer`, scellée, `[source: …]` présent). Mais la preuve VOLUMÉTRIQUE
 n'est PAS faite — voir le chantier ⑨ ci-dessous, qu'elle a révélé.
 
+### ⑪ DEUX DETTES OUVERTES PAR LA SESSION DU 05/08/2026 (à traiter tôt)
+1. 🟡 **Les 2 correctifs Codex ne sont gardés par RIEN** — `[features].hooks` et l'absence de
+   `model` vivent dans `~/.codex/config.toml`, **hors repo** : aucun test ne peut les voir.
+   **Action précise** : ajouter à `doctor.js --codex-hooks` un check « `[features].hooks` = true
+   ET `codex_hooks` ABSENT » + negative-check. Sans lui, un rollback de config repasse en
+   déprécié sans que rien ne crie. **MANQUE ASSUMÉ, non corrigé le 05/08 (fin de session).**
+2. 🟡 **La CI signale ELLE-MÊME une dépréciation** (découvert en vérifiant le run vert) :
+   « Node.js 20 is deprecated. actions/checkout@v4, actions/setup-node@v4 … forced to run on
+   Node.js 24 ». ⚠️ **C'est une 4ᵉ piste pour le chantier ⑩, et elle MARCHE** : contrairement à
+   Codex, GitHub Actions PERSISTE ses avertissements dans les logs ⇒ `gh run view --log` grepé
+   sur « deprecat » est un gate GRATUIT et décidable, au moins pour le harnais CI.
+   **Action** : passer `checkout`/`setup-node` à v5, puis poser ce grep.
+
 ### ⑩ GATE ANTI-DÉPRÉCIATION MULTI-HARNAIS — 3 PISTES MESURÉES, 2 FERMÉES (05/08/2026)
 **Question posée (mainteneur)** : « y a-t-il un gate pour détecter les *deprecated* sur tous les
 harnais ? » **Réponse : non — et détecter l'ANNONCE n'est pas automatisable gratuitement.**
