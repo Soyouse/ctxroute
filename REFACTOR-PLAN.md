@@ -77,18 +77,42 @@ vue sans un run RÉEL — c'est l'argument entier du canari, appliqué à la mai
 rollout comme message `developer`, scellée, `[source: …]` présent). Mais la preuve VOLUMÉTRIQUE
 n'est PAS faite — voir le chantier ⑨ ci-dessous, qu'elle a révélé.
 
-### ⑪ DEUX DETTES OUVERTES PAR LA SESSION DU 05/08/2026 (à traiter tôt)
-1. 🟡 **Les 2 correctifs Codex ne sont gardés par RIEN** — `[features].hooks` et l'absence de
-   `model` vivent dans `~/.codex/config.toml`, **hors repo** : aucun test ne peut les voir.
-   **Action précise** : ajouter à `doctor.js --codex-hooks` un check « `[features].hooks` = true
-   ET `codex_hooks` ABSENT » + negative-check. Sans lui, un rollback de config repasse en
-   déprécié sans que rien ne crie. **MANQUE ASSUMÉ, non corrigé le 05/08 (fin de session).**
-2. 🟡 **La CI signale ELLE-MÊME une dépréciation** (découvert en vérifiant le run vert) :
-   « Node.js 20 is deprecated. actions/checkout@v4, actions/setup-node@v4 … forced to run on
-   Node.js 24 ». ⚠️ **C'est une 4ᵉ piste pour le chantier ⑩, et elle MARCHE** : contrairement à
-   Codex, GitHub Actions PERSISTE ses avertissements dans les logs ⇒ `gh run view --log` grepé
-   sur « deprecat » est un gate GRATUIT et décidable, au moins pour le harnais CI.
-   **Action** : passer `checkout`/`setup-node` à v5, puis poser ce grep.
+### ⑪ ✅ LES DEUX DETTES DU 05/08/2026 SONT FERMÉES (le jour même)
+1. ✅ **Le feature flag Codex est GARDÉ** — nouveau `doctor.js --codex-config <config.toml>`,
+   opt-in SÉPARÉ de `--codex-hooks` **parce que le flag vit dans un AUTRE fichier que le câblage**
+   (`~/.codex/config.toml` ≠ `ProgramData/.../requirements.toml`). Exige les DEUX faits, jamais un
+   seul : `hooks = true` PRÉSENT **ET** `codex_hooks` ABSENT — ne vérifier que le nouveau
+   laisserait dormir un déprécié à côté. **Ancrage début de ligne** (`^[ \t]*codex_hooks[ \t]*=`) :
+   un COMMENTAIRE a le droit de nommer le flag pour dire de ne plus l'écrire — c'est exactement le
+   cas du `config.toml` de référence, et un gate qui rougit sur du sain finit débranché.
+   **CÂBLÉ** dans `requirements.toml` (SessionStart Codex) : sans câblage, le check serait une
+   capacité sans usage — la dette qu'on combat. **MESURES** : `doctor.test.js` **68 tests**
+   (61 → 68, negative-check 7e en 5 volets dont le faux positif du commentaire) · run réel sur le
+   câblage vivant **16 ok / 0 problème**, muet, exit 0.
+   ⚠️ Reste NON gardée, et c'est ASSUMÉ : l'ABSENCE de `model` épinglé. Un `model` valide est
+   légitime, seul un modèle refusé par le serveur casse — indécidable hors appel réseau. Le
+   commentaire dans `config.toml` porte la raison ; le canari verrait l'effet.
+2. ✅ **CI passée en `actions/checkout@v5` + `actions/setup-node@v5`** (les 2 workflows) — fin de
+   l'avertissement « Node.js 20 is deprecated ». Le gate qui va avec est posé dans le rituel
+   (`rituel-stack-audit.md`) : **`gh run view <id> --log | grep -i deprecat`**. ⚠️ C'est la 4ᵉ piste
+   du chantier ⑩ **et la seule qui marche** : GitHub Actions PERSISTE ses avertissements, là où
+   Codex ne les met que sur stderr. Gratuit, décidable — mais limité au harnais CI.
+   Scorie corrigée au passage : `test.yml` affirmait « repo PRIVÉ = 2000 min/mois ». **Le repo est
+   PUBLIC** (vérifié `gh repo view`), donc minutes illimitées ; la séparation des workflows reste
+   justifiée par le TEMPS DE RETOUR, plus par le quota.
+
+### ⑫ ✅ FAUX ROUGE DU DIFFÉRENTIEL DE PORTE — trouvé ET fermé le 05/08/2026
+`porte-differential.test.js` est passé au ROUGE après **deux lignes ajoutées à des docs du parc**,
+sans qu'aucun moteur ne change. **Cause mesurée** (223 c d'écart = exactement l'enveloppe) : la
+porte SCELLE au-delà de 50 % du budget (4 000 c) ; l'oracle `protect-files.js` est FIGÉ depuis le
+17/07 et ignore le sceau né le 03/08. Le test ne tenait que parce que les payloads pesaient
+~3 400 c — **un gate dont la validité dépend de la taille du parc est un compte à rebours**, pas
+un gate. **Fix** : comparer le CONTENU déscellé (back-référence sur le marqueur, donc un sceau
+incohérent n'est PAS avalé) + **negative-check dédié** prouvant que `desceller()` n'assouplit que
+l'enveloppe. 🛑 **La tentation à ne JAMAIS suivre** : raccourcir une doc pour repasser sous le
+seuil — dégrader un livrable pour tenir dans notre propre plomberie, l'interdit du framework.
+⚠️ Cet oracle restera daté : chaque capacité ajoutée à la porte après le 17/07 creusera l'écart.
+Question à reposer au prochain `/stack-audit` : **ce différentiel doit-il encore exister ?**
 
 ### ⑩ GATE ANTI-DÉPRÉCIATION MULTI-HARNAIS — 3 PISTES MESURÉES, 2 FERMÉES (05/08/2026)
 **Question posée (mainteneur)** : « y a-t-il un gate pour détecter les *deprecated* sur tous les
@@ -109,30 +133,58 @@ Mesures, pour ne PAS refaire ces essais :
 l'ANNONCE (personne ne le peut gratuitement), il détecte l'**EFFET** — le jour où le flag est
 retiré et où l'injection meurt. C'est gratuit, universel par construction, et déjà conçu pour ça.
 **Cela fait du chantier ② (canari Codex) la PRIORITÉ n°1**, plus une simple symétrie manquante.
+✅ **4ᵉ PISTE, POSÉE le 05/08/2026 — la seule qui marche, mais bornée à la CI** : GitHub Actions
+PERSISTE ses avertissements ⇒ `gh run view <id> --log | grep -i deprecat`, gratuit et décidable,
+inscrit dans `rituel-stack-audit.md`. Elle ne couvre QUE le harnais CI : Codex et Claude restent
+au canari. Ne pas la présenter comme une réponse générale.
 Piste restante si un jour l'annonce doit être vue AVANT la mort : un `codex exec` trivial en
 **nightly** (jamais au pre-push — cf CLAUDE.md « gate JAMAIS bloquant »), scannant stderr sur
 `deprecat`. À ne poser que si une 2ᵉ dépréciation fait réellement mal.
 
-### ⑨ 🔴 CODEX 0.146 = « CODE MODE » : le skill n'atteint plus l'agent (NOUVEAU, 05/08/2026)
-**Mesuré, pas supposé.** Sur un run réel visant `Desktop/ctxroute/paths.js` :
+### ⑨ 🟠 CODEX : `skill/ctxroute` ABSENT d'un run réel — CAUSE INCONNUE (05/08/2026)
+⚠️ **CE CHANTIER S'APPELAIT « CODE MODE : le skill n'atteint plus l'agent ». Ce titre était FAUX**
+et il est réécrit ici plutôt qu'annoté (cf `pilotage.md` : un jugement renversé se réécrit).
+**LE FAIT MESURÉ, lui, tient** — run réel visant `Desktop/ctxroute/paths.js` :
 · la porte Codex a bien tourné (état de session créé) ;
 · l'injection est arrivée : **1 415 caractères, `paths.md` SEULE**, scellée, sans reliquat ;
 · **`skill/ctxroute` (42 848 c) est ABSENT du rollout**, et **rien ne l'annonce** ;
 · `explain.js` sur le payload reconstruit rend pourtant `✓ skill/ctxroute source=skill cadence=once`.
-**⇒ le payload RÉEL du hook diffère de ce qu'on peut reconstruire depuis le rollout.**
-Fait nouveau qui l'explique probablement : **0.146 n'appelle plus le shell directement**. Le modèle
-émet un `custom_tool_call` nommé **`exec`** dont l'`input` est du **JavaScript** :
-`const r = await tools.shell_command({command:"Get-Content … ctxroute\\paths.js", workdir:"…"})`.
-Le chemin n'est donc plus un paramètre, il est **enfoui dans du code, avec double échappement**.
+**L'EXPLICATION QUE J'EN AVAIS TIRÉE ÉTAIT FAUSSE.** J'avais vu dans le rollout un `custom_tool_call`
+nommé `exec` portant du JavaScript (`await tools.shell_command({command:"…"})`) et conclu que le
+chemin était « enfoui dans du code, double-échappé », donc invisible au matcher. **Non** : j'avais
+confondu la vue du ROLLOUT avec le payload du HOOK. Ce que dit la doc officielle :
+🔵 **DOC-FIRST FAIT LE 05/08/2026 :**
+Doc officielle `learn.chatgpt.com/codex/hooks` (relue ce jour ; l'ancienne URL `developers.openai.com`
+redirige 308 vers `learn.chatgpt.com`, et il n'existe PAS de `docs/hooks.md` dans le repo GitHub) :
+· *« When a model uses code mode to call a tool from JavaScript, hook decisions apply to that
+  nested call »* ⇒ **le code mode NE CONTOURNE PAS les hooks.** Le hook reçoit l'appel IMBRIQUÉ
+  avec son `tool_name` canonique — **pas le JavaScript**. Le `custom_tool_call exec` observé était
+  la vue du ROLLOUT, pas le payload du hook : je les avais confondus.
+· Table « Tool coverage » : shell et unified exec (`exec_command`) ⇒ *« Match as `Bash` »*, commande
+  dans `tool_input.command`. **C'est exactement ce que `sources/file.js` fait déjà** (l. 118/140) ⇒
+  **AUCUN changement de moteur ni de données n'est justifié par le code mode.** Le plan ne bouge pas.
+· Payload `PreToolUse` inchangé (`session_id`/`cwd`/`tool_name`/`tool_input`/`tool_use_id`/`turn_id`…),
+  décisions `deny`/`allow`+`updatedInput`, `ask` *« parsed but fail closed »*, `additionalContextLimit`
+  défaut **2500 tokens** — nos 3 correctifs (renommage `hooks`, `deny`, limite à 0) restent CORRECTS.
+🔴 **DEUX FAITS NOUVEAUX, eux, changent quelque chose** (gravés dans `porte.md`) :
+① *« Hosted tools, such as `WebSearch` … don't use the local function-tool hook path »* ⇒ le
+   déclencheur `tool:` est **MUET sur Codex pour les outils hébergés** : asymétrie de HARNAIS
+   assumée, à ne JAMAIS chasser dans le moteur. ② *« Some specialized tool paths can opt out of the
+   default hook path. Treat tool hooks as a useful guardrail, not a complete enforcement boundary »*
+   ⇒ confirme noir sur blanc que `enforce` est un garde-fou, pas une frontière d'application.
+⇒ **CE QUI RESTE DE ⑨** : la capture du payload réel (étape ①) reste à faire — elle n'est plus une
+enquête sur le code mode, mais la seule façon d'expliquer pourquoi `skill/ctxroute` était absent.
+Hypothèse restante à MESURER, pas à conclure : cadence `once` déjà consommée, ou budget.
 ⚠️ **NE PAS « corriger » le moteur à l'aveugle** — piège prouvé le 31/07 (3 sondes fausses, une
 session perdue, un faux verdict « le moteur est en cause »). **ORDRE OBLIGATOIRE** : ① CAPTURER le
 payload réel du hook Codex (le journaliser depuis la coquille, en tmpdir) ; ② le rejouer dans
 `explain.js` ; ③ seulement alors décider — et la réponse sera probablement en **DONNÉES**
 (enrichir `match`) avant d'être dans le moteur (contrat d'extension §7 : « un trou de matching se
 règle d'abord en données »).
-⚠️ **Gravité** : côté Codex, tout skill/doc dont le déclencheur passe par un chemin enfoui dans du
-code mode est MUET — sans aucun signal. C'est exactement la classe de panne que le canari existe
-pour voir, et Codex n'a toujours pas de canari (chantier ②).
+⚠️ **Gravité, reformulée après la doc** : la panne n'est plus imputée au code mode (piste morte),
+mais le FAIT demeure — un savoir attendu n'est pas arrivé et **rien ne l'a annoncé**. C'est
+exactement la classe de panne que le canari existe pour voir, et Codex n'a toujours pas de canari
+(chantier ②). Le silence, lui, est confirmé comme le vrai défaut.
 
 ### ④ RETRAIT DE `confirm` — ✅ FAIT (05/08/2026, GO du mainteneur)
 **CIBLE ATTEINTE, intégralement.** `confirm` et `ask` n'existent plus nulle part : ni dans le
@@ -193,8 +245,8 @@ Inchangés (sections plus bas). Le biais s'est encore manifesté ces 2 jours.
 
 ### ⑧ Divers froids
 Anti-mojibake · `sources.md` et `doctor.md` dépassent le seuil de dilution (à scinder) ·
-worktree périmé `~/Desktop/mcp-doc-hooks-paquets` à supprimer · `[features].codex_hooks`
-DÉPRÉCIÉ dans `~/.codex/config.toml` (→ `[features].hooks`).
+worktree périmé `~/Desktop/mcp-doc-hooks-paquets` à supprimer.
+(La ligne « `codex_hooks` déprécié » a été RETIRÉE d'ici : corrigée le jour même, cf ③.)
 
 ---
 

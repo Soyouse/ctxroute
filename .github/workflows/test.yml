@@ -16,8 +16,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -31,8 +31,8 @@ jobs:
   coupling:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -43,7 +43,9 @@ jobs:
 #    Raison : `paths:` s'applique au WORKFLOW entier, jamais à un job — la
 #    garder ici la ferait tourner à CHAQUE push (235-296 s mesuré), y compris
 #    sur un commit de doc. Doctrine CLAUDE.md : « job LOURD (> ~3 min) →
-#    workflow SÉPARÉ à paths stricts ». Repo PRIVÉ = 2000 min/mois.
+#    workflow SÉPARÉ à paths stricts ». (Ce repo est PUBLIC, donc minutes
+#    illimitées — la séparation reste valable pour le temps de retour, pas
+#    pour le quota. Redevient un enjeu de quota si le repo repasse privé.)
 #    ⚠️ NE PAS la ré-ajouter ici : elle tournerait DEUX fois, et le filtre
 #    `paths` de l'autre workflow deviendrait décoratif.
 #    Le miroir paths ⟷ stryker.conf.json est scellé par

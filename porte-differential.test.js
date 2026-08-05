@@ -34,6 +34,32 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'porte-diff-'));
 const CONFIG = path.join(TMP, 'config.json');
 if (parcPresent) fs.writeFileSync(CONFIG, JSON.stringify(RUSH ? { confirm: false } : {}));
 
+// ⚠️ DÉSCELLEMENT — LIRE AVANT DE TOUCHER (05/08/2026, faux rouge PAYÉ).
+//    Ce différentiel compare la porte à `protect-files.js`, un oracle FIGÉ
+//    (sa propre doc l'interdit d'évolution). Le SCEAU multi-trames est né le
+//    03/08/2026, APRÈS lui : l'oracle ne saura JAMAIS sceller. Or la porte
+//    scelle dès que l'injection dépasse 50 % du budget (4 000 c) — donc dès
+//    ce seuil, l'octet brut diffère TOUJOURS, pour une raison qui n'est pas
+//    une divergence de moteur mais une couche de TRANSPORT absente d'un côté.
+// ⚠️ Le test n'a survécu jusqu'ici que par CHANCE : les payloads testés
+//    pesaient ~3 400 c, juste sous le seuil. Deux lignes ajoutées à des docs
+//    du parc l'ont fait basculer — un gate qui dépend de la taille du parc
+//    n'est pas un gate, c'est un compte à rebours.
+// ⚠️ On compare donc le CONTENU, enveloppe retirée — la parité reste prouvée
+//    À L'OCTET sur ce qui fait le sens. 🛑 NE JAMAIS « corriger » ce rouge en
+//    raccourcissant une doc : ce serait dégrader un livrable pour entrer dans
+//    une limite de NOTRE plomberie, exactement l'interdit du framework
+//    (« il LIVRE TOUT »). La doc est saine ; c'est l'oracle qui est daté.
+// ⚠️ Le motif exige le MÊME marqueur en tête et en pied (back-référence) :
+//    un déscellement permissif masquerait une vraie divergence, et ce test
+//    deviendrait décoratif — la classe d'erreur des gates inertes du 03/08.
+const SCEAU_RE = /^⚠️ INJECTION SCELLÉE — ce bloc se termine par ###FIN:([0-9a-f]+)###\n[^\n]*\n[^\n]*\n\n([\s\S]*)\n\n###FIN:\1###$/;
+function desceller(ctx) {
+  if (typeof ctx !== 'string') return ctx;
+  const m = SCEAU_RE.exec(ctx);
+  return m ? m[2] : ctx;
+}
+
 function runHook(script, payload, env) {
   return new Promise((resolve) => {
     const child = execFile(process.execPath, [script], { encoding: 'utf8', env: { ...process.env, ...env } }, (_err, stdout) => {
@@ -60,7 +86,7 @@ test.skipIf(!parcPresent)('LECTURE : contenu injecté IDENTIQUE à l\'octet prè
   assert.ok(vieux && neuf, 'les deux moteurs doivent injecter sur ce payload connu');
   assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'allow');
   assert.strictEqual(neuf.hookSpecificOutput.permissionDecision, 'allow');
-  assert.strictEqual(neuf.hookSpecificOutput.additionalContext, vieux.hookSpecificOutput.additionalContext);
+  assert.strictEqual(desceller(neuf.hookSpecificOutput.additionalContext), vieux.hookSpecificOutput.additionalContext);
   assert.strictEqual(neuf.systemMessage, vieux.systemMessage);
 });
 
@@ -70,7 +96,7 @@ test.skipIf(!parcPresent)('ÉCRITURE : décision miroir du rush réel, mêmes do
   if (RUSH) {
     assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'allow');
     assert.strictEqual(neuf.hookSpecificOutput.permissionDecision, 'allow');
-    assert.strictEqual(RUSH_PREFIX + neuf.hookSpecificOutput.additionalContext, vieux.hookSpecificOutput.additionalContext);
+    assert.strictEqual(RUSH_PREFIX + desceller(neuf.hookSpecificOutput.additionalContext), vieux.hookSpecificOutput.additionalContext);
   } else {
     assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'ask');
     assert.strictEqual(neuf.hookSpecificOutput.permissionDecision, 'ask');
@@ -82,7 +108,7 @@ test.skipIf(!parcPresent)('BASH : reconstruction cd && — mêmes docs injectée
   const { vieux, neuf } = await both({ toolName: 'Bash', toolInput: { command: 'cd C:/Users/dev/Desktop/ctxroute && node doctor.js' } });
   // Silence des deux OU injection identique — jamais l'un sans l'autre.
   assert.strictEqual(neuf === null, vieux === null, 'un moteur parle, l\'autre se tait');
-  if (vieux) assert.strictEqual(neuf.hookSpecificOutput.additionalContext, vieux.hookSpecificOutput.additionalContext);
+  if (vieux) assert.strictEqual(desceller(neuf.hookSpecificOutput.additionalContext), vieux.hookSpecificOutput.additionalContext);
 });
 
 test.skipIf(!parcPresent)('GIT + NON-MATCH : silence des deux côtés', async () => {
@@ -96,4 +122,27 @@ test.skipIf(!parcPresent)('GIT + NON-MATCH : silence des deux côtés', async ()
 
 test.skipIf(!parcPresent)('HOOK_DIR sanity : le parc réel existe bien là où on le croit', () => {
   assert.ok(fs.existsSync(HOOK_DIR));
+});
+
+// ⚠️ NEGATIVE-CHECK du déscellement (05/08/2026) — SANS lui, `desceller()` est
+//    un `return ctx` déguisé qui rendrait les 3 comparaisons ci-dessus
+//    décoratives. Un assouplissement introduit pour faire passer un rouge DOIT
+//    prouver qu'il n'assouplit QUE ce qu'il prétend.
+test('desceller() retire l\'enveloppe ET RIEN D\'AUTRE', () => {
+  const corps = 'doc A\n\n---\n\ndoc B';
+  const scelle = '⚠️ INJECTION SCELLÉE — ce bloc se termine par ###FIN:abcd1234###\n'
+    + '   ligne 2\n   ligne 3\n\n' + corps + '\n\n###FIN:abcd1234###';
+  assert.strictEqual(desceller(scelle), corps, 'un bloc scellé bien formé doit rendre son corps EXACT');
+
+  // Non scellé → rendu INTACT : le chemin nominal reste une comparaison stricte.
+  assert.strictEqual(desceller(corps), corps);
+
+  // ⚠️ LE CAS QUI COMPTE : marqueurs DIFFÉRENTS = sceau incohérent. On ne
+  //    descelle PAS — sinon on avalerait un vrai défaut de transport.
+  const bancal = scelle.replace('###FIN:abcd1234###\n', '###FIN:00000000###\n');
+  assert.strictEqual(desceller(bancal), bancal);
+
+  // ⚠️ Une divergence DANS le corps reste visible après déscellement.
+  const autre = scelle.replace('doc B', 'doc C');
+  assert.notStrictEqual(desceller(autre), corps);
 });

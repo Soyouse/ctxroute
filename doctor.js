@@ -541,6 +541,39 @@ function checkCodexWiring(hooksPath) {
     'protect-files.js encore câblé dans les hooks Codex EN MÊME TEMPS que la coquille : chaque doc arrive en DOUBLE.');
 }
 
+// ── 2ter. FEATURE FLAG CODEX (~/.codex/config.toml) ──────────────────
+// ⚠️ RAISON D'ÊTRE : le câblage le plus parfait du monde est MORT si Codex
+//    n'active pas les hooks. Le flag vit dans un AUTRE fichier que le câblage
+//    (config.toml ≠ requirements.toml) et HORS du repo : aucun test ne pouvait
+//    le voir. Trou payé le 05/08/2026 — `[features].codex_hooks` était encore
+//    posé alors que Codex 0.146 l'a DÉPRÉCIÉ au profit de `hooks`. Le jour où
+//    un flag déprécié est RETIRÉ, toute l'injection Codex meurt EN SILENCE
+//    (les hooks sont fail-open par contrat : rien ne crie).
+// ⚠️ DEUX exigences, jamais une seule : `hooks = true` PRÉSENT **ET**
+//    `codex_hooks` ABSENT. Vérifier la seule présence du nouveau laisserait
+//    passer un fichier qui porte les deux — donc un déprécié qui dort.
+// ⚠️ La DÉCLARATION seule compte, jamais une MENTION : un commentaire a le
+//    droit de nommer `codex_hooks` pour expliquer pourquoi il ne faut plus
+//    l'écrire (c'est le cas dans le config.toml de référence). Même leçon que
+//    le faux positif protect-files du 19/07/2026 → ancrage en début de ligne.
+function checkCodexFeatures(configPath) {
+  say(`\nfeature flag CODEX (${configPath}) :`);
+  let raw = null;
+  try { raw = fs.readFileSync(configPath, 'utf8'); } catch { /* raw reste null */ }
+  if (raw === null) { check('config Codex lisible', false, `fichier introuvable : ${configPath}`); return; }
+
+  check('[features].hooks = true est DÉCLARÉ (sans lui, AUCUN hook Codex ne tourne)',
+    /^[ \t]*hooks[ \t]*=[ \t]*true[ \t]*$/m.test(raw),
+    'aucune déclaration `hooks = true` dans la config Codex : les hooks sont DÉSACTIVÉS, '
+    + 'donc aucune doc ni aucun skill n\'est injecté côté Codex — et rien ne le signale.');
+
+  check('l\'ancien flag DÉPRÉCIÉ `codex_hooks` n\'est plus déclaré',
+    !/^[ \t]*codex_hooks[ \t]*=/m.test(raw),
+    '`codex_hooks` est encore DÉCLARÉ : déprécié depuis Codex 0.146.0, remplacé par `hooks`. '
+    + 'Codex ne l\'annonce que sur stderr au démarrage (rien n\'est persisté) et le retirera : '
+    + 'ce jour-là toute l\'injection Codex meurt EN SILENCE. Renommer en `hooks = true`.');
+}
+
 say('ctxroute doctor\n');
 probe();
 
@@ -566,6 +599,11 @@ if (idx !== -1 && process.argv[idx + 1]) { checkInstall(); checkWiring(process.a
 // qu'un harnais). Usage : node doctor.js --codex-hooks ~/.codex/hooks.json
 const idxC = process.argv.indexOf('--codex-hooks');
 if (idxC !== -1 && process.argv[idxC + 1]) checkCodexWiring(process.argv[idxC + 1]);
+// Feature flag Codex : opt-in SÉPARÉ du câblage, car il vit dans un AUTRE
+// fichier (config.toml) que les hooks managés (requirements.toml).
+// Usage : node doctor.js --codex-config ~/.codex/config.toml
+const idxF = process.argv.indexOf('--codex-config');
+if (idxF !== -1 && process.argv[idxF + 1]) checkCodexFeatures(process.argv[idxF + 1]);
 
 const failed = checks.filter((c) => !c.ok).length;
 if (failed > 0 || !QUIET) console.log(`\n${checks.length - failed} ok, ${failed} problème(s)`);

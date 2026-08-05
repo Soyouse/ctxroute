@@ -77,8 +77,8 @@ jobs:
   mutation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           # ⚠️ Node ≥22 obligatoire (dependency-cruiser l'exige). Un mismatch
           #    avec la machine dev EST le bug le plus probable si ce job échoue

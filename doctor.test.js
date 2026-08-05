@@ -346,6 +346,50 @@ process.stdin.on('end', () => {
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
+// ── Cas 7e — NEGATIVE : le FEATURE FLAG Codex (05/08/2026) ────────────
+// ⚠️ Le câblage le plus parfait est MORT si Codex n'active pas les hooks, et
+//    le flag vit dans un AUTRE fichier que le câblage, HORS du repo : aucun
+//    autre test ne peut le voir. Trou payé le 05/08/2026 (`codex_hooks`
+//    déprécié encore posé). Les 4 volets ci-dessous existent parce qu'un gate
+//    jamais vu rouge est un gate qu'on CROIT posé.
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-codex-features-'));
+  try {
+    const cfg = path.join(tmp, 'config.toml');
+    const run = () => runDoctor(DOCTOR, ['--codex-config', cfg]);
+
+    // 7e-1 — config SAINE : le nouveau flag, et rien d'autre → vert.
+    fs.writeFileSync(cfg, '[features]\nhooks = true\n');
+    ok('config CODEX avec `hooks = true` seul → doctor exit 0', run().status === 0);
+
+    // 7e-2 — le flag DÉPRÉCIÉ est encore déclaré (le cas RÉEL du 05/08).
+    fs.writeFileSync(cfg, '[features]\nhooks = true\ncodex_hooks = true\n');
+    const rDep = run();
+    ok('config CODEX avec `codex_hooks` déclaré → doctor exit ≠ 0', rDep.status !== 0);
+    ok('flag déprécié → la raison dit la mort SILENCIEUSE',
+      rDep.stderr.includes('déprécié') && rDep.stderr.includes('SILENCE'));
+
+    // 7e-3 — ⚠️ LE PIÈGE : un COMMENTAIRE a le DROIT de nommer `codex_hooks`
+    //        pour expliquer pourquoi il ne faut plus l'écrire — c'est le cas
+    //        du config.toml de référence. Un match non ancré rougirait ici,
+    //        et un gate qui rougit sur du sain finit débranché (leçon rush).
+    fs.writeFileSync(cfg, '[features]\n# `hooks` et NON `codex_hooks` depuis 0.146\nhooks = true\n');
+    ok('`codex_hooks` cité en COMMENTAIRE seulement → doctor exit 0 (pas de faux positif)',
+      run().status === 0);
+
+    // 7e-4 — flag ABSENT : aucun hook Codex ne tourne, donc zéro injection.
+    fs.writeFileSync(cfg, '[features]\nweb_search = true\n');
+    const rAbs = run();
+    ok('config CODEX SANS `hooks = true` → doctor exit ≠ 0', rAbs.status !== 0);
+    ok('flag absent → la raison dit que les hooks sont DÉSACTIVÉS',
+      rAbs.stderr.includes('DÉSACTIVÉS'));
+
+    // 7e-5 — fichier introuvable : « je n'ai pas pu mesurer » ≠ « c'est sain ».
+    ok('config CODEX introuvable → doctor exit ≠ 0',
+      runDoctor(DOCTOR, ['--codex-config', path.join(tmp, 'absent.toml')]).status !== 0);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
 // ── Cas 4 — NEGATIVE : settings.json pointe vers un fichier inexistant ──
 // La mort silencieuse la plus probable : le câblage vit hors du repo.
 {
