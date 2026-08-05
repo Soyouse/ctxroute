@@ -101,6 +101,37 @@ n'est PAS faite — voir le chantier ⑨ ci-dessous, qu'elle a révélé.
    PUBLIC** (vérifié `gh repo view`), donc minutes illimitées ; la séparation des workflows reste
    justifiée par le TEMPS DE RETOUR, plus par le quota.
 
+### ⑬ 🔴 LE RELIQUAT NE DEVRAIT PAS EXISTER — trou de conception, VU EN RÉEL le 05/08/2026
+**Observé en session** : `⚠️ 12 morceau(x) non émis : le nombre de paquets déclarés est TROP
+PETIT` — le skill `webzenon-infra` n'est pas arrivé en entier.
+**MESURES** : budget 8 000 c/trame · capacité utile **7 658 c** (enveloppe déduite) ·
+**capacité TOTALE = 12 × 7 658 = 91 896 c** · ce seul skill pèse **75 927 c ⇒ 10 trames sur 12**.
+Avec les docs fichier de l'appel en plus, le plafond saute.
+**POURQUOI UNE LIMITE EXISTE** (ce n'est pas un bug d'implémentation) : `N` = le NOMBRE de
+DÉCLARATIONS du hook dans `settings.json`. Le harnais spawne EXACTEMENT ce qui est déclaré — on
+ne peut pas créer une 13ᵉ trame pendant l'appel. La capacité d'UN appel d'outil est donc FINIE
+et fixée à froid.
+🔴 **LE MAINTENEUR A RAISON : « rien ne doit être non émis ».** Et le protocole dont on se
+réclame le dit aussi — **ni RFC 2046 ni RFC 6455 ni TCP ne JETTENT quoi que ce soit quand la
+fenêtre est pleine : ils DIFFÈRENT.** Nous, on annonce et on abandonne. L'annonce évite le
+silence (c'est déjà ça, et ça a marché), mais elle ne remplace pas la livraison. **Le slogan
+« le framework LIVRE TOUT » est donc FAUX au-delà de 91 896 c — le dire ainsi était une
+approximation, elle est corrigée ici.**
+✅ **CIBLE (la seule qui ferme vraiment le trou)** : le canal n'est pas UNE trame, c'est le FLUX
+des appels d'outils. Le reliquat doit être **mis en file persistante** (`state/`) et **émis en
+priorité aux appels SUIVANTS**, jusqu'à épuisement. « Non émis » devient « émis au tour d'après ».
+C'est exactement la continuation de RFC 6455 et la fenêtre glissante de TCP.
+⚠️ **NE PAS coder ça à la volée** : la file touche l'état partagé, l'ORDRE (le rank porte la
+priorité), la dédup avec la cadence `once`/`smart`, et surtout le **déterminisme du plan
+mémoïsé** (les N processus doivent tous calculer le MÊME plan sans se coordonner — une file lue
+par 12 processus parallèles est précisément le piège de concurrence déjà documenté). Signal
+« état mutable partagé » ⇒ la doctrine impose TLA+ **ou** un point de sérialisation unique.
+Concevoir d'abord, mesurer, puis livrer.
+**Palliatif disponible en attendant, à ARBITRER par le mainteneur** : monter `--paquets` de 12 à
+~24 (capacité ×2). **Coût mesuré le 03/08 : 12 process node à vide = ~4 s par appel d'outil, dont
+96 % de démarrage de node** ⇒ 24 trames ≈ 8 s. C'est cher et ça ne fait que repousser le mur :
+le vrai correctif est la file.
+
 ### ⑫ ✅ FAUX ROUGE DU DIFFÉRENTIEL DE PORTE — trouvé ET fermé le 05/08/2026
 `porte-differential.test.js` est passé au ROUGE après **deux lignes ajoutées à des docs du parc**,
 sans qu'aucun moteur ne change. **Cause mesurée** (223 c d'écart = exactement l'enveloppe) : la
