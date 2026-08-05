@@ -235,6 +235,21 @@ SOURCE UNIQUE) — le transport est la dernière brique à ne pas l'appliquer.
 🔴 **ET LE GATE D'ASYMÉTRIE NE LE VOIT PAS** : `frontmatter.test.js` scelle la symétrie du
 VOCABULAIRE (les clés existent dans les 4 corpus). Personne ne scelle la symétrie du CHEMIN
 D'ÉMISSION. Un gate qui vérifie une dimension laisse croire que toutes sont vérifiées.
+**LE SQUELETTE CIBLE — 4 COUCHES, et 3 sont DÉJÀ propres** (c'est une EXTRACTION, pas une
+réécriture) :
+| # | Couche | Rôle | État |
+|---|---|---|---|
+| 1 | `sources/*` | « quelles docs ? » — PURES, zéro dialecte | ✅ |
+| 2 | `gate.js` | « laquelle, maintenant ? » — PURE, cascade en UN point | ✅ |
+| 3 | **`emission-core.js`** | budget · morcelage · sceau · paquets · file | ❌ **à extraire** |
+| 4 | coquilles harnais | dialecte de SORTIE seulement (~15 l.) | ✅ |
+**LA RÈGLE QUI TIENT LE SQUELETTE** : *aucun émetteur n'écrit sur stdout — il rend à la couche
+d'émission.* C'est le motif des frameworks web (un handler ne sérialise jamais sa réponse ; le
+pipeline le fait). ⚠️ **DIFFÉRENCE CAPITALE avec eux** : là-bas on ne PEUT pas contourner le
+pipeline (on ne possède pas le transport). Ici on possède tout ⇒ **seule une machine peut
+l'imposer**. D'où le gate ci-dessous : sans lui, la couche existe mais reste facultative, et on
+n'a fait que déplacer le problème.
+
 ✅ **CIBLE, en deux temps et dans cet ordre** :
 1. **Extraire `emission-core.js`** — la couche que TOUT émetteur traverse : reçoit des segments +
    un budget + un indice de trame, rend le texte scellé et le reliquat. `porte-core` et
