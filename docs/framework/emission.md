@@ -1,0 +1,12 @@
+---
+rules: [{"pattern":"emission-core.js","scope":["ctxroute"]},{"pattern":"emission-core-gate.test.js","scope":["ctxroute"]}]
+mode: dumb
+---
+# emission-core.js — LA COUCHE QUE TOUT ÉMETTEUR TRAVERSE (05/08/2026)
+⚠️ **AUCUN ÉMETTEUR NE COMPOSE SA SORTIE** — il rend des segments à cette couche (motif des frameworks web : un handler ne sérialise jamais sa réponse). Écrire `additionalContext` sans passer par ici = spill silencieux dès que le contenu dépasse la trame. C'est le défaut EXACT qui a laissé `session-inject.js` sans transport pendant des semaines : le transport était un CHOIX D'APPELANT, donc de l'opt-in par recopie.
+⚠️ **LA COUCHE NE SUFFIT PAS, LE GATE LA REND OBLIGATOIRE** : `emission-core-gate.test.js` scanne les fichiers qui écrivent la clé `additionalContext` et exige qu'ils ATTEIGNENT ce module (traversée TRANSITIVE — les coquilles passent par `porte-core.js`, leur imposer un import direct casserait les couches). **DÉRIVÉ du code, jamais une liste** ⇒ tout émetteur FUTUR est couvert le jour où il est écrit. Ne JAMAIS le remplacer par une liste en dur : elle dépendrait de la vigilance, ce qu'on corrige justement.
+⚠️ **CE FICHIER EST UNE COQUILLE I/O** (store de file) — jamais muté Stryker. TOUTE la décision de transport est PURE et vit dans `budget.js` (`ordonner`, `planifierPaquets`, `baseId`), muté à 100 %. Ne JAMAIS rapatrier de logique ici : lire la file → déléguer → réécrire la file, rien d'autre.
+⚠️ **FILE PARTAGÉE PAR TOUS LES ÉMETTEURS, VOLONTAIREMENT.** À SessionStart il n'y a pas de « geste suivant » où drainer : c'est le store COMMUN (même préfixe `reliquat-`, même scope d'agent) qui fait reprendre le reliquat de la porte session par la porte PreToolUse au tout premier appel d'outil. Ne JAMAIS préfixer la file par émetteur — ce serait rendre le reliquat de session indrainable.
+⚠️ **`emettre` S'APPELLE SOUS LOCK** (elle lit puis réécrit la file). Lock indisponible ⇒ dégrader vers `decouper` (frais seul, file INTACTE) — jamais se taire, jamais écrire sans lock. `decouper` seul est réservé aux REJOUES d'un découpage déjà décidé (plan mémoïsé) et à ce chemin dégradé.
+⚠️ **ON NE FUSIONNE PAS LES ÉMETTEURS** : SessionStart et PreToolUse ont des événements et des contrats de sortie DIFFÉRENTS. On partage la COUCHE D'ÉMISSION, jamais l'orchestration.
+⚠️ **EXEMPTION = RELIQUE UNIQUEMENT**, déclarée avec son POURQUOI dans le gate, et le volet INVERSE la tue dès qu'elle est périmée. N'y jamais inscrire un émetteur VIVANT.

@@ -36,6 +36,13 @@ const { ADAPTERS } = require('./source-adapters');
 const { collectAll, loadConfig } = require('./collect-core');
 // Budget de TRAME (31/07/2026) : borne ce qui sort, annonce ce qui ne rentre pas.
 const budget = require('./budget');
+// ⚠️ COUCHE D'ÉMISSION (05/08/2026, REFACTOR-PLAN ⑯) — SOURCE UNIQUE du
+//    transport (file + découpage). Elle vivait ICI, ce qui la rendait
+//    facultative pour les AUTRES émetteurs : `session-inject.js` ne la
+//    traversait pas et sortait donc sans sceau ni morcelage. Ne JAMAIS
+//    rapatrier la file ni le découpage dans cette orchestration — le gate
+//    `emission-core-gate.test.js` exige que tout émetteur passe par le module.
+const emission = require('./emission-core');
 const { withLock } = require('./lock');
 const paths = require('./paths');
 const store = require('./session-store');
@@ -50,37 +57,11 @@ const STORE_PREFIX = 'doc-seen-';
 //    RELISENT. Le découpage, lui, est pur et déterministe : chacun le
 //    recalcule et n'émet que son indice. Purgé par ctxroute-reset.js.
 const PLAN_PREFIX = 'plan-';
-// ⚠️ FILE D'ÉMISSION (05/08/2026) — ce qui ne tient pas dans les N trames d'UN
-//    geste attend ici et repart au geste SUIVANT. Préfixe distinct, keyé par le
-//    scope d'agent, purgé par ctxroute-reset.js comme les autres.
-//
-//    POURQUOI ELLE EXISTE. `--paquets N` fixe le nombre de trames que le harnais
-//    spawne : la capacité d'UN appel est donc FINIE (N × capacité de trame). Le
-//    morcelage découpe tout correctement, mais au-delà de ce total les derniers
-//    morceaux n'avaient plus de trame où voyager — on les ANNONÇAIT puis on les
-//    JETAIT. C'était la seule perte réelle du framework, et elle était de notre
-//    fait, pas de celui du harnais.
-//
-// ⚠️ C'EST LE COMPORTEMENT DE L'ÉMETTEUR TCP, ET CE N'EST PAS UNE ANALOGIE
-//    DÉCORATIVE : fenêtre pleine ⇒ les données RESTENT dans le tampon
-//    d'émission et partent à la fenêtre suivante. Aucun protocole de transport
-//    ne jette parce que la fenêtre est pleine — canal borné, flux illimité.
-//    Conséquence directe : `--paquets N` n'est plus un PLAFOND de livraison,
-//    seulement un DÉBIT. On peut le baisser sans rien perdre (ça arrive sur
-//    plus de gestes), et aucune taille de doc n'est plus indélivrable.
-//
-// ⚠️ LA FILE PASSE TOUJOURS AVANT LE FRAIS — RFC 6455 : un message fragmenté
-//    n'est JAMAIS entrelacé avec un autre. Un document commencé se termine
-//    avant qu'un autre commence, sinon le récepteur ne peut plus recoller ses
-//    `MORCEAU j/m`. Ne JAMAIS trier, prioriser ni intercaler ici.
-//
-// ⚠️ ON STOCKE LE TEXTE, PAS UNE RÉFÉRENCE À RECALCULER. Deux raisons, aucune
-//    négociable : ① les N processus parallèles doivent voir EXACTEMENT la même
-//    entrée (le plan mémoïsé porte donc les segments, pas seulement les ids) ;
-//    ② une doc ÉDITÉE entre deux gestes ferait recoller des morceaux d'une
-//    version avec des morceaux d'une autre — un Frankenstein silencieux. Le
-//    résidu conservé est, par construction, exactement ce qui n'a pas été livré.
-const RELIQUAT_PREFIX = 'reliquat-';
+// ⚠️ LA FILE D'ÉMISSION A QUITTÉ CE FICHIER (05/08/2026, REFACTOR-PLAN ⑯).
+//    Elle vit désormais dans `emission-core.js`, la couche que TOUT émetteur
+//    traverse. La garder ici la rendait facultative pour les autres émetteurs
+//    — c'est exactement le défaut qui a laissé la porte SESSION sans transport.
+//    Ne JAMAIS redéclarer un préfixe de file ici.
 // Compteur de TOURS (porte turn-count.js, UserPromptSubmit) — préfixe distinct.
 const TURN_PREFIX = 'turn-count-';
 
@@ -180,15 +161,15 @@ function run(data, emit, options) {
     // Section critique sous lock (état par session, dédup par doc). Un corpus
     // 100% dumb ne produit aucune écriture (changed=false) — parité perf.
     const lockDir = path.join(paths.stateDir(), `.lock-doc-${lib.sanitizeSessionId(sessionId)}`);
-    const decouper = (segs) => budget.planifierPaquets(segs, budgetMax, nbPaquets);
-    // Un morceau porte l'id `<doc>#<j>` (posé par `budget.morceler`). Tout ce qui
-    // raisonne en DOCUMENT (dédup avec la file, badge de la statusline) doit donc
-    // repasser par la base — sinon un document à moitié livré serait vu comme un
-    // document DIFFÉRENT de lui-même, et réinjecté en double.
-    const baseId = (id) => {
-      const i = id.indexOf('#');
-      return i === -1 ? id : id.slice(0, i);
-    };
+    // ⚠️ TOUT PASSE PAR LA COUCHE D'ÉMISSION — jamais `budget.planifierPaquets`
+    //    en direct depuis un émetteur. `decouper` seul = REJOUE d'un découpage
+    //    déjà décidé (plan mémoïsé) ou chemin DÉGRADÉ sans lock ; le chemin
+    //    normal est `emission.emettre`, qui touche la file.
+    const decouper = (segs) => emission.decouper(segs, budgetMax, nbPaquets);
+    // Identité d'un document : source unique dans `budget.js` (les morceaux
+    // portent `<doc>#<j>`). Vivait ici en copie locale — c'est une règle du
+    // TRANSPORT, pas de cette orchestration.
+    const baseId = budget.baseId;
     let res = withLock(lockDir, () => {
       // ⚠️ RELECTURE DU PLAN — le cœur du multi-paquets. Les N processus sont
       //    PARALLÈLES et ne peuvent pas se parler : un seul décide (et écrit
@@ -213,31 +194,21 @@ function run(data, emit, options) {
       const state = store.loadState(STORE_PREFIX, sessionId);
       const r = gate.decide(config, decls, matched, state, turnCount, acc.owner);
 
-      // ── LA FILE PASSE D'ABORD, LE FRAIS ENSUITE (RFC 6455 : jamais entrelacé) ──
-      // ⚠️ L'ORDRE N'EST PAS UNE PRÉFÉRENCE, C'EST LA CONDITION DU RECOLLAGE.
-      //    Un document fragmenté doit se terminer avant qu'un autre commence :
-      //    intercaler du frais au milieu de ses `MORCEAU j/m` laisserait le
-      //    récepteur incapable de savoir quel morceau appartient à quoi.
-      const file = store.loadState(RELIQUAT_PREFIX, sessionId);
-      const enAttente = Array.isArray(file.segments) ? file.segments : [];
-      // ⚠️ DÉDUP OBLIGATOIRE : une doc `dumb` est re-décidée à CHAQUE geste. Sans
-      //    ce filtre, une doc encore en cours de livraison serait ré-empilée
-      //    entière derrière ses propres morceaux — doublon de tokens ET
-      //    recollage impossible. La file fait AUTORITÉ tant qu'elle n'est pas
-      //    vidée : ce qu'elle porte ne peut pas être réémis en parallèle.
-      const dejaEnFile = new Set(enAttente.map((s) => baseId(s.id)));
-      const segments = enAttente.concat(segmentsPour(r.inject).filter((s) => !dejaEnFile.has(s.id)));
-
-      const paquets = decouper(segments);
-      // ⚠️ CE QUI N'EST PAS SORTI RETOURNE EN FILE — le geste qui a remplacé
-      //    « jeter » par « différer ». Les différés vivent dans le DERNIER
-      //    paquet (c'est lui qui porte l'annonce) ; en trame unique il n'y en a
-      //    qu'un, donc le même code couvre les deux harnais.
-      // ⚠️ ÉCRITURE INCONDITIONNELLE, y compris avec un reste VIDE : c'est ce
-      //    qui VIDE la file quand tout est enfin livré. Ne la rendre
-      //    conditionnelle qu'au non-vide ferait boucler la dernière livraison
-      //    à chaque geste, pour toujours.
-      store.saveState(RELIQUAT_PREFIX, sessionId, { segments: paquets[paquets.length - 1].differes });
+      // ── ÉMISSION : file d'abord, frais ensuite, reste persisté ──
+      // ⚠️ TOUT CE MÉCANISME VIT DANS `emission-core.js` (ordre RFC 6455, dédup
+      //    par document, écriture inconditionnelle de la file). Il était ÉCRIT
+      //    ICI jusqu'au 05/08/2026 — donc invisible et non réutilisable pour
+      //    les autres émetteurs. Ne JAMAIS le réinstaller dans cette fonction :
+      //    ce serait recréer la copie que ⑯ vient de supprimer.
+      const em = emission.emettre({
+        frais: segmentsPour(r.inject),
+        budgetMax,
+        nbPaquets,
+        indice,
+        scopeId: sessionId,
+      });
+      const segments = em.segments;
+      const paquets = em.paquets;
 
       // ⚠️ LA BOUCLE DE RESTAURATION D'ÉTAT DES DIFFÉRÉS A ÉTÉ SUPPRIMÉE ICI
       //    (05/08/2026). Elle « dé-marquait » une doc différée pour que le geste

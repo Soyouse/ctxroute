@@ -222,7 +222,22 @@ sa réserve** : observé, jamais une dépendance.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
-### ⑯ 🔴 CAUSE RACINE DE ⑮ — LE TRANSPORT N'EST PAS UNE COUCHE, C'EST UN CHOIX D'APPELANT
+### ⑯ ✅ LIVRÉ 05/08/2026 — LE TRANSPORT EST DEVENU UNE COUCHE
+**FAIT** : `emission-core.js` extrait (file + découpage + persistance du reliquat) ; `porte-core.js`
+et `session-inject.js` sont désormais des APPELANTS, aucun ne réimplémente rien. Les parties PURES
+(`baseId`, `ordonner`) sont remontées dans `budget.js` — muté **100,00 %, 0 survivant** — pour que
+la décision reste hors de l'I/O. `emission-core.js` est une coquille I/O, jamais mutée.
+**LE GATE, qui est le vrai livrable** : `emission-core-gate.test.js` scanne les fichiers qui
+écrivent la CLÉ `additionalContext` et exige qu'ils ATTEIGNENT la couche, en **traversée
+TRANSITIVE** (les coquilles de harnais passent par `porte-core` — exiger un import direct casserait
+les couches). DÉRIVÉ du code ⇒ tout émetteur FUTUR est couvert le jour où il est écrit. 3 volets :
+scan + filet d'existence (`>= 3` émetteurs, sinon c'est le GATE qui est cassé) · volet INVERSE sur
+les exemptions périmées · **negative-check par sabotage EN MÉMOIRE** (jamais un fichier réel : la
+1re version d'un tel check avait fait tomber 38 tests d'autres suites). Seule exemption :
+`legacy-mcp-inject.js`, RELIQUE-oracle qui doit rester figée, avec son pourquoi écrit.
+⚠️ **AUCUNE modification de `settings.json`** — c'était une extraction, le câblage est intact.
+
+<details><summary>Constat d'origine (conservé : c'est le raisonnement, pas l'état)</summary>
 ⑮ n'est pas un oubli, c'est un **défaut de squelette**, et il en produira d'autres.
 **Le constat** : il y a DEUX émetteurs de contexte — `porte-core.js` (PreToolUse, les 2 harnais)
 et `session-inject.js` (SessionStart/PostCompact). Le transport (morcelage + sceau + paquets +
@@ -264,7 +279,27 @@ qu'on veut justement supprimer — et le gate arriverait après le mal.
 ⚠️ Ne PAS fusionner les deux portes pour autant (événements et contrats DIFFÉRENTS, invariant déjà
 écrit dans `session-porte.md`) : on partage la COUCHE D'ÉMISSION, jamais l'orchestration.
 
-### ⑮ 🔴 LA PORTE SESSION N'A PAS DE TRANSPORT — trou TROUVÉ le 05/08/2026
+</details>
+
+### ⑮ ✅ LIVRÉ 05/08/2026 (dans le même geste que ⑯) — LA PORTE SESSION A SON TRANSPORT
+**FAIT** : `session-inject.js` traverse `emission-core`. Sceau, morcelage et file s'appliquent ;
+segments par DOCUMENT (le séparateur de la couche est le MÊME `
+
+---
+
+`, donc **parité à
+l'octet** tant que le corpus tient dans la trame). Lock obligatoire autour de la file, dégradation
+au frais seul si le lock manque — jamais un silence.
+**LES DEUX INCONNUES, TRANCHÉES SANS RÉTRO-INGÉNIERIE** :
+① « un SessionStart déclaré N fois est-il spawné N fois ? » → **NON MESURÉ, donc NON UTILISÉ** :
+on émet sur UNE trame (`nbPaquets: 1`). À une trame le morcelage livre quand même TOUT, simplement
+sur plusieurs gestes. Passer à N est un réglage APRÈS mesure, pas une reconception.
+② « la file a-t-elle un sens là où il n'y a pas de geste suivant ? » → **OUI, par le store
+PARTAGÉ** : même préfixe `reliquat-`, même scope d'agent ⇒ le reliquat de la porte session est
+drainé par la porte PreToolUse au TOUT PREMIER appel d'outil. C'est exactement l'hypothèse écrite
+ici la veille, et elle n'a coûté **aucune ligne de `settings.json`**.
+
+<details><summary>Constat d'origine (conservé)</summary>
 **`session-inject.js` ne contient AUCUNE référence à `budget`/`planifier`/`paquet`/`reliquat`.**
 Les docs de `docs/session/` (le « CLAUDE.md géré par le framework », injecté à CHAQUE début de
 session et après compaction) sortent donc **d'un bloc, dans UNE sortie de hook** — soumises au
@@ -284,6 +319,8 @@ existe déjà, c'est du câblage, pas de la conception.
 n'y a pas encore de « geste suivant » — sans doute faut-il que le reliquat soit repris par la
 porte PreToolUse au premier outil, donc un store PARTAGÉ entre les deux portes.
 ⚠️ Modifie `settings.json` (PROD) ⇒ **GO explicite du mainteneur**, à un moment où aucun agent ne tourne.
+
+</details>
 
 ### ⑬ ✅ FILE DE RELIQUAT — LIVRÉE le 05/08/2026 (le trou est FERMÉ, plus de réserve)
 ⚠️ **JUGEMENT RENVERSÉ, RÉÉCRIT (pilotage.md) : cette section disait « FACULTATIF après ⑭ ».

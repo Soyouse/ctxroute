@@ -644,4 +644,41 @@ function tailleEnveloppe() {
 //    travers `planifierPaquets` laissait ses frontières intestables : 6 mutants
 //    y survivaient le 03/08/2026 alors que tout le reste du module était à 100 %.
 //    Ce n'est PAS une extension d'API publique — aucune coquille ne l'appelle.
-module.exports = { planifier, planifierPaquets, capacitePaquet, morceler, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };
+// ⚠️ IDENTITÉ D'UN DOCUMENT, source unique (05/08/2026). `morceler` pose des ids
+//    `<doc>#<j>` ; TOUT ce qui raisonne en DOCUMENT (dédup avec la file, badge
+//    de la statusline, attribution à une source) doit repasser par la base.
+//    Sans ce repli, un document à moitié livré serait vu comme un document
+//    DIFFÉRENT de lui-même et réinjecté en double. Vivait en copie locale dans
+//    porte-core.js — remonté ici avec la file : c'est une règle du TRANSPORT,
+//    pas de l'orchestration d'un émetteur particulier.
+function baseId(id) {
+  const i = id.indexOf('#');
+  return i === -1 ? id : id.slice(0, i);
+}
+
+/**
+ * ORDRE D'ÉMISSION — la file d'abord, le frais ensuite.
+ *
+ * ⚠️ CE N'EST PAS UNE PRÉFÉRENCE, C'EST LA CONDITION DU RECOLLAGE (RFC 6455) :
+ *    un document fragmenté n'est JAMAIS entrelacé avec un autre. Intercaler du
+ *    frais au milieu de ses `MORCEAU j/m` laisserait le récepteur incapable de
+ *    savoir quel morceau appartient à quoi. Ne JAMAIS trier ni prioriser ici.
+ * ⚠️ DÉDUP OBLIGATOIRE PAR DOCUMENT : une doc `dumb` est re-décidée à CHAQUE
+ *    geste. Sans ce filtre, une doc encore en cours de livraison serait
+ *    ré-empilée ENTIÈRE derrière ses propres morceaux — doublon de tokens ET
+ *    recollage impossible. La file fait AUTORITÉ tant qu'elle n'est pas vidée.
+ */
+function ordonner(enAttente, frais) {
+  const file = Array.isArray(enAttente) ? enAttente : [];
+  const neufs = Array.isArray(frais) ? frais : [];
+  const dejaEnFile = new Set(file.map((s) => baseId(s.id)));
+  return file.concat(neufs.filter((s) => !dejaEnFile.has(baseId(s.id))));
+}
+
+// ⚠️ `morceler` est EXPORTÉ pour être scellé DIRECTEMENT : c'est un SCANNER (il
+//    interprète un format — des lignes — pour produire des tranches), et la
+//    doctrine du parc impose le property-based sur tout scanner. Le tester à
+//    travers `planifierPaquets` laissait ses frontières intestables : 6 mutants
+//    y survivaient le 03/08/2026 alors que tout le reste du module était à 100 %.
+//    Ce n'est PAS une extension d'API publique — aucune coquille ne l'appelle.
+module.exports = { planifier, planifierPaquets, capacitePaquet, morceler, baseId, ordonner, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };

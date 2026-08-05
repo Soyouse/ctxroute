@@ -20,7 +20,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
-import { planifier, planifierPaquets, capacitePaquet, morceler, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, capacitePaquet, morceler, baseId, ordonner, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
 
 // Fixtures = THUNKS (cf. perTest ci-dessus).
 const seg = (id, n, label) => ({ id, text: 'x'.repeat(n), label: label || id + '.md' });
@@ -788,4 +788,48 @@ test('capacitePaquet : nbPaquets NON entier retombe sur la largeur minimale', ()
   //    des largeurs d'en-tête différentes, donc des capacités différentes.
   assert.strictEqual(capacitePaquet(8000, 10.5), capacitePaquet(8000, 2));
   assert.notStrictEqual(capacitePaquet(8000, 11), capacitePaquet(8000, 2));
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// IDENTITE DE DOCUMENT ET ORDRE D'EMISSION (remontes de porte-core.js le
+// 05/08/2026 avec la couche d'emission : ce sont des regles du TRANSPORT).
+// ⚠️ Ces cas vivent ICI et pas dans le fichier property : Stryker N'EXECUTE PAS
+//    les property-tests. Une garde prouvee seulement par property laisse des
+//    mutants survivants et le score MENT (paye deux fois le 05/08/2026).
+// ═══════════════════════════════════════════════════════════════════════
+
+test('BASE_ID : un morceau retrouve son document, un document reste lui-meme', () => {
+  assert.strictEqual(baseId('docs/foo.md'), 'docs/foo.md');
+  assert.strictEqual(baseId('docs/foo.md#3'), 'docs/foo.md');
+  // Premier '#' seulement : un id qui en contient deux ne doit pas se couper au dernier.
+  assert.strictEqual(baseId('a#1#2'), 'a');
+});
+
+test('ORDONNER : la file passe DEVANT le frais (RFC 6455, jamais entrelace)', () => {
+  const file = [{ id: 'a#1', text: 'A1' }];
+  const frais = [{ id: 'b', text: 'B' }];
+  assert.deepStrictEqual(ordonner(file, frais).map((s) => s.id), ['a#1', 'b']);
+});
+
+test('ORDONNER : une doc DEJA en file nest pas re-empilee (dedup par DOCUMENT)', () => {
+  // ⚠️ LE CAS FONDATEUR : une doc `dumb` est re-decidee a CHAQUE geste. Sans la
+  //    dedup, elle serait re-empilee ENTIERE derriere ses propres morceaux —
+  //    doublon de tokens ET recollage impossible.
+  const file = [{ id: 'a#2', text: 'A2' }, { id: 'a#3', text: 'A3' }];
+  const frais = [{ id: 'a', text: 'A ENTIER' }, { id: 'b', text: 'B' }];
+  assert.deepStrictEqual(ordonner(file, frais).map((s) => s.id), ['a#2', 'a#3', 'b']);
+});
+
+test('ORDONNER : la dedup compare des DOCUMENTS des DEUX cotes, pas des ids bruts', () => {
+  // Sans baseId cote frais, un morceau frais `a#1` passerait alors que `a` est
+  // deja en file — deux versions du meme document en vol.
+  const file = [{ id: 'a', text: 'A' }];
+  const frais = [{ id: 'a#1', text: 'A1' }];
+  assert.deepStrictEqual(ordonner(file, frais).map((s) => s.id), ['a']);
+});
+
+test('ORDONNER : entrees absentes/invalides = degradation, jamais un crash', () => {
+  assert.deepStrictEqual(ordonner(undefined, [{ id: 'x', text: 'X' }]).map((s) => s.id), ['x']);
+  assert.deepStrictEqual(ordonner([{ id: 'y', text: 'Y' }], undefined).map((s) => s.id), ['y']);
+  assert.deepStrictEqual(ordonner(null, null), []);
 });
