@@ -9,8 +9,15 @@
 //    coquille = la dérive que ce framework combat. SEUL le `emit` (dialecte de
 //    SORTIE du harnais) varie — il est INJECTÉ par la coquille appelante.
 //
+// ⚠️ LE CŒUR NE TUE JAMAIS LE PROCESSUS (06/08/2026). Il RETOURNE quand il n'y
+//    a rien à émettre ; c'est la COQUILLE qui décide de sortir. Il appelait
+//    `process.exit(0)` à 4 endroits : le cycle de vie du processus est une
+//    décision de coquille, exactement comme le dialecte de sortie — un cœur
+//    partagé qui s'arroge la mort du processus est la MÊME fuite de couche que
+//    le transport orchestré dans un seul émetteur (⑯). Effet de bord concret :
+//    `run()` était intestable et inappelable depuis un autre contexte.
 // ⚠️ CONTRAT emit(decision, fullDoc, systemMessage) : appelé au plus UNE fois,
-//    DOIT terminer le process (exit 0). decision ∈ 'allow'|'ask' — un harnais
+//    DOIT terminer le process (exit 0) — c'est la coquille qui l'écrit. decision ∈ 'allow'|'ask' — un harnais
 //    sans support 'ask' le DÉGRADE en injection simple (jamais en silence).
 //
 // ⚠️ Ce module est une COQUILLE PARTAGÉE (I/O : lock, store, config) — jamais
@@ -113,7 +120,7 @@ function run(data, emit, options) {
     const config = loadConfig();
 
     // Interrupteur global — même sémantique sur tous les harnais.
-    if (!lib.isFrameworkEnabled(config)) process.exit(0);
+    if (!lib.isFrameworkEnabled(config)) return;
 
     // ── COLLECTE (collect-core.js → registre source-adapters.js) ──
     // Chaque adaptateur pose ses docs matchées + decls/bodies/labels dans
@@ -244,13 +251,13 @@ function run(data, emit, options) {
     //    gate.decide n'a rien décidé de neuf (tout est déjà `seen`). Tester
     //    l'ancien champ ferait sortir en silence avec une file pleine — la doc
     //    n'arriverait alors JAMAIS. C'est le piège exact de ce chantier.
-    if (res.segments.length === 0) process.exit(0);
+    if (res.segments.length === 0) return;
 
     // ⚠️ Un paquet VIDE sort en SILENCE (exit 0) : il n'a ni contenu ni annonce.
     //    En trame unique ce cas est impossible dès que `inject` est non vide —
     //    la parité est donc intacte.
     const plan = res.paquets[indice - 1];
-    if (!plan || plan.texte === '') process.exit(0);
+    if (!plan || plan.texte === '') return;
 
     const fullDoc = plan.texte;
 
@@ -277,7 +284,7 @@ function run(data, emit, options) {
     }
     emit(res.decision, fullDoc, msgs.join(' · '));
   } catch {
-    process.exit(0); // fail-open
+    // fail-open : on RÉPOND « rien à injecter », on ne tue pas le processus.
   }
 }
 

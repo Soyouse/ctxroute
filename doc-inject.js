@@ -92,9 +92,16 @@ function emit(decision, fullDoc, systemMessage) {
 //      indices différents ne sont PAS fusionnés : doc officielle 03/08/2026).
 //    · Rien de déclaré ⇒ trame unique ⇒ comportement d'aujourd'hui à l'octet.
 readStdinJson(
-  (data) => run(data, emit, {
-    ...parsePaquetArgs(process.argv),
-    invocationId: typeof data.tool_use_id === 'string' ? data.tool_use_id : '',
-  }),
+  (data) => {
+    // ⚠️ LA SORTIE APPARTIENT À LA COQUILLE (06/08/2026). `run` RETOURNE quand
+    //    il n'y a rien à émettre — il ne tue plus le processus (fuite de couche,
+    //    même famille que ⑯ : le cycle de vie est une décision de coquille).
+    //    Quand il émet, `emit` termine le process avant cette ligne.
+    run(data, emit, {
+      ...parsePaquetArgs(process.argv),
+      invocationId: typeof data.tool_use_id === 'string' ? data.tool_use_id : '',
+    });
+    process.exit(0);
+  },
   () => process.exit(0)
 );

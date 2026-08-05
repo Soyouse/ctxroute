@@ -67,6 +67,12 @@ function emit(decision, fullDoc, systemMessage) {
 }
 
 readStdinJson(
-  (data) => run(data, emit, { budget: lib.budgetDeclare(process.argv) }),
+  (data) => {
+  // ⚠️ LA SORTIE APPARTIENT À LA COQUILLE (06/08/2026). `run` RETOURNE quand il
+  //    n'y a rien à émettre — il ne tue plus le processus (fuite de couche, même
+  //    famille que ⑯). Quand il émet, `emit` sort avant cette ligne.
+    run(data, emit, { budget: lib.budgetDeclare(process.argv) });
+    process.exit(0);
+  },
   () => process.exit(0)
 );

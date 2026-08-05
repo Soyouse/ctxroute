@@ -60,12 +60,18 @@ function run(filePaths) {
         reason: '[ctxroute] La doc que tu viens d\'écrire est INVALIDE — elle serait morte/faussée en silence. Corrige MAINTENANT :\n- '
           + errs.join('\n- ') + '\nFichier : ' + filePath,
       }));
-      process.exit(0);
+      // ⚠️ Le cœur RETOURNE, il ne tue pas : la sortie appartient à la
+      //    COQUILLE (06/08/2026). `return` et non `break` — un blocage émis,
+      //    on n'examine PAS les fichiers suivants (une seule sortie par hook).
+      return;
     }
   } catch {
     /* fail-open */
   }
-  process.exit(0);
+  // ⚠️ NE PAS remettre `process.exit(0)` ici : le cycle de vie du processus
+  //    est une décision de COQUILLE, jamais d'un cœur partagé (scellé par
+  //    `emission-core-gate.test.js`). Ce cœur avait le même défaut que
+  //    porte-core — trouvé par le gate DÉRIVÉ, pas à l'œil.
 }
 
 module.exports = { run, docKind };

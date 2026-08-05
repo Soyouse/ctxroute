@@ -31,6 +31,8 @@ readStdinJson(
   (data) => {
     const filePath = (data.tool_input || {}).file_path;
     run(typeof filePath === 'string' ? [filePath] : []);
+    // ⚠️ La sortie appartient à la COQUILLE (06/08/2026, cf guard-core).
+    process.exit(0);
   },
   () => process.exit(0)
 );

@@ -222,6 +222,26 @@ sa réserve** : observé, jamais une dépendance.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
+### ⑯bis ✅ LIVRÉ 06/08/2026 — LE CYCLE DE VIE APPARTIENT À LA COQUILLE
+**MÊME FAMILLE QUE ⑯, AUTRE AXE.** Le transport était un choix d'appelant ; la MORT DU PROCESSUS
+était une décision de cœur : `porte-core.js` appelait `process.exit(0)` 4× et `guard-core.js` 2×.
+Sortir est le rôle de la COQUILLE — celle qui connaît le harnais et son contrat de sortie.
+Effet concret : `run()` était intestable et inappelable depuis un autre contexte.
+**FAIT** : les 2 cœurs RETOURNENT ; les 4 coquilles (`doc-inject`, `codex-doc-inject`,
+`doc-write-guard`, `codex-doc-write-guard`) assument `process.exit(0)`. Parité prouvée par les
+différentiels (octet). Gate DÉRIVÉ de `*-core.js` dans `emission-core-gate.test.js` (+ volet
+existence + negative-check en mémoire, avec dé-commentarisation pour ne pas rougir sur une MENTION).
+🔴 **LE GATE A TROUVÉ `guard-core`, PAS MOI** : je n'avais corrigé que `porte-core`. Un gate dérivé
+trouve ce que la revue ne voit pas — c'est exactement l'argument de ⑳.
+⚠️ **NÉ D'UNE REVUE « ŒIL DE SENIOR » DU CODE FONCTIONNEL SEUL** (sans tests ni mutation). Le reste
+de cette revue : le nommage est BILINGUE (API interne en français, DSL en anglais) — frein réel à
+l'adoption pour un projet qui vise le standard multi-harnais. À trancher (cf ㉒).
+
+### ㉒ 🟠 BACKLOG — LANGUE DU CODE : trancher, puis appliquer mécaniquement
+API interne en français (`planifierPaquets`, `emettre`, `decouper`, `chargerFile`), DSL en anglais
+(`match`/`scope`/`exclude`/`mode`). Incohérent pour un projet OPEN SOURCE visant le standard
+industriel : un contributeur étranger lit la moitié du code. ⚠️ Renommage MÉCANIQUE de masse ⇒
+expand/contract + différentiels comme filet, jamais en fin de session. Décider la cible D'ABORD.
 ### ⑰ ✅ LIVRÉ 05/08/2026 — LE BUDGET SUIT LA LIMITE DÉCLARÉE (Codex : 11 gestes → 1)
 **LE DÉFAUT, et sa classe.** Le câblage Codex déclarait `additionalContextLimit = 0` depuis le
 04/08 — son commentaire disait même « c'est POUR ÇA que Codex n'a pas besoin de fragmentation ».

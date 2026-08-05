@@ -27,6 +27,10 @@ const { extractFilePaths } = require('./sources/file');
 const { readStdinJson } = require('./stdin-json');
 
 readStdinJson(
-  (data) => run(extractFilePaths(data.tool_name || '', data.tool_input || {})),
+  (data) => {
+    // ⚠️ La sortie appartient à la COQUILLE (06/08/2026, cf guard-core).
+    run(extractFilePaths(data.tool_name || '', data.tool_input || {}));
+    process.exit(0);
+  },
   () => process.exit(0)
 );
