@@ -68,7 +68,7 @@ function parseArgs(argv) {
 //    consommé, compteurs smart) — le dire, ne jamais le faire croire.
 function verdict(config, payload) {
   const acc = collectAll(config, payload);
-  const r = gate.decide(config, acc.decls, acc.matched, payload.toolName, {}, 0, acc.owner);
+  const r = gate.decide(config, acc.decls, acc.matched, {}, 0, acc.owner);
   return { acc, decision: r.decision, inject: r.inject };
 }
 

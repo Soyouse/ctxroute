@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"deps-purete-gate.test.js","scope":["ctxroute"]},{"pattern":".dependency-cruiser.json","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # deps-purete-gate — le gate qui vérifie que les gates PEUVENT rougir
 ⚠️ **BUG RÉEL 03/08/2026** : `lib-pure-must-stay-pure`, le plus ancien gate d'architecture du repo, était **INERTE**. Un `require('fs')` en tête de `lib-pure.js` passait VERT. **Toutes** les règles `*-must-stay-pure` étaient décoratives.

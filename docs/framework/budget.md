@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"budget.js","scope":["ctxroute"]},{"pattern":"budget.test.js","scope":["ctxroute"]},{"pattern":"budget.property.test.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # budget.js — LE FRAMEWORK LIVRE TOUT, quelle que soit la taille
 ⚠️ **DEUX CHEMINS, PAS TROIS.** Ça rentre dans la trame ⇒ on émet tel quel (zéro enveloppe, zéro boucle). Ça ne rentre pas ⇒ on **découpe en morceaux** répartis sur N trames. Il n'existe AUCUN cas où le framework refuse de livrer : l'indélivrabilité est impossible par construction. Ne JAMAIS réintroduire un plafond de taille ni un « trop gros » — ce serait faire porter à l'auteur d'une doc un défaut du TRANSPORT.

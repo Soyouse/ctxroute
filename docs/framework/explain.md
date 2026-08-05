@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"explain.js","scope":["ctxroute"]},{"pattern":"explain.test.js","scope":["ctxroute"]},{"pattern":"collect-core.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # explain.js / collect-core.js — « pourquoi ça s'injecte (ou pas) ? »
 

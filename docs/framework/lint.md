@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"lint-corpus","exclude":["node_modules"]},{"pattern":"lint.js","scope":["ctxroute"],"exclude":["node_modules"]},{"pattern":"lint.test.js","scope":["ctxroute"],"exclude":["node_modules"]}]
 mode: dumb
-confirm: true
 rank: 556
 ---
 # lint.js / lint-corpus.js — audit du PARC (le framework s'audite lui-même)

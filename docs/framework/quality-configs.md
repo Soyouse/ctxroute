@@ -2,7 +2,6 @@
 match: [stryker.conf.json, .dependency-cruiser.json, .jscpd.json]
 scope: [ctxroute]
 mode: dumb
-confirm: true
 rank: 370
 ---
 # stryker.conf.json / .dependency-cruiser.json / .jscpd.json — invariants

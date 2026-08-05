@@ -130,7 +130,7 @@ const DRIFT_UNITS = ['tool', 'turn'];
 // ⚠️ Le moteur ne DOIT jamais en dépendre : aucune décision, aucun matching,
 //    aucun tri. Le jour où une source la lirait, ce serait un champ de config
 //    déguisé en commentaire — donc une 2ᵉ vérité.
-const KNOWN = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note', 'enforce'];
+const KNOWN = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'rank', 'threshold', 'driftUnit', 'note', 'enforce'];
 
 // ⚠️ `inject: never` — LE SILENCE DEVIENT UNE DÉCLARATION, jamais un oubli.
 //    MESURÉ le 15/07/2026 : 14 docs sur 306 ne sont visées par AUCUNE règle.
@@ -322,9 +322,6 @@ function validate(data) {
   }
   for (const e of cadenceErrors(data)) errs.push(e);
   for (const e of noteErrors(data)) errs.push(e);
-  if ('confirm' in data && typeof data.confirm !== 'boolean') {
-    errs.push('`confirm` doit être true ou false');
-  }
   if ('rank' in data && typeof data.rank !== 'number') errs.push('`rank` doit être un nombre');
   // ⚠️ Clé inconnue = ERREUR, jamais ignorée en silence : `mach:` au lieu de `match:`
   //    passerait sinon inaperçu et la doc serait morte sans que personne ne le sache.

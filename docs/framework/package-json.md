@@ -2,7 +2,6 @@
 match: package.json
 scope: [ctxroute]
 mode: dumb
-confirm: true
 rank: 374
 ---
 # package.json (ctxroute) — invariants

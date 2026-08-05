@@ -52,7 +52,7 @@ beforeEach(() => {
 afterAll(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 test('ALLOW : lecture d\'un fichier documenté → doc injectée, format protect-files', async () => {
-  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\n# Piège serveur\nNE PAS toucher X.\n');
+  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\n---\n# Piège serveur\nNE PAS toucher X.\n');
   const { code, stdout } = await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 's1' });
   assert.strictEqual(code, 0);
   const out = parseOut(stdout);
@@ -61,21 +61,19 @@ test('ALLOW : lecture d\'un fichier documenté → doc injectée, format protect
   assert.strictEqual(out.systemMessage, '📄 doc: piege');
 });
 
-test('ASK : écriture (Edit) sur doc confirm: true → permissionDecision ask', async () => {
-  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\ncontenu\n');
-  const { stdout } = await run({ tool_name: 'Edit', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 's1' });
-  const out = parseOut(stdout);
-  assert.strictEqual(out.hookSpecificOutput.permissionDecision, 'ask');
-  assert.ok(out.hookSpecificOutput.permissionDecisionReason.startsWith('[FICHIER DOCUMENTE — MODIFICATION] Confirmer avant de modifier.\n\n'));
-});
-
-test('RUSH via config : confirm=false → allow sur Edit, doc quand même injectée', async () => {
-  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\ncontenu\n');
-  fs.writeFileSync(CONFIG, JSON.stringify({ confirm: false }));
+// ⚠️ ANTI-RETOUR `ask` — prouvé PAR SPAWN RÉEL (05/08/2026). Remplace les 2
+//    tests « ASK » et « RUSH ». Un test unitaire sur gate.js ne suffirait pas :
+//    c'est la COQUILLE qui écrit `permissionDecision`, donc c'est elle qui
+//    pourrait réintroduire un `ask` sans que le moteur en sache rien.
+test('ANTI-RETOUR : une écriture sur doc documentée reste `allow` — jamais `ask`', async () => {
+  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\n---\ncontenu\n');
+  // `confirm` n'est plus du vocabulaire : même posé en config, il n'a AUCUN effet.
+  fs.writeFileSync(CONFIG, JSON.stringify({ confirm: true }));
   const { stdout } = await run({ tool_name: 'Edit', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 's1' });
   const out = parseOut(stdout);
   assert.strictEqual(out.hookSpecificOutput.permissionDecision, 'allow');
-  assert.ok(out.hookSpecificOutput.additionalContext.includes('contenu'));
+  assert.ok(out.hookSpecificOutput.additionalContext.includes('contenu'), 'le savoir est livré, sans escalade humaine');
+  assert.strictEqual(out.hookSpecificOutput.permissionDecisionReason, undefined);
 });
 
 test('SILENCE : aucun match → stdout vide, exit 0', async () => {
@@ -95,14 +93,14 @@ test('DÉDUP smart : 1er appel injecte, rappel immédiat silencieux (état par s
 });
 
 test('PARITÉ perf : corpus 100% dumb → AUCUN fichier d\'état écrit', async () => {
-  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\ncontenu\n');
+  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\n---\ncontenu\n');
   await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'perf' });
   const files = fs.existsSync(STATE) ? fs.readdirSync(STATE).filter((f) => f.startsWith('doc-seen-')) : [];
   assert.deepStrictEqual(files, []);
 });
 
 test('PARITÉ : doc au corps vide = inexistante (pas d\'injection, pas d\'ask)', async () => {
-  writeDoc('vide.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\n');
+  writeDoc('vide.md', '---\nmatch: server.js\nmode: dumb\n---\n');
   const { stdout } = await run({ tool_name: 'Edit', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 's1' });
   assert.strictEqual(stdout.trim(), '');
 });

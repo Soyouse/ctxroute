@@ -1,7 +1,6 @@
 ---
 match: stdin-json.js
 mode: dumb
-confirm: true
 rank: 369
 ---
 # stdin-json.js — invariants

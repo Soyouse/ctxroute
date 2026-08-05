@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"loader.js","scope":["ctxroute"]},{"pattern":"loader.test.js","scope":["ctxroute"]},{"pattern":"shadow-inject.js","scope":["ctxroute"]},{"pattern":"shadow-inject.test.js","scope":["ctxroute"]},{"pattern":"shadow-reconcile.js","scope":["ctxroute"]},{"pattern":"oracle.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # loader.js / shadow-*.js / oracle.js — shadow du moteur unifié (RELIQUE — décâblé 17/07/2026)
 

@@ -2,7 +2,6 @@
 match: test.yml
 scope: [ctxroute]
 mode: dumb
-confirm: true
 rank: 373
 ---
 # .github/workflows/test.yml — invariants

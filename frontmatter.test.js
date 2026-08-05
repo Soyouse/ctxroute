@@ -48,8 +48,11 @@ test('parse : non-string → totalité (jamais un throw)', () => {
 
 // ── parse : scalaires ──
 test('parse : booléens', () => {
-  assert.strictEqual(parse('---\nconfirm: true\n---\n').data.confirm, true);
-  assert.strictEqual(parse('---\nconfirm: false\n---\n').data.confirm, false);
+  // ⚠️ Portait sur `confirm` jusqu'au 05/08/2026 (retiré). `enforce` est le
+  //    booléen du vocabulaire — le parser DOIT rendre un vrai booléen, pas la
+  //    chaîne "true" : une valeur non booléenne est REFUSÉE par validate().
+  assert.strictEqual(parse('---\nenforce: true\n---\n').data.enforce, true);
+  assert.strictEqual(parse('---\nenforce: false\n---\n').data.enforce, false);
 });
 test('parse : nombres — SEULEMENT si toute la chaîne est un nombre', () => {
   // ⚠️ Number() seul accepterait trop : "12-factor" deviendrait 12.
@@ -103,10 +106,9 @@ test('validate : mode limité à dumb|once|smart', () => {
   assert.ok(validate({ match: 'a', mode: '' }).length > 0);
   assert.deepStrictEqual(MODES, ['dumb', 'once', 'smart'], 'le contrat des modes a changé');
 });
-test('validate : confirm booléen, rank numérique', () => {
-  assert.ok(validate({ match: 'a', confirm: 'oui' }).length > 0);
+test('validate : rank numérique', () => {
   assert.ok(validate({ match: 'a', rank: '3' }).length > 0);
-  assert.deepStrictEqual(validate({ match: 'a', confirm: false, rank: 0 }), []);
+  assert.deepStrictEqual(validate({ match: 'a', rank: 0 }), []);
 });
 test('validate : clé INCONNUE rejetée (typo `mach:` = doc morte en silence)', () => {
   assert.ok(validate({ match: 'a', mach: 'b' }).length > 0);
@@ -118,13 +120,13 @@ test('validate : clé INCONNUE rejetée (typo `mach:` = doc morte en silence)', 
 test('validate : toutes les clés COMPATIBLES acceptées ensemble', () => {
   // ⚠️ `mcp` RETIRÉ de ce cas le 31/07/2026 : il n'est plus un déclencheur du
   //    corpus fichier (§A) — l'y laisser reviendrait à re-certifier le faux vert.
-  assert.deepStrictEqual(validate({ match: 'a', scope: ['s'], exclude: ['e'], mode: 'dumb', confirm: true, rank: 1, threshold: 3 }), []);
+  assert.deepStrictEqual(validate({ match: 'a', scope: ['s'], exclude: ['e'], mode: 'dumb', rank: 1, threshold: 3 }), []);
   // ⚠️ Contrat écrit EN DUR — ne JAMAIS le dériver de KNOWN (il muterait avec le code).
   // ⚠️ `note` AJOUTÉE le 04/08/2026 — commentaire d'auteur, JAMAIS lue par le moteur.
   // ⚠️ MISE À JOUR DÉLIBÉRÉE (05/08/2026) : `enforce` ajouté. Ce test a rougi
   //    en premier — c'est son rôle : le vocabulaire ne s'étend jamais par
   //    accident. Ajouter une clé DOIT coûter une décision explicite ici.
-  assert.deepStrictEqual(KNOWN, ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'confirm', 'rank', 'threshold', 'driftUnit', 'note', 'enforce']);
+  assert.deepStrictEqual(KNOWN, ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude', 'mode', 'rank', 'threshold', 'driftUnit', 'note', 'enforce']);
   // ⚠️ Contrat EN DUR aussi pour DRIFT_UNITS (source unique du vocabulaire d'unité).
   assert.deepStrictEqual(DRIFT_UNITS, ['tool', 'turn']);
   // ⚠️ Contrat EN DUR des DÉCLENCHEURS (4 depuis 19/07/2026 : + `tool`).
@@ -200,7 +202,7 @@ test('validate : `inject: never` + `rules` = CONTRADICTION', () => {
 // ── `inject: never` — le silence déclaré (14 docs muettes mesurées le 15/07) ──
 test('validate : `inject: never` SEUL = valide (doc de référence, on-demand)', () => {
   assert.deepStrictEqual(validate({ inject: 'never' }), []);
-  assert.deepStrictEqual(validate({ inject: 'never', mode: 'dumb', confirm: false }), []);
+  assert.deepStrictEqual(validate({ inject: 'never', mode: 'dumb' }), []);
 });
 test('validate : `inject: never` + déclencheur = CONTRADICTION (jamais une précédence devinée)', () => {
   assert.ok(validate({ inject: 'never', match: 'a.js' }).length > 0);
@@ -244,7 +246,7 @@ test('validate : une doc FICHIER seule reste valide', () => {
 });
 test('validate : ZÉRO déclencheur = ROUGE (doc morte en silence = le bug qu\'on tue)', () => {
   assert.ok(validate({}).length > 0);
-  assert.ok(validate({ mode: 'dumb', confirm: true }).length > 0);
+  assert.ok(validate({ mode: 'dumb' }).length > 0);
 });
 test('validate : un déclencheur PRÉSENT mais vide/mal typé = ROUGE', () => {
   assert.ok(validate({ match: '' }).length > 0);
@@ -453,7 +455,8 @@ test('`enforce` est admis AUSSI dans une doc MCP (même vocabulaire partout)', (
 // ⚠️ Fige QUELLE clé vit dans QUEL corpus. Toute divergence future devient une
 //    DÉCISION explicite (ce test rougit) au lieu d'un écart qui s'installe.
 //    Né d'une vraie question : « tout est-il symétrique ? » — la réponse était
-//    NON pour `confirm`, et personne ne l'avait écrit nulle part.
+//    NON pour `confirm`, et personne ne l'avait écrit nulle part. Depuis son
+//    retrait, la réponse est OUI, et ce gate est ce qui la maintient vraie.
 // ═══════════════════════════════════════════════════════════════════════
 test('SYMÉTRIE : la cadence est IDENTIQUE dans les 2 corpus de docs', () => {
   // Ces 5 clés ont le MÊME sens partout ⇒ elles DOIVENT être partout.
@@ -464,21 +467,22 @@ test('SYMÉTRIE : la cadence est IDENTIQUE dans les 2 corpus de docs', () => {
     'une doc MCP doit accepter TOUTE la cadence, enforce compris');
 });
 
-test('ASYMÉTRIE ASSUMÉE : `confirm` n\'existe QUE dans les docs fichier', () => {
-  // 🛑 CE N'EST PAS UN OUBLI — mesuré le 05/08/2026 avant de trancher :
-  //    · 363 des 379 docs du parc portent `confirm: true` (convention recopiée) ;
-  //    · l'interrupteur GLOBAL est à `false` ⇒ elles ne déclenchent RIEN ;
-  //    · Codex ne supporte pas `ask` : il y est dégradé en simple injection ;
-  //    · `ask` remet un HUMAIN dans la boucle = contraire au 0-human.
-  //    Il vient de protect-files.js, repris tel quel pour la parité de bascule
-  //    du 17/07/2026, et n'a jamais été rejugé depuis.
-  // ⚠️ NE PAS « corriger » cette asymétrie en étendant `confirm` aux docs MCP,
-  //    aux skills ou à `defaults` : ce serait généraliser un mot éteint et
-  //    contraire à la doctrine. `enforce` couvre le besoin en mieux (autonome,
-  //    identique sur les 2 harnais, livre le savoir avec le refus).
-  //    Sort en sursis : cf REFACTOR-PLAN « confirm — ce mot devait-il exister ? ».
-  assert.ok(KNOWN.includes('confirm'), 'confirm reste admis en doc fichier (prod)');
-  assert.ok(validateMcp({ confirm: true }).length > 0, 'confirm doit RESTER refusé en doc MCP');
+test('ANTI-RETOUR : `confirm` n\'est plus du vocabulaire, dans AUCUN corpus', () => {
+  // 🛑 RETIRÉ le 05/08/2026, après mesure — ne JAMAIS le réintroduire :
+  //    · 390 frontmatters le portaient (convention recopiée depuis
+  //      protect-files.js pour la parité de bascule du 17/07/2026) ;
+  //    · l'interrupteur GLOBAL était à `false` ⇒ ils ne déclenchaient RIEN,
+  //      et personne ne s'en était aperçu — définition d'une clé morte ;
+  //    · Codex ne supporte pas `ask` : il y était dégradé en simple injection,
+  //      donc un même mot avait DEUX sens selon le harnais ;
+  //    · `ask` remet un HUMAIN dans la boucle = contraire au 0-human, qui est
+  //      le mur porteur du framework.
+  // ⚠️ Le besoin « arrêter un geste » est couvert par `enforce` : automatique,
+  //    identique sur les 2 harnais, et il LIVRE le savoir avec le refus.
+  //    Deux mots pour un besoin = loi anti-synonyme violée.
+  assert.ok(!KNOWN.includes('confirm'), 'confirm ne doit plus être une clé admise');
+  assert.ok(validate({ match: 'a.js', confirm: true }).length > 0, 'confirm doit être REFUSÉ en doc fichier');
+  assert.ok(validateMcp({ confirm: true }).length > 0, 'confirm doit être REFUSÉ en doc MCP');
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -488,7 +492,9 @@ test('ASYMÉTRIE ASSUMÉE : `confirm` n\'existe QUE dans les docs fichier', () =
 // ⚠️ POURQUOI : le framework a 4 corpus (doc fichier · doc MCP · entrée skill ·
 //    defaults.{source}). Une clé de COMPORTEMENT qui n'atterrit que dans l'un
 //    d'eux crée un décalage que PERSONNE ne voit — c'est arrivé à `confirm`,
-//    resté fichier-only depuis le 1er commit sans que ce soit une décision.
+//    resté fichier-only depuis le 1er commit sans que ce soit une décision,
+//    jusqu'à son retrait le 05/08/2026. Ce gate existe pour que ça ne se
+//    reproduise pas : la prochaine clé asymétrique rougira le jour même.
 //
 // ⚠️ PRINCIPE : **symétrie par DÉFAUT, exception DÉCLARÉE.** Aucune liste de
 //    clés en dur ici : les clés de comportement sont DÉRIVÉES (vocabulaire
@@ -507,16 +513,14 @@ const MATCHING = ['match', 'mcp', 'rules', 'tool', 'inject', 'scope', 'exclude',
 
 // Échantillon VALIDE par clé de comportement. Toute clé sans échantillon = ROUGE
 // (volet ⓪) : impossible d'ajouter une clé en la rendant invisible au gate.
-const ECHANTILLON = { mode: 'once', threshold: 2, driftUnit: 'turn', note: 'x', enforce: true, confirm: true };
+const ECHANTILLON = { mode: 'once', threshold: 2, driftUnit: 'turn', note: 'x', enforce: true };
 
 // 🛑 LES SEULES ASYMÉTRIES ADMISES — chacune avec sa RAISON MESURÉE.
 //    Ajouter une entrée ici est une DÉCISION, jamais un contournement.
 const ASYMETRIES_JUSTIFIEES = {
-  confirm: "héritage de protect-files.js repris pour la parité de bascule du 17/07/2026, jamais rejugé. "
-    + "Mesuré le 05/08/2026 : 363 des 379 docs du parc le portent (convention recopiée) MAIS l'interrupteur "
-    + "global est à `false` — elles ne déclenchent RIEN ; Codex ne supporte pas `ask` (dégradé en injection) ; "
-    + "et `ask` remet un HUMAIN dans la boucle, contraire au 0-human. NE PAS l'étendre aux autres corpus : "
-    + "ce serait généraliser un mot éteint. `enforce` couvre le besoin en mieux. Sort en sursis (REFACTOR-PLAN).",
+  // ⚠️ VIDE, et c'est le but : le vocabulaire de comportement est INTÉGRALEMENT
+  //    symétrique depuis le retrait de `confirm` (05/08/2026). Une entrée ici
+  //    est une DÉCISION écrite, jamais un contournement pour faire passer le gate.
 };
 
 test('GATE SYMÉTRIE ⓪ : toute clé de comportement a un échantillon (rien ne peut se cacher)', () => {

@@ -20,7 +20,7 @@ const HOOK = path.join(__dirname, 'shadow-inject.js');
 
 function faussesDocs() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shadow-docs-'));
-  fs.writeFileSync(path.join(dir, 'piege.md'), '---\nmatch: fichier-piege.js\nmode: dumb\nconfirm: true\nrank: 0\n---\n⚠️ invariant\n');
+  fs.writeFileSync(path.join(dir, 'piege.md'), '---\nmatch: fichier-piege.js\nmode: dumb\nrank: 0\n---\n⚠️ invariant\n');
   return dir;
 }
 

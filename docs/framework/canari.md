@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"canari.js","scope":["ctxroute"]},{"pattern":"canari-check.js","scope":["ctxroute"]},{"pattern":"canari.test.js","scope":["ctxroute"]},{"pattern":"canari-check.test.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # canari — le SEUL témoin qui regarde l'AUTRE BOUT du tuyau
 ⚠️ **TOUT LE RESTE SE TESTE SOI-MÊME.** Le doctor spawne NOTRE hook avec NOTRE payload et vérifie NOTRE sortie — aveugle au seul risque restant : que le HARNAIS change d'avis (champs renommés, `additionalContext` plus consommé). Alors les hooks fail-open en silence, le doctor reste VERT, et plus rien n'atteint l'agent. Le canari observe le RÉEL : le transcript écrit par le harnais.

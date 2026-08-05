@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"fuite-pure.js","scope":["ctxroute"]},{"pattern":"fuite-perso-gate.test.js","scope":["ctxroute"]},{"pattern":"fuite-pure.test.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 rank: 566
 ---
 # fuite-perso — le gate qui empêche une donnée personnelle d'atteindre un dépôt PUBLIC

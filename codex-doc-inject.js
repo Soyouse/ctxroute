@@ -13,10 +13,11 @@
 //      état PARTAGÉ maître/sous-agents, absorbé par construction. Le jour où
 //      OpenAI expose agent_id, AUCUN code à changer.
 //    - stdout : hookSpecificOutput.additionalContext + systemMessage = OK.
-//    - `permissionDecision: "ask"` = « parsed but not supported yet » →
-//      DÉGRADATION EXPLICITE : confirm devient une injection simple, préfixée
-//      de l'avertissement MODIFICATION (jamais un ask silencieusement perdu).
-//      Le jour où Codex supporte ask : réaligner cet emit sur doc-inject.js.
+//    - `permissionDecision: "ask"` = « parsed but not supported yet ». Il
+//      n'y a plus rien à dégrader : `ask` a été RETIRÉ du framework le
+//      05/08/2026 (escalade humaine = anti 0-human, et sens différent selon
+//      le harnais). NE PAS le réintroduire pour Codex « quand il le gérera » :
+//      `enforce`/`deny` couvre le besoin, à l'identique sur les 2 harnais.
 //    - `permissionDecision: "allow"` : OMIS volontairement — on n'accorde
 //      jamais une permission à la place du harnais, on informe seulement.
 //
@@ -42,19 +43,17 @@ function emit(decision, fullDoc, systemMessage) {
   //    Une clé documentée n'est pas forcément dans la version installée : on
   //    mesure, on ne suppose pas.
   if (decision === 'deny') {
-    // ⚠️ SORTIE PARTAGÉE avec Claude Code (porte-core.sortieDeny) — contrairement
-    //    à `ask`, qui reste DÉGRADÉ ici. C'est le seul point où les deux harnais
-    //    parlent le même dialecte au mot près, donc le seul à mutualiser.
+    // ⚠️ SORTIE PARTAGÉE avec Claude Code (porte-core.sortieDeny) : les deux
+    //    harnais parlent ici le même dialecte au mot près. Depuis le retrait
+    //    d'`ask` (05/08/2026), c'est le SEUL écart de comportement possible —
+    //    tout le reste est une injection nue, identique des deux côtés.
     console.log(JSON.stringify(sortieDeny(fullDoc)));
     process.exit(0);
   }
-  const context = decision === 'ask'
-    ? '[FICHIER DOCUMENTE — MODIFICATION] Confirmer avant de modifier.\n\n' + fullDoc
-    : fullDoc;
   const out = {
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
-      additionalContext: context,
+      additionalContext: fullDoc,
     },
   };
   if (systemMessage) out.systemMessage = systemMessage;

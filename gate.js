@@ -7,8 +7,8 @@
 //    Muté par Stryker (mutate + include Stryker, cf quality-configs.md).
 //
 // ⚠️ C'EST LA PIÈCE QUI REMPLACE l'injection de protect-files.js À LA BASCULE.
-//    Parité comportementale EXIGÉE sur le corpus migré (tout en mode dumb +
-//    confirm: true) : mêmes docs, mêmes instants, ask sur les mêmes outils.
+//    Parité comportementale EXIGÉE sur le corpus migré (tout en mode dumb) :
+//    mêmes docs, mêmes instants.
 //    Scellée par porte-differential.test.js (spawn vieux vs nouveau moteur).
 //
 // ⚠️ Le dédup par DOC (modes smart/once, compteurs « outils étrangers ») est
@@ -18,13 +18,16 @@
 
 'use strict';
 
-const { shouldInjectFor, confirmFor } = require('./lib-pure');
+const { shouldInjectFor } = require('./lib-pure');
 const { DRIFT_UNITS, MODES } = require('./frontmatter');
 
-// ⚠️ COPIE CONTRACTUELLE de la liste de protect-files.js (writeTools) — outils
-//    d'ÉCRITURE qui déclenchent une confirmation quand une doc `confirm: true`
-//    est injectée. Liste unifiée Claude + Codex. Épinglée EN DUR dans gate.test.js.
-const WRITE_TOOLS = ['mcp__ssh__ssh_edit_file', 'mcp__ssh__ssh_write_file', 'mcp__ssh__ssh_upload_file', 'Edit', 'Write', 'apply_patch'];
+// ⚠️ `confirm`/`ask` RETIRÉ le 05/08/2026 (avec `WRITE_TOOLS`, qui n'existait que
+//    pour lui). NE JAMAIS le réintroduire : ① `ask` escalade vers l'HUMAIN, à
+//    l'exact opposé du 0-human qui fonde ce framework ; ② Codex ne le supporte
+//    pas (dégradation silencieuse ⇒ un même mot, deux sens selon le harnais) ;
+//    ③ `enforce` couvre déjà « arrêter un geste », automatiquement et à
+//    l'identique sur les 2 harnais — deux mots pour un besoin = loi anti-synonyme.
+//    Il était à `false` en config depuis la bascule : mort, et personne ne l'a vu.
 
 // ═══════════════════════════════════════════════════════════════════════
 // CASCADE DES AUTORITÉS — 4 ÉTAGES, UN SEUL POINT (ici). 04/08/2026.
@@ -158,23 +161,22 @@ function bloqueForDoc(config, decl, source) {
 /**
  * LA décision de la porte. PURE — ne mute AUCUN argument.
  *
- * @param {object} config  - ctxroute-config.json (mode, defaultThreshold, confirm…)
+ * @param {object} config  - ctxroute-config.json (mode, defaultThreshold, defaults…)
  * @param {object} decls   - { [doc]: frontmatter } de TOUT le corpus (modes des
  *                           docs « étrangères » nécessaires aux compteurs smart).
  * @param {string[]} matched - docs matchées par la source, ORDRE = ordre d'injection.
- * @param {string} toolName
  * @param {object} state   - { [doc]: { seen, sinceLastCall, turn? } } AVANT cet appel.
  * @param {number} [turnCount] - compteur de TOURS de la session (porte
  *                           turn-count.js, UserPromptSubmit). CONTRAT : l'appelant
  *                           passe un entier (0 si inconnu/illisible) — jamais de
  *                           garde ici (mutant équivalent). Consommé UNIQUEMENT
  *                           par les docs smart à driftUnit 'turn'.
- * @returns {{ decision: 'none'|'allow'|'ask', inject: string[], state: object, changed: boolean }}
+ * @returns {{ decision: 'none'|'allow'|'deny', inject: string[], state: object, changed: boolean }}
  *
  * ⚠️ `changed` = le state a RÉELLEMENT bougé — un corpus 100% dumb ne produit
  *    JAMAIS d'écriture (parité perf avec protect-files, qui n'a aucun état).
  */
-function decide(config, decls, matched, toolName, state, turnCount, owners) {
+function decide(config, decls, matched, state, turnCount, owners) {
   const prev = state || {};
   // ⚠️ Source PROPRIÉTAIRE de chaque doc (acc.owner, posé par l'adaptateur) —
   //    seule entrée de l'étage ② de la cascade. ABSENT = cascade d'AVANT à
@@ -255,19 +257,15 @@ function decide(config, decls, matched, toolName, state, turnCount, owners) {
     }
   }
 
-  // ask UNIQUEMENT si un outil d'écriture ET au moins une doc INJECTÉE demande
-  // confirmation (confirmFor : config.confirm === false = rush → tout allow).
-  // ⚠️ `deny` PRIME sur tout : une doc qui doit ARRÊTER le geste ne peut pas être
-  //    dégradée en simple demande de confirmation. L'ordre est deny > ask > allow.
-  //    Et il n'y a rien à décider quand rien n'est injecté : bloquer sans livrer
-  //    le savoir serait un mur muet — le pire des deux mondes.
+  // ⚠️ TROIS décisions, plus jamais quatre (05/08/2026) : rien à injecter =
+  //    `none` · une doc `enforce` a mordu = `deny` · sinon `allow`. Il n'y a
+  //    rien à décider quand rien n'est injecté : bloquer sans livrer le savoir
+  //    serait un mur muet — le pire des deux mondes.
   const decision = inject.length === 0
     ? 'none'
     : bloquees.length > 0
       ? 'deny'
-      : WRITE_TOOLS.includes(toolName) && inject.some((doc) => confirmFor(config, decls[doc] || {}))
-        ? 'ask'
-        : 'allow';
+      : 'allow';
 
   return { decision, inject, state: next, changed };
 }
@@ -287,4 +285,4 @@ function docLabel(doc) {
   return title ? title[1].slice(0, 40) : '';
 }
 
-module.exports = { decide, docLabel, WRITE_TOOLS, modeForDoc, thresholdForDoc, driftUnitForDoc, enforceForDoc, bloqueForDoc };
+module.exports = { decide, docLabel, modeForDoc, thresholdForDoc, driftUnitForDoc, enforceForDoc, bloqueForDoc };

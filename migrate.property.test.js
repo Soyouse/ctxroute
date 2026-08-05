@@ -57,7 +57,6 @@ test('ROUND-TRIP — parse(serialize(x)) rend EXACTEMENT x', () => {
       //    Sans cette branche, la property serait AVEUGLE au format qui porte
       //    précisément les cas les plus dangereux (scope perdu = sur-injection).
       assert.deepStrictEqual(relu.rules, decl.rules, 'rules perdu au round-trip');
-      assert.strictEqual(relu.confirm, true, 'confirm perdu → des `ask` disparaissent en silence');
       assert.strictEqual(relu.rank, rank, 'rank perdu → ordre parent→enfant cassé');
       if (decl.scope) assert.deepStrictEqual(relu.scope, decl.scope, 'scope perdu');
       if (decl.exclude) assert.deepStrictEqual(relu.exclude, decl.exclude, 'exclude perdu');
@@ -86,7 +85,7 @@ test('ROUND-TRIP — le CORPS de la doc est préservé intact', () => {
   //    d'un octet. Une doc amputée = un invariant perdu pour l'agent.
   fc.assert(
     fc.property(fc.string(), (corps) => {
-      const decl = { match: 'x.js', confirm: true, rank: 0 };
+      const decl = { match: 'x.js', rank: 0 };
       const r = parse(serialize(decl) + corps);
       if (!/^﻿?---[ \t]*\r?\n/.test(corps)) assert.strictEqual(r.body, corps, 'corps de la doc altéré');
       return true;

@@ -118,19 +118,6 @@ function modeFor(config, server) {
   return override || config.mode || 'smart';
 }
 
-// Confirmation (ask) effective pour UNE doc : config utilisateur > frontmatter > défaut.
-// ⚠️ REMPLACE le fichier sentinelle `.rush` de protect-files.js après la bascule (#4) :
-//    deux mécanismes de config pour un moteur = l'anti-pattern « deux formats, un lecteur ».
-//    `config.confirm === false` = le rush d'aujourd'hui (tous les ask éteints), mais dans
-//    LE MÊME JSON que le reste — plus de fichier sentinelle parallèle.
-// ⚠️ Fail-open côté UTILISATEUR : seul `false` littéral éteint (config cassée ≠ rush).
-// ⚠️ Une doc ne demande confirmation QUE si son frontmatter dit `confirm: true` —
-//    `true` littéral uniquement : un frontmatter corrompu ne doit jamais inventer un ask.
-function confirmFor(config, decl) {
-  if (config && config.confirm === false) return false;
-  return !!(decl && decl.confirm === true);
-}
-
 // Interrupteur GLOBAL du framework entier (config.json → "enabled").
 // ⚠️ Coupe TOUT (injection additionalContext ET tracking d'état/compteurs) —
 // pattern standard (ESLint, git hooks SKIP=...) pour désactiver temporairement
@@ -288,7 +275,6 @@ module.exports = {
   thresholdFor,
   modeFor,
   isServerActive,
-  confirmFor,
   isFrameworkEnabled,
   shouldShowNotification,
   formatSystemMessage,

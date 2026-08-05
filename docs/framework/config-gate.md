@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"ctxroute-config.json","scope":["ctxroute"],"rank":359},{"pattern":"config-gate.test.js","scope":["ctxroute"],"rank":360},{"pattern":"legacy-mcp-inject.test.js","scope":["ctxroute"],"rank":361},{"pattern":"ctxroute-config.schema.json","rank":567}]
 mode: dumb
-confirm: true
 rank: 359
 ---
 # ctxroute-config.json / config-gate.test.js — invariants

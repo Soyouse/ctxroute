@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"session-inject.js","scope":["ctxroute"]},{"pattern":"session-inject.test.js","scope":["ctxroute"]},{"pattern":"sources-session.test.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # session-inject.js / sources/session.js — porte SESSION (LIVE 17/07/2026)
 

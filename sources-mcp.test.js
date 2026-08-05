@@ -87,7 +87,13 @@ describe('sources/mcp — declFor', () => {
     expect(declFor(config, 'odoo')).toEqual({ mode: 'smart', threshold: 4 });
   });
 
-  it("jamais de confirm : la source MCP informe, ne demande jamais", () => {
+  it('une decl ne porte QUE de la cadence — aucune clé de DÉCISION', () => {
+    // ⚠️ Portait sur `confirm` (retiré le 05/08/2026). L'invariant est plus
+    //    large et survit à son retrait : une source INFORME, elle ne décide rien.
+    const CADENCE = ['mode', 'threshold', 'driftUnit', 'note', 'enforce'];
+    for (const k of Object.keys(declFor({}, 'stripe'))) {
+      expect(CADENCE).toContain(k);
+    }
     expect('confirm' in declFor({}, 'stripe')).toBe(false);
   });
 });

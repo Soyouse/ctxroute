@@ -20,7 +20,7 @@
 //    l'ordre d'injection parent→enfant vit aujourd'hui dans l'ordre des LIGNES de
 //    protected-paths.json. Renuméroter « proprement » réordonnerait des docs
 //    concaténées et casserait leur sens SANS RIEN AFFICHER.
-const CLES = ['match', 'rules', 'scope', 'exclude', 'mode', 'confirm', 'rank'];
+const CLES = ['match', 'rules', 'scope', 'exclude', 'mode', 'rank'];
 
 function serializeValue(k, v) {
   // ⚠️ `rules` = JSON inline (contrepartie EXACTE du JSON.parse de frontmatter.js).
@@ -65,9 +65,6 @@ function grouper(rules) {
 
 /**
  * Construit la déclaration d'une doc. PUR.
- * ⚠️ `confirm: true` TOUJOURS — non négociable. protect-files.js demande
- *    confirmation sur écriture DÈS QU'une doc matche ; l'omettre supprimerait en
- *    silence des centaines d'`ask` sur des fichiers critiques (VPS, prod).
  *    La migration PRÉSERVE le comportement, elle ne le juge pas. Le tri
  *    « qui mérite un ask » est un chantier SÉPARÉ, humain, plus tard.
  *
@@ -104,13 +101,12 @@ function declaration(entries, rank, interleaved, idxs) {
       if (interleaved && Array.isArray(idxs)) r.rank = idxs[i];
       return r;
     });
-    return { rules, mode: 'dumb', confirm: true, rank };
+    return { rules, mode: 'dumb', rank };
   }
 
   const decl = {
     match: entries.length === 1 ? entries[0].pattern : entries.map((e) => e.pattern),
     mode: 'dumb',
-    confirm: true,
     rank,
   };
   const scope = entries[0].scope;

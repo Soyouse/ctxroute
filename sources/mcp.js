@@ -47,8 +47,9 @@ function matchingDocs(config, { toolName, toolInput }) {
 // Decl (vocabulaire gate.js) d'une doc MCP. `fm` = frontmatter parsé de LA doc
 // (l'auteur propose) ; valeur absente OU invalide → fallback config serveur
 // (l'utilisateur/global dispose, cf lib-pure). TOTAL : ne throw jamais.
-// ⚠️ Jamais de `confirm` ici : la source MCP INFORME, elle ne demande jamais
-//    de confirmation (parité legacy-mcp-inject.js, qui n'a aucun ask).
+// ⚠️ Une decl ne porte QUE de la cadence : une source INFORME, elle ne décide
+//    rien (le refus `enforce` est résolu par gate.js). `confirm` a été retiré
+//    du framework le 05/08/2026 — ne pas réintroduire de clé de décision ici.
 function declFor(config, server, fm) {
   const data = fm || {};
   const decl = {

@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"lock.js","scope":["ctxroute"],"exclude":["package-lock.json"]},{"pattern":"lock.test.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 rank: 366
 ---
 # lock.js — invariants

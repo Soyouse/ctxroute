@@ -2,7 +2,6 @@
 match: [doctor.js, doctor.test.js]
 scope: [ctxroute]
 mode: dumb
-confirm: true
 rank: 356
 ---
 # doctor.js / doctor.test.js — dead-man switch

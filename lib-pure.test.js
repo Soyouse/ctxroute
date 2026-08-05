@@ -90,15 +90,6 @@ ok('isServerActive: filterMode inconnu → fail-open (actif)', () => lib.isServe
 ok('isServerActive: filterMode "none" AVEC filterList non-vide → ignore quand même la liste (pas un blacklist implicite)', () => lib.isServerActive({ filterMode: 'none', filterList: ['stripe'] }, 'stripe') === true);
 ok('isServerActive: filterMode absent AVEC filterList non-vide → même comportement que "none" explicite', () => lib.isServerActive({ filterList: ['stripe'] }, 'stripe') === true);
 
-// ── confirmFor (#4 : le futur remplaçant du fichier sentinelle .rush) ──
-ok('confirmFor: frontmatter confirm:true + config muette → ask', () => lib.confirmFor({}, { confirm: true }) === true);
-ok('confirmFor: config.confirm=false ÉTEINT tout (le rush, mais dans le JSON)', () => lib.confirmFor({ confirm: false }, { confirm: true }) === false);
-ok('confirmFor: doc sans confirm → jamais d\'ask (true littéral exigé)', () => lib.confirmFor({}, {}) === false);
-ok('confirmFor: confirm non-booléen ("oui") → jamais d\'ask (corruption ≠ ask inventé)', () => lib.confirmFor({}, { confirm: 'oui' }) === false);
-ok('confirmFor: config.confirm=true explicite ne FORCE pas un ask sur doc muette', () => lib.confirmFor({ confirm: true }, {}) === false);
-ok('confirmFor: config/decl null → false, jamais un throw (totalité)', () => lib.confirmFor(null, null) === false);
-ok('confirmFor: config cassée (confirm:"off") ≠ rush — l\'ask déclaré reste', () => lib.confirmFor({ confirm: 'off' }, { confirm: true }) === true);
-
 // ── isFrameworkEnabled (interrupteur GLOBAL — coupe injection ET tracking) ──
 ok('isFrameworkEnabled: pas de champ "enabled" → ON par défaut', () => lib.isFrameworkEnabled({}) === true);
 ok('isFrameworkEnabled: enabled=true explicite → ON', () => lib.isFrameworkEnabled({ enabled: true }) === true);

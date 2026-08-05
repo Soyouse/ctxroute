@@ -29,7 +29,7 @@ function run(rel, content, { kind = 'file' } = {}) {
 }
 
 test('doc fichier SAINE = silence total (zéro pollution de contexte)', () => {
-  const r = run('ok.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\ncontenu\n');
+  const r = run('ok.md', '---\nmatch: server.js\nmode: dumb\n---\ncontenu\n');
   expect(r.status).toBe(0);
   expect(r.stdout).toBe('');
 });

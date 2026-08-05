@@ -11,7 +11,7 @@ import { decide } from './gate.js';
 
 const docId = fc.constantFrom('docs/a.md', 'docs/b.md', 'docs/c.md', 'docs/d.md');
 const mode = fc.constantFrom('dumb', 'once', 'smart', undefined);
-const decl = fc.record({ mode, confirm: fc.option(fc.boolean(), { nil: undefined }) });
+const decl = fc.record({ mode });
 const decls = fc.dictionary(docId, decl, { maxKeys: 4 });
 const entry = fc.oneof(
   fc.constant(null),
@@ -23,19 +23,18 @@ const toolName = fc.constantFrom('Read', 'Edit', 'Write', 'Bash', 'mcp__ssh__ssh
 const config = fc.record({
   mode,
   defaultThreshold: fc.option(fc.integer({ min: 1, max: 10 }), { nil: undefined }),
-  confirm: fc.option(fc.boolean(), { nil: undefined }),
 });
 
-test('TOTALITÉ : jamais de throw, decision ∈ {none, allow, ask}', () => {
+test('TOTALITÉ : jamais de throw, decision ∈ {none, allow, deny}', () => {
   fc.assert(fc.property(config, decls, matched, toolName, state, (c, d, m, t, s) => {
-    const r = decide(c, d, m, t, s);
-    assert.ok(['none', 'allow', 'ask'].includes(r.decision));
+    const r = decide(c, d, m, s);
+    assert.ok(['none', 'allow', 'deny'].includes(r.decision));
   }));
 });
 
 test('SOUS-SUITE : inject ⊆ matched, ordre préservé', () => {
   fc.assert(fc.property(config, decls, matched, toolName, state, (c, d, m, t, s) => {
-    const r = decide(c, d, m, t, s);
+    const r = decide(c, d, m, s);
     let i = 0;
     for (const doc of m) if (r.inject[i] === doc) i++;
     assert.strictEqual(i, r.inject.length, 'inject doit être une sous-suite ordonnée de matched');
@@ -45,14 +44,14 @@ test('SOUS-SUITE : inject ⊆ matched, ordre préservé', () => {
 test('PURETÉ : le state passé en argument n\'est JAMAIS muté', () => {
   fc.assert(fc.property(config, decls, matched, toolName, state, (c, d, m, t, s) => {
     const avant = JSON.stringify(s);
-    decide(c, d, m, t, s);
+    decide(c, d, m, s);
     assert.strictEqual(JSON.stringify(s), avant);
   }));
 });
 
 test('none ⟺ inject vide (jamais un ask/allow sans doc)', () => {
   fc.assert(fc.property(config, decls, matched, toolName, state, (c, d, m, t, s) => {
-    const r = decide(c, d, m, t, s);
+    const r = decide(c, d, m, s);
     assert.strictEqual(r.decision === 'none', r.inject.length === 0);
   }));
 });
@@ -60,7 +59,7 @@ test('none ⟺ inject vide (jamais un ask/allow sans doc)', () => {
 test('CORPUS 100% DUMB : injecte tout, changed=false, state passthrough', () => {
   const dumbDecls = fc.dictionary(docId, fc.record({ mode: fc.constant('dumb') }), { maxKeys: 4 });
   fc.assert(fc.property(dumbDecls, matched, toolName, (d, m, t) => {
-    const r = decide({ mode: 'dumb' }, d, m, t, {});
+    const r = decide({ mode: 'dumb' }, d, m, {});
     assert.deepStrictEqual(r.inject, m);
     assert.strictEqual(r.changed, false);
     assert.deepStrictEqual(r.state, {});
@@ -72,8 +71,8 @@ test('CONVERGENCE once/smart : rejouer immédiatement le même appel = silence',
   fc.assert(fc.property(quietDecls, fc.uniqueArray(docId, { minLength: 1, maxLength: 4 }), (d, m) => {
     // decls complètes pour toutes les docs matchées (mode non-dumb garanti).
     const full = { ...Object.fromEntries(m.map((x) => [x, { mode: 'once' }])), ...d };
-    const r1 = decide({}, full, m, 'Read', {});
-    const r2 = decide({}, full, m, 'Read', r1.state);
+    const r1 = decide({}, full, m, {});
+    const r2 = decide({}, full, m, r1.state);
     assert.deepStrictEqual(r2.inject, [], 'le rejeu immédiat doit être silencieux');
     assert.strictEqual(r2.changed, false, 'le rejeu immédiat ne doit rien réécrire');
   }));

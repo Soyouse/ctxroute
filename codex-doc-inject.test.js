@@ -56,7 +56,7 @@ afterAll(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 // Payload Codex réaliste : outils natifs Codex (Bash/apply_patch), pas d'agent_id.
 test('DIALECTE : match sur commande Bash Codex → additionalContext SANS permissionDecision', async () => {
-  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\n# Piège serveur\nNE PAS toucher X.\n');
+  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\n---\n# Piège serveur\nNE PAS toucher X.\n');
   const { code, stdout } = await run({ tool_name: 'Bash', tool_input: { command: 'cat C:/proj/server.js' }, session_id: 'cx1', cwd: 'C:/proj' });
   assert.strictEqual(code, 0);
   const out = parseOut(stdout);
@@ -67,13 +67,17 @@ test('DIALECTE : match sur commande Bash Codex → additionalContext SANS permis
   assert.strictEqual(out.systemMessage, '📄 doc: piege');
 });
 
-test('ASK DÉGRADÉ : écriture apply_patch sur doc confirm → additionalContext préfixé, PAS de ask', async () => {
-  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\nconfirm: true\n---\ncontenu\n');
+// ⚠️ ANTI-RETOUR `ask` côté Codex (05/08/2026). Remplace « ASK DÉGRADÉ » : il
+//    n'y a plus rien à dégrader, `ask` a été retiré du framework. Ce test
+//    interdit que la coquille Codex réinvente une escalade — préfixe compris.
+test('ANTI-RETOUR : apply_patch sur doc documentée → contexte NU, sans préfixe de confirmation', async () => {
+  writeDoc('piege.md', '---\nmatch: server.js\nmode: dumb\n---\ncontenu\n');
   const { stdout } = await run({ tool_name: 'apply_patch', tool_input: { command: '*** Begin Patch\n*** Update File: C:/proj/server.js\n@@\n*** End Patch' }, session_id: 'cx1' });
   const out = parseOut(stdout);
   assert.strictEqual(out.hookSpecificOutput.permissionDecision, undefined);
-  assert.ok(out.hookSpecificOutput.additionalContext.startsWith('[FICHIER DOCUMENTE — MODIFICATION] Confirmer avant de modifier.\n\n'));
   assert.ok(out.hookSpecificOutput.additionalContext.includes('contenu'));
+  assert.ok(!/Confirmer avant/i.test(out.hookSpecificOutput.additionalContext),
+    'aucune demande de confirmation ne doit subsister : le 0-human est le mur porteur');
 });
 
 test('SILENCE : aucun match → stdout vide, exit 0', async () => {

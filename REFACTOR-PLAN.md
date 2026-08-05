@@ -52,8 +52,33 @@ Clé ABSENTE du binaire 0.144.6 (mesuré, méthode validée par 5 témoins). **0
 disponible.** Reste à faire : mettre Codex à jour → re-mesurer la clé dans le binaire → injection
 volumineuse réelle de bout en bout. À faire AVEC ② (le canari est le témoin qui manque).
 
-### ④ RETRAIT DE `confirm` — DÉCISION PRISE, ATTEND LE GO
-**Verdict (05/08/2026) : le SUPPRIMER.** Trois raisons, par ordre de poids :
+### ④ RETRAIT DE `confirm` — ✅ FAIT (05/08/2026, GO du mainteneur)
+**CIBLE ATTEINTE, intégralement.** `confirm` et `ask` n'existent plus nulle part : ni dans le
+vocabulaire (`KNOWN`), ni dans `lib-pure` (`confirmFor` supprimée), ni dans `gate.js` (la porte
+rend **3 décisions et pas 4** : `none` · `allow` · `deny`), ni dans les 2 coquilles, ni au schéma,
+ni dans la config livrée, ni dans un seul frontmatter du parc.
+**RETIRÉ EN PRIME, non prévu au plan** : `WRITE_TOOLS` (la liste d'outils d'écriture) et le
+paramètre `toolName` de `decide()` — ils n'existaient QUE pour `ask`. Les garder aurait laissé
+une liste à maintenir pour rien et un paramètre mort dans la signature la plus chaude du moteur.
+**Aucune décision de la porte ne dépend plus du NOM de l'outil.**
+**MESURES** : **390 frontmatters** nettoyés (363 dans `~/.claude/hooks/docs` + 27 dans
+`docs/`, tous vérifiés DANS le frontmatter, 0 hors bloc) · lint-corpus **0 erreur** ·
+**964 tests verts / 48 fichiers** · **mutation 100,00 %** (1775 tués, 0 survivant) ·
+doctor **12 ok / 0 problème** · jscpd **0,51 %** (< 1 %).
+**ANTI-RETOUR SCELLÉ** (c'est ce qui reste du chantier, et le plus important) :
+① `gate.test.js` — aucune entrée ne peut produire `ask`, et les décisions sont EXACTEMENT
+`none|allow|deny` ; ② `frontmatter.test.js` — `confirm` REFUSÉ dans les 2 corpus de docs ;
+③ **spawn RÉEL sur les 2 coquilles** (c'est la coquille qui écrit `permissionDecision`, donc
+c'est elle qui pourrait le réintroduire sans que le moteur en sache rien) ; ④ le gate de
+symétrie a `ASYMETRIES_JUSTIFIEES` **VIDE** — le vocabulaire est intégralement symétrique.
+**Leçon à garder** : la clé était à `false` depuis la bascule du 17/07/2026, donc **morte
+pendant trois semaines sans que personne ne s'en aperçoive**. C'est la définition d'une dette :
+pas un bug, un mot qui coûte à lire et ne rend rien. Une machine ne l'aurait jamais signalée —
+seul le gate de symétrie l'a rendue VISIBLE, et il a fallu la question du mainteneur pour la tuer.
+
+<details><summary>Raisons du verdict (conservées — c'est ce qui interdit le retour en arrière)</summary>
+
+Trois raisons, par ordre de poids :
 1. **Contraire au 0-human** — `ask` remet un humain dans la boucle ; le skill le proscrit.
 2. **Asymétrie IRRÉDUCTIBLE** — Codex ne supporte pas `ask` (dégradé en injection). Un standard
    multi-harnais ne peut pas reposer sur un mot qui ne marche que d'un côté.
@@ -63,14 +88,16 @@ volumineuse réelle de bout en bout. À faire AVEC ② (le canari est le témoin
 Origine : héritage de `protect-files.js`, repris tel quel pour la parité de bascule du 17/07/2026,
 jamais rejugé depuis. `enforce` couvre le besoin en mieux (autonome, identique sur les 2 harnais,
 livre le savoir avec le refus).
-⚠️ **POURQUOI ÇA ATTEND** : retirer la clé du vocabulaire rend **363 docs de PROD invalides d'un
-coup** (clé inconnue = ERREUR). Règle n°1 du skill : interdit sans GO explicite.
-**ORDRE OBLIGATOIRE (expand/contract)** : ① nettoyer les 363 frontmatters ; ② vérifier le corpus
-(`lint-corpus`) ; ③ retirer `confirm` de `KNOWN` + `confirmFor` + la branche `ask` de `gate.js` et
-des 2 coquilles + la clé globale du schéma ; ④ retirer l'entrée de `ASYMETRIES_JUSTIFIEES`
-(le gate de symétrie ROUGIT si on l'oublie — volet inverse) ; ⑤ mutation + doctor + CI.
+⚠️ **L'ORDRE A COMPTÉ (expand/contract), il est la raison pour laquelle rien n'a cassé** :
+retirer la clé du vocabulaire AVANT de nettoyer les frontmatters aurait rendu 390 docs de PROD
+invalides d'un coup (clé inconnue = ERREUR) — donc plus aucune injection, pour tous les agents
+en cours. Ordre suivi : ① nettoyer les 390 frontmatters ; ② `lint-corpus` vert ; ③ retirer le
+code ; ④ vider `ASYMETRIES_JUSTIFIEES` ; ⑤ mutation + doctor. **À rejouer tel quel pour toute
+future suppression de clé.**
 ⚠️ **NE PAS « corriger » l'asymétrie en ÉTENDANT `confirm`** aux docs MCP/skills/defaults :
 ce serait généraliser un mot éteint et contraire à la doctrine. Piste ÉCARTÉE, avec sa mesure.
+
+</details>
 
 ### ⑤ `enforce` N'EST UTILISÉ PAR AUCUNE DOC
 Le mot existe, prouvé, symétrique — et **le comportement réel du parc est INCHANGÉ**.

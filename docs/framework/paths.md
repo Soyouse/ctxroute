@@ -3,7 +3,6 @@ match: paths.js
 scope: [ctxroute]
 exclude: [protected-paths.json]
 mode: dumb
-confirm: true
 rank: 355
 ---
 # paths.js — source unique des chemins

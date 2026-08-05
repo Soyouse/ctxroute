@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"ARBORESCENCE.md","scope":["ctxroute"]},{"pattern":"REFACTOR-PLAN.md","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # ARBORESCENCE.md / REFACTOR-PLAN.md — les 2 documents de PILOTAGE du repo
 ⚠️ **`ARBORESCENCE.md` = filet d'EXHAUSTIVITÉ** : 1 ligne par fichier, JAMAIS un jugement d'importance — un fichier hors liste est un trou PAR DÉFINITION. Ajout/suppression/renommage ⇒ MAJ **dans le même geste**. Scellé par le volet ② de `couverture-gate.test.js` (il lit ce fichier ET le skill).

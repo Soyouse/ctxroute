@@ -17,9 +17,9 @@ const etat = (existants, avecFm) => ({
   aDejaFrontmatter: (d) => avecFm.includes(d),
 });
 
-test('serialize : ordre des clés FIGÉ (match, scope, exclude, mode, confirm, rank)', () => {
-  const out = serialize({ rank: 3, confirm: true, match: 'a.js', scope: ['x'] });
-  assert.strictEqual(out, '---\nmatch: a.js\nscope: [x]\nconfirm: true\nrank: 3\n---\n');
+test('serialize : ordre des clés FIGÉ (match, scope, exclude, mode, rank)', () => {
+  const out = serialize({ rank: 3, match: 'a.js', scope: ['x'] });
+  assert.strictEqual(out, '---\nmatch: a.js\nscope: [x]\nrank: 3\n---\n');
 });
 
 test('serialize : omet les clés absentes (jamais `undefined` écrit)', () => {
@@ -45,10 +45,6 @@ test('grouper : ignore les règles malformées, ne throw jamais', () => {
   assert.strictEqual(grouper([null, {}, { pattern: 'a' }, { doc: 'd' }, 'x']).size, 0);
   assert.strictEqual(grouper('pas un tableau').size, 0);
   assert.strictEqual(grouper(undefined).size, 0);
-});
-
-test('declaration : confirm TOUJOURS true (préserve les `ask` de protect-files)', () => {
-  assert.strictEqual(declaration([{ pattern: 'a.js' }], 0).confirm, true);
 });
 
 // ⚠️ GATE DE NON-RÉGRESSION COMPORTEMENTALE — ne JAMAIS assouplir.
@@ -99,7 +95,6 @@ test('planifier : le frontmatter produit se relit à l’identique (round-trip)'
   const d = parse(p.actions[0].frontmatter + 'corps').data;
   assert.strictEqual(d.match, 'a.js');
   assert.deepStrictEqual(d.scope, ['s']);
-  assert.strictEqual(d.confirm, true);
   assert.strictEqual(d.rank, 0);
 });
 
@@ -110,8 +105,8 @@ test('planifier : le frontmatter produit se relit à l’identique (round-trip)'
 // ═══════════════════════════════════════════════════════════════════════
 
 test('MUTANT CLES — les 6 clés sont TOUTES sérialisées, dans l’ordre exact', () => {
-  const out = serialize({ match: 'a.js', scope: ['s'], exclude: ['e'], mode: 'dumb', confirm: true, rank: 7 });
-  assert.strictEqual(out, '---\nmatch: a.js\nscope: [s]\nexclude: [e]\nmode: dumb\nconfirm: true\nrank: 7\n---\n');
+  const out = serialize({ match: 'a.js', scope: ['s'], exclude: ['e'], mode: 'dumb', rank: 7 });
+  assert.strictEqual(out, '---\nmatch: a.js\nscope: [s]\nexclude: [e]\nmode: dumb\nrank: 7\n---\n');
 });
 
 test('MUTANT CLES — une clé HORS liste n’est jamais écrite', () => {
@@ -157,7 +152,6 @@ test('DIVERGENCE — scopes différents entre règles → `rules:` par-entrée, 
     { pattern: 'c.js', scope: ['proj-a'], exclude: ['dist'] },
   ]);
   assert.strictEqual(d.mode, 'dumb');
-  assert.strictEqual(d.confirm, true);
   assert.strictEqual(d.rank, 3);
 });
 

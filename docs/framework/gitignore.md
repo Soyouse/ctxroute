@@ -2,7 +2,6 @@
 match: .gitignore
 scope: [ctxroute]
 mode: dumb
-confirm: true
 rank: 354
 ---
 # .gitignore (ctxroute) — piège

@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"skill.js","scope":["ctxroute"]},{"pattern":"sources-skill.test.js","scope":["ctxroute"]},{"pattern":"skill-registry-gate","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # sources/skill.js — SOURCE « skill » : déclenche un skill par PÉRIMÈTRE (0 doublon)
 ⚠️ PUR, muté 100%. RÉUTILISE `matchingDocs` (dimension FICHIER : `match`/`scope`/`exclude` OU `rules` par-entrée depuis 19/07 — MÊME vocabulaire que les docs, `perimeter` supprimé 18/07, synonyme = doublon ; `rules` exclusif de match/scope/exclude, schéma `not` + précédence runtime, validation déléguée à matchingDocs — zéro garde dupliquée) + `lib.serverName`/`toolSuffix`/`getByPath` (dimension MCP, 3 GRAINS : `"srv"` · `"srv/outil"` · `"srv/sous-outil"` via subToolParam) — JAMAIS un 2ᵉ matcher. Les 2 dimensions en UNION dédupée par doc.

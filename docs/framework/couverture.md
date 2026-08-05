@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"couverture-gate.test.js","scope":["ctxroute"]}]
 mode: dumb
-confirm: true
 ---
 # couverture-gate.test.js — le repo se documente lui-même, ou il rougit
 ⚠️ 5 volets DÉRIVÉS (jamais une liste recopiée — ce serait le même bug) : ① tout `.js` racine/`sources/` reçoit une doc injectable (mesuré par la VRAIE source) · ② tout fichier TRACKÉ est dans l'arbo du skill · ③ tout module est dans l'`includeOnly` de dependency-cruiser · ④ **SUPPRIME le 03/08/2026** (plafond de LONGUEUR des docs) — le framework LIVRE, il ne juge JAMAIS la taille : une doc trop lourde est MORCELEE et livree, l'indelivrabilite est impossible par construction. Ne PAS le reintroduire, la raison est gravee dans le fichier · ⑤ **SUPPRIME aussi le 03/08/2026** (plafond du POIDS DES SKILLS). Les volets ①→③ restent ACTIFS.

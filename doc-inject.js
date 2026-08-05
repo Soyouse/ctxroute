@@ -16,14 +16,14 @@
 //    (sources pures) → décision (gate.js) → stdout. Toute la logique est
 //    PURE et mutée ; ce fichier ne fait que lire/verrouiller/écrire.
 //
-// ⚠️ PARITÉ protect-files EXIGÉE sur le corpus migré (dumb + confirm: true) :
+// ⚠️ PARITÉ protect-files EXIGÉE sur le corpus migré (dumb) :
 //    mêmes docs, même contenu (frontmatter retiré via parse().body — source
-//    unique, jamais une regex recopiée), même format ask/allow, même label
+//    unique, jamais une regex recopiée), même format de sortie, même label
 //    [source: .claude/hooks/docs/…]. Scellée par porte-differential.test.js.
 //
-// ⚠️ Le rush d'aujourd'hui (.rush) devient `confirm: false` dans
-//    ctxroute-config.json (confirmFor, #4) — la porte NE lit JAMAIS .rush.
-//    À la bascule : reporter l'état du .rush dans la config, puis retirer le fichier.
+// ⚠️ La porte NE lit JAMAIS .rush (fichier sentinelle de protect-files.js).
+//    Son remplaçant `confirm` a lui-même été RETIRÉ le 05/08/2026 : plus
+//    aucun interrupteur de confirmation, ni fichier, ni clé de config.
 //
 // ⚠️ FAIL-OPEN intégral (config/corpus/state illisibles → exit 0 sans stdout),
 //    SAUF le sens de l'injection sur échec de LOCK : on décide alors SANS état
@@ -64,25 +64,19 @@ function emit(decision, fullDoc, systemMessage) {
     console.log(JSON.stringify(sortieDeny(fullDoc)));
     process.exit(0);
   }
-  if (decision === 'ask') {
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'ask',
-        permissionDecisionReason: '[FICHIER DOCUMENTE — MODIFICATION] Confirmer avant de modifier.\n\n' + fullDoc,
-      },
-    }));
-  } else {
-    const out = {
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'allow',
-        additionalContext: fullDoc,
-      },
-    };
-    if (systemMessage) out.systemMessage = systemMessage;
-    console.log(JSON.stringify(out));
-  }
+  // ⚠️ La branche `ask` a été RETIRÉE le 05/08/2026 (avec la clé `confirm`).
+  //    Ne JAMAIS la réintroduire : `ask` demandait une autorisation à l'HUMAIN,
+  //    à l'opposé du 0-human, et n'existait pas côté Codex. Le seul refus du
+  //    framework est `deny` (ci-dessus), automatique et identique partout.
+  const out = {
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'allow',
+      additionalContext: fullDoc,
+    },
+  };
+  if (systemMessage) out.systemMessage = systemMessage;
+  console.log(JSON.stringify(out));
   process.exit(0);
 }
 

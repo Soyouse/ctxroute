@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"legacy-mcp-inject.js","rank":350},{"pattern":"ctxroute-reset.js","rank":351},{"pattern":"ctxroute-config.json","rank":352},{"pattern":"legacy-mcp-inject.test.js","rank":353},{"pattern":"lib-pure.js","scope":["ctxroute"],"rank":362},{"pattern":"lock.js","scope":["ctxroute"],"exclude":["package-lock.json"],"rank":365},{"pattern":"stdin-json.js","rank":368}]
 mode: dumb
-confirm: true
 rank: 350
 ---
 # ctxroute — déplacé en dossier autonome (repo git séparé)

@@ -1,7 +1,6 @@
 ---
 rules: [{"pattern":"deadline.js","scope":["ctxroute"],"rank":533},{"pattern":"deadline.test.js","scope":["ctxroute"],"rank":534},{"pattern":"deadline-gate.test.js","scope":["ctxroute"],"rank":535},{"pattern":"deadline-charge.test.js","scope":["ctxroute"],"rank":545}]
 mode: dumb
-confirm: true
 rank: 533
 ---
 # deadline.js — échéance de process (anti-zombie)
