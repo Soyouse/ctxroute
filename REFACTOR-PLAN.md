@@ -222,6 +222,33 @@ sa réserve** : observé, jamais une dépendance.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
+### ⑯ 🔴 CAUSE RACINE DE ⑮ — LE TRANSPORT N'EST PAS UNE COUCHE, C'EST UN CHOIX D'APPELANT
+⑮ n'est pas un oubli, c'est un **défaut de squelette**, et il en produira d'autres.
+**Le constat** : il y a DEUX émetteurs de contexte — `porte-core.js` (PreToolUse, les 2 harnais)
+et `session-inject.js` (SessionStart/PostCompact). Le transport (morcelage + sceau + paquets +
+file) vit DANS `porte-core.js`, c'est-à-dire dans l'ORCHESTRATION d'un seul des deux. Le second
+ne le traverse pas, et **rien ne l'y oblige** : c'est de l'opt-in par recopie.
+🔴 **Donc le trou se reproduira au 3ᵉ émetteur** (PostCompact côté Codex, SubagentStart, Stop… —
+5 événements Codex non exploités sont déjà listés). Le framework interdit ce motif PARTOUT
+ailleurs (« moteur figé, sources qui s'empilent », cascade résolue en UN point, collecte en
+SOURCE UNIQUE) — le transport est la dernière brique à ne pas l'appliquer.
+🔴 **ET LE GATE D'ASYMÉTRIE NE LE VOIT PAS** : `frontmatter.test.js` scelle la symétrie du
+VOCABULAIRE (les clés existent dans les 4 corpus). Personne ne scelle la symétrie du CHEMIN
+D'ÉMISSION. Un gate qui vérifie une dimension laisse croire que toutes sont vérifiées.
+✅ **CIBLE, en deux temps et dans cet ordre** :
+1. **Extraire `emission-core.js`** — la couche que TOUT émetteur traverse : reçoit des segments +
+   un budget + un indice de trame, rend le texte scellé et le reliquat. `porte-core` et
+   `session-inject` deviennent des appelants ; aucun ne réimplémente rien.
+2. **Poser le GATE STATIQUE, DÉRIVÉ (jamais une liste écrite)** : « tout fichier qui écrit
+   `additionalContext` DOIT importer `emission-core` ». Dérivé du code, il couvre d'office les
+   émetteurs FUTURS — c'est la seule forme qui tienne. Negative-check obligatoire : saboter une
+   COPIE d'un émetteur (retirer l'import) et exiger le ROUGE, sinon le gate naît inerte
+   (leçon des `*-must-stay-pure`, 03/08/2026).
+⚠️ **Faire ⑯ AVANT ⑮** : câbler la porte session à la main d'abord, ce serait poser la 2ᵉ copie
+qu'on veut justement supprimer — et le gate arriverait après le mal.
+⚠️ Ne PAS fusionner les deux portes pour autant (événements et contrats DIFFÉRENTS, invariant déjà
+écrit dans `session-porte.md`) : on partage la COUCHE D'ÉMISSION, jamais l'orchestration.
+
 ### ⑮ 🔴 LA PORTE SESSION N'A PAS DE TRANSPORT — trou TROUVÉ le 05/08/2026
 **`session-inject.js` ne contient AUCUNE référence à `budget`/`planifier`/`paquet`/`reliquat`.**
 Les docs de `docs/session/` (le « CLAUDE.md géré par le framework », injecté à CHAQUE début de
