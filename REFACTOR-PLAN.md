@@ -101,7 +101,48 @@ n'est PAS faite — voir le chantier ⑨ ci-dessous, qu'elle a révélé.
    PUBLIC** (vérifié `gh repo view`), donc minutes illimitées ; la séparation des workflows reste
    justifiée par le TEMPS DE RETOUR, plus par le quota.
 
-### ⑬ 🔴 LE RELIQUAT NE DEVRAIT PAS EXISTER — trou de conception, VU EN RÉEL le 05/08/2026
+### ⑭ 🔴 CAUSE RACINE DU RELIQUAT — LA PRÉMISSE DU MÉCANISME EST FAUSSE (05/08/2026)
+**DOC OFFICIELLE, lue ce jour** (`docs.claude.com/en/docs/claude-code/hooks` → 301 vers
+`code.claude.com/docs/en/hooks`), citation EXACTE :
+> *« Hook output strings, including `additionalContext`, `systemMessage`, and plain stdout, are
+> capped at 10,000 characters. Output that exceeds this limit is **saved to a file and replaced
+> with a preview and file path**, the same way a large valid Bash result is handled »*
+
+Et : *« All matching hooks run in parallel »* · **« There is no documented limit on the number of
+hooks »**.
+
+🔴 **TROIS DE NOS AFFIRMATIONS SONT PÉRIMÉES OU FAUSSES** :
+1. « plafond interne **NON documenté** » (budget.md, skill) ⇒ **FAUX** : 10 000, documenté.
+2. « le harnais tronque **EN SILENCE** » ⇒ **FAUX** : il SPILLE dans un fichier et donne le
+   CHEMIN. Ce n'est pas une perte, c'est un débordement récupérable.
+3. Le commentaire scellé de `planifier()` — *« Ne JAMAIS émettre le segment tronqué : ce serait
+   rendre au harnais exactement le pavé qu'il coupe en silence »* — **repose entièrement sur la
+   croyance n°2**. Sa prémisse tombe.
+
+🔴 **CONSÉQUENCE, ET C'EST LE VRAI DÉFAUT** : le harnais a un filet, mais **il ne peut pas nous
+rattraper puisqu'on ne lui donne jamais le surplus** — on le jette AVANT d'émettre. Nous avons
+bâti un transport à 12 processus (~4 s/geste) pour éviter une perte qui n'existait pas, et créé
+au passage la SEULE perte réelle du système.
+✅ **FIX, et il est petit** : **ne plus jamais différer — émettre TOUT**, y compris ce qui dépasse
+le budget de la trame. Au-delà, le harnais spille et l'agent reçoit aperçu + chemin (il peut LIRE).
+Concerne **les DEUX fonctions** : `planifier()` (trame unique — le cas de Codex et de tout harnais
+sans multi-trames) ET `planifierPaquets()` (dernier paquet).
+⚠️ **CE FIX NE PARIE SUR RIEN** — c'est ce qui le rend acceptable face à un fournisseur qui change
+sans prévenir (objection du mainteneur, juste) : spill présent ⇒ récupérable · spill retiré ⇒ on
+n'est pas plus mal qu'en jetant · seuil abaissé ⇒ le SCEAU le rend bruyant et le CANARI voit
+l'effet. **Aucune promesse d'Anthropic dans l'équation.**
+⚠️ **NE PAS coder 10 000 en dur** : le budget reste fourni par la COQUILLE. On ne consomme ce fait
+que pour cesser de JETER, jamais pour caler une constante dessus.
+**TRAVAIL RESTANT** (non fait — le cœur est muté 100 %, property-based et couvert par 2
+différentiels ; le bâcler serait pire que le trou) : ① `planifier` + `planifierPaquets` émettent
+tout ② l'annonce devient un AVERTISSEMENT de dépassement, plus un constat d'abandon ③ `differes`
+devient vide par construction ⇒ vérifier la boucle de `porte-core.js` qui restaure l'état des
+différés (elle devient inerte, elle doit le rester par sécurité) ④ property « rien n'est jamais
+différé » ⑤ re-mutation, 2 différentiels, doc + skill.
+⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
+qu'en fichier), plus une nécessité.
+
+### ⑬ 🟡 FILE DE RELIQUAT — devient FACULTATIF après ⑭ — trou de conception, VU EN RÉEL le 05/08/2026
 **Observé en session** : `⚠️ 12 morceau(x) non émis : le nombre de paquets déclarés est TROP
 PETIT` — le skill `webzenon-infra` n'est pas arrivé en entier.
 **MESURES** : budget 8 000 c/trame · capacité utile **7 658 c** (enveloppe déduite) ·
