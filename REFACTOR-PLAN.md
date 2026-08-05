@@ -222,6 +222,27 @@ sa réserve** : observé, jamais une dépendance.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
+### ⑮ 🔴 LA PORTE SESSION N'A PAS DE TRANSPORT — trou TROUVÉ le 05/08/2026
+**`session-inject.js` ne contient AUCUNE référence à `budget`/`planifier`/`paquet`/`reliquat`.**
+Les docs de `docs/session/` (le « CLAUDE.md géré par le framework », injecté à CHAQUE début de
+session et après compaction) sortent donc **d'un bloc, dans UNE sortie de hook** — soumises au
+plafond de 10 000 c, sans sceau, sans morcelage, sans file.
+⚠️ **Ça marche aujourd'hui UNIQUEMENT parce que le corpus session pèse ~1,2 Ko.** C'est du
+dimensionnement statique — précisément ce que la file vient d'éliminer partout ailleurs. Le jour
+où quelqu'un y met un vrai document, il part en fichier de spill **en silence**, et personne ne
+le saura : cette voie n'a ni sceau (donc aucune détection de troncature) ni canari dédié.
+🔴 **La garantie « n'importe quelle taille arrive » est donc FAUSSE sur cette voie.** Ne pas
+l'affirmer sans cette réserve tant que ⑮ n'est pas fait.
+✅ **CIBLE** : faire passer `session-inject.js` par `budget.planifierPaquets` comme la porte —
+mêmes `--paquet k --paquets N` déclarés dans `settings.json`, même sceau, même file. Le cœur
+existe déjà, c'est du câblage, pas de la conception.
+⚠️ **DEUX INCONNUES À MESURER AVANT DE CODER** (ne pas rétro-ingénierer) : ① un hook
+`SessionStart` déclaré N fois est-il bien spawné N fois (la dédup du harnais se fait par commande
++ args — vrai pour PreToolUse, à VÉRIFIER ici) ; ② la file a-t-elle un sens à SessionStart, où il
+n'y a pas encore de « geste suivant » — sans doute faut-il que le reliquat soit repris par la
+porte PreToolUse au premier outil, donc un store PARTAGÉ entre les deux portes.
+⚠️ Modifie `settings.json` (PROD) ⇒ **GO explicite du mainteneur**, à un moment où aucun agent ne tourne.
+
 ### ⑬ ✅ FILE DE RELIQUAT — LIVRÉE le 05/08/2026 (le trou est FERMÉ, plus de réserve)
 ⚠️ **JUGEMENT RENVERSÉ, RÉÉCRIT (pilotage.md) : cette section disait « FACULTATIF après ⑭ ».
 C'était FAUX**, et la décision du mainteneur l'a tranché : ⑭ seul (« émettre au-delà du budget et
