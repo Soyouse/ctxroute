@@ -1,5 +1,94 @@
 # Plan de refactor — fusion en moteur d'injection unique
 
+---
+
+# 📍 ÉTAT AU 05/08/2026 — À LIRE EN PREMIER (reprise de session)
+
+## Bilan des 2 jours (04 → 05/08/2026)
+
+**Livré, prouvé, en prod :**
+| Chantier | État | Preuve |
+|---|---|---|
+| `defaults.{source}` — cascade 3 → **4 étages** | ✅ | réglages par catégorie (`file`/`mcp`/`skill`/`tool`), clés DÉRIVÉES du registre |
+| `note:` — commentaire d'auteur | ✅ | le seul champ que le moteur ne lit JAMAIS ; symétrisé dans les 4 corpus le 05/08 |
+| **`enforce`** — refuser le geste | ✅ | spawn RÉEL sur les 2 harnais, mutation 100 % |
+| **Gate anti-décalage** du vocabulaire | ✅ | a trouvé `note` manquant au 1er run |
+| Symétrie des 4 sources (`enforce`) | ✅ | gate DÉRIVÉ d'`ADAPTERS` — une 5ᵉ source naîtra avec |
+| `additionalContextLimit = 0` (Codex) | 🟡 | posé + gate doctor, mais **INERTE sur 0.144.6** |
+
+**Chiffres de clôture** : 978 tests verts (48 fichiers) · mutation **100,00 %** (cliquet tenu) ·
+doctor **61 ok / 0 problème** sur les 2 câblages réels · CI verte (`test` 3 OS + `mutation`) ·
+0 violation de couplage · 1 clone consigné (0,28 %, seuil 1 %).
+
+**⚠️ Ce que ces 2 jours ont coûté en erreurs — à ne pas répéter :**
+1. **Garde posée à la mauvaise couche** (anti-bloc-YAML) — la CI l'a tuée en 4 min. Une garde
+   doit vivre là où l'information discriminante existe.
+2. **Deux gardes INERTES en JSON** (split TOML-only, motif `= 0` sans guillemets) — un gate qui ne
+   peut pas rougir dans un des formats acceptés est décoratif.
+3. **Trois restrictions empilées sur `enforce`** (interdire `smart`, exiger `once` écrit, interdire
+   `dumb`) pour un problème INEXISTANT — remplaçées par l'ALTERNANCE (idée du mainteneur).
+4. **Diagnostic trop doux** : « doc qui ment » alors que c'était une PANNE silencieuse (Codex).
+5. **`find /` lancé sur tout le disque**, resté en fond des heures — repéré par le mainteneur.
+⇒ **Constante** : à chaque fois, la correction est venue du mainteneur ou d'une MACHINE
+(CI, mutation, jscpd, gate), jamais de mon propre jugement. C'est la justification vivante du
+framework — et la raison de ne JAMAIS remplacer un gate par une consigne en prose.
+
+---
+
+## 🔴 CHANTIERS OUVERTS — par ordre de priorité (session suivante)
+
+### ① CANARI SANS SONDE DOCTOR — LE PLUS GRAVE (ouvert depuis le 03/08, repoussé 2×)
+`grep -c canari doctor.js` = **0**. Le canari est câblé en PROD (`UserPromptSubmit`) sans aucune
+preuve qu'il fonctionne. **Un dead-man switch non surveillé donne la FAUSSE CONFIANCE** — pire que
+pas de filet. C'est MON trou (je l'ai câblé sans sonde), et il viole le contrat du framework
+(« preuves obligatoires avant de câbler »). Détail complet plus bas, section ①.
+
+### ② CODEX N'A AUCUN CANARI
+Filet mono-harnais. Si OpenAI change son contrat de hooks, ça meurt en SILENCE. Seule inconnue à
+MESURER : format du transcript Codex + marqueur d'appel d'outil. Détail section ②.
+
+### ③ `additionalContextLimit` — POSÉ MAIS INERTE
+Clé ABSENTE du binaire 0.144.6 (mesuré, méthode validée par 5 témoins). **0.146.0 est
+disponible.** Reste à faire : mettre Codex à jour → re-mesurer la clé dans le binaire → injection
+volumineuse réelle de bout en bout. À faire AVEC ② (le canari est le témoin qui manque).
+
+### ④ RETRAIT DE `confirm` — DÉCISION PRISE, ATTEND LE GO
+**Verdict (05/08/2026) : le SUPPRIMER.** Trois raisons, par ordre de poids :
+1. **Contraire au 0-human** — `ask` remet un humain dans la boucle ; le skill le proscrit.
+2. **Asymétrie IRRÉDUCTIBLE** — Codex ne supporte pas `ask` (dégradé en injection). Un standard
+   multi-harnais ne peut pas reposer sur un mot qui ne marche que d'un côté.
+3. **Le retirer ne change RIEN** — mesuré : l'interrupteur global est à `false`, donc les
+   **363 docs sur 379** qui portent `confirm: true` ne déclenchent déjà plus rien.
+   Le comportement d'après-suppression EST le comportement actuel. Risque fonctionnel NUL.
+Origine : héritage de `protect-files.js`, repris tel quel pour la parité de bascule du 17/07/2026,
+jamais rejugé depuis. `enforce` couvre le besoin en mieux (autonome, identique sur les 2 harnais,
+livre le savoir avec le refus).
+⚠️ **POURQUOI ÇA ATTEND** : retirer la clé du vocabulaire rend **363 docs de PROD invalides d'un
+coup** (clé inconnue = ERREUR). Règle n°1 du skill : interdit sans GO explicite.
+**ORDRE OBLIGATOIRE (expand/contract)** : ① nettoyer les 363 frontmatters ; ② vérifier le corpus
+(`lint-corpus`) ; ③ retirer `confirm` de `KNOWN` + `confirmFor` + la branche `ask` de `gate.js` et
+des 2 coquilles + la clé globale du schéma ; ④ retirer l'entrée de `ASYMETRIES_JUSTIFIEES`
+(le gate de symétrie ROUGIT si on l'oublie — volet inverse) ; ⑤ mutation + doctor + CI.
+⚠️ **NE PAS « corriger » l'asymétrie en ÉTENDANT `confirm`** aux docs MCP/skills/defaults :
+ce serait généraliser un mot éteint et contraire à la doctrine. Piste ÉCARTÉE, avec sa mesure.
+
+### ⑤ `enforce` N'EST UTILISÉ PAR AUCUNE DOC
+Le mot existe, prouvé, symétrique — et **le comportement réel du parc est INCHANGÉ**.
+⚠️ **Une capacité sans usage n'est pas encore un actif** (même motif que les paquets et le
+canari). Cible : choisir les gestes IRRÉVERSIBLES (paiement, suppression, envoi client) et poser
+`enforce: true` dessus, un par un. **Décision humaine, geste par geste** — jamais en masse,
+jamais en `defaults` (un blocage de catégorie rend le système invivable).
+
+### ⑥ DÉCLENCHEUR DOC-FIRST + ⑦ DRIFT-TEST doc↔code
+Inchangés (sections plus bas). Le biais s'est encore manifesté ces 2 jours.
+
+### ⑧ Divers froids
+Anti-mojibake · `sources.md` et `doctor.md` dépassent le seuil de dilution (à scinder) ·
+worktree périmé `~/Desktop/mcp-doc-hooks-paquets` à supprimer · `[features].codex_hooks`
+DÉPRÉCIÉ dans `~/.codex/config.toml` (→ `[features].hooks`).
+
+---
+
 > Statut : ✅ **TERMINÉ (17/07/2026)** — architecture cible ATTEINTE. Hook UNIQUE
 > `doc-inject.js` (matcher `*`) live en prod : sources/file.js + sources/mcp.js →
 > gate.js (dédup par DOC). `legacy-mcp-inject.js` retiré du câblage (gardé comme
