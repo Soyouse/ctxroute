@@ -93,7 +93,12 @@ readStdinJson(
       //    les deux portes partagent LA MÊME file. Une clé différente ici
       //    rendrait le reliquat de session indrainable.
       const scopeId = lib.scopeId(data && data.session_id, data && data.agent_id);
-      const budgetMax = require('./budget').DEFAUT_BUDGET;
+      // ⚠️ BUDGET DÉCLARÉ PAR LE CÂBLAGE (`--budget N`, cf lib.budgetDeclare) —
+      //    absent ⇒ plancher framework, comportement d'avant à l'octet. Cette
+      //    porte est un ÉMETTEUR : elle DOIT suivre la limite déclarée au
+      //    harnais comme la porte PreToolUse, sinon elle morcelle pour rien.
+      const declare = lib.budgetDeclare(process.argv);
+      const budgetMax = declare === undefined ? require('./budget').DEFAUT_BUDGET : declare;
 
       // ⚠️ LOCK OBLIGATOIRE AUTOUR DE LA FILE (lire puis réécrire). Sans
       //    exclusion mutuelle, deux processus qui se croisent en perdent une

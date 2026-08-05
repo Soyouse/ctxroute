@@ -182,7 +182,18 @@ function composer(segments, k) {
 //    interne, une 2ᵉ copie devient une garde REDONDANTE — donc un mutant
 //    ÉQUIVALENT, donc un survivant éternel (mesuré 03/08/2026 : 4 survivants
 //    dus exactement à ça). Un seul endroit décide, un seul endroit se teste.
+// ⚠️ `Infinity` = « AUCUNE LIMITE », valeur LÉGITIME depuis le 05/08/2026 — pas
+//    un accident à filtrer. Un harnais peut DÉCLARER qu'il ne borne rien :
+//    mesuré dans le binaire Codex 0.146.0, `additionalContextLimit = 0` signifie
+//    littéralement « disables spilling », donc livraison intégrale. Sans ce
+//    chemin, `Number.isFinite` rejetait l'infini et retombait sur le PLANCHER de
+//    8 000 : on morcelait un skill en 7 trames alors que le tuyau acceptait tout
+//    d'un bloc — dégradation SILENCIEUSE, tout restait vert. Ne JAMAIS revenir à
+//    un simple `Number.isFinite` ici.
+// ⚠️ Budget infini ⇒ tout tient dans une trame ⇒ ni sceau ni morcelage ⇒ rendu
+//    HISTORIQUE à l'octet. C'est la parité, pas un cas particulier.
 function budgetEffectif(budget) {
+  if (budget === Infinity) return Infinity;
   return Number.isFinite(budget) && budget > 0 ? budget : DEFAUT_BUDGET;
 }
 

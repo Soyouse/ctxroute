@@ -264,7 +264,51 @@ function parsePaquetArgs(argv) {
   return { paquet, nbPaquets };
 }
 
+/**
+ * BUDGET DÉCLARÉ PAR LE CÂBLAGE — `--budget N`, à côté de l'`additionalContextLimit`
+ * du MÊME bloc de `requirements.toml`. Scellé par `budget-declare-gate.test.js`,
+ * qui exige que les deux chiffres soient ÉGAUX.
+ *
+ * ⚠️ SÉMANTIQUE REPRISE MOT POUR MOT DE CODEX — mesurée dans le binaire 0.146.0 :
+ *    *« Configured `additionalContext` spill threshold. `null` uses 2,500 tokens;
+ *    `0` disables spilling. »* Donc **`0` = AUCUNE limite**, et c'est ce que notre
+ *    câblage déclare. Reprendre LEUR convention plutôt qu'en inventer une :
+ *    deux conventions pour un même chiffre, c'est la divergence garantie.
+ *
+ * ⚠️ POURQUOI EN ARGUMENT ET PAS EN DUR NI LU AU RUNTIME. En dur = une 2ᵉ source
+ *    de vérité qui dérive dès que le câblage change (le défaut EXACT qu'on
+ *    corrige : la limite valait 0 depuis le 04/08 et le moteur supposait 8 000,
+ *    donc un skill partait en 7 morceaux pour rien, en silence, tout vert). Lu au
+ *    runtime = une I/O de plus à CHAQUE appel d'outil, sur un chemin fail-open.
+ *    L'argument fait voyager le chiffre AVEC la déclaration — même motif que
+ *    `--paquet k --paquets N` côté Claude Code, rien de neuf.
+ *
+ * ⚠️ ABSENT = comportement d'AVANT à l'octet (plancher framework). Un câblage
+ *    ancien n'est jamais cassé par cette évolution.
+ * ⚠️ NE JAMAIS écrire ici une valeur de harnais en dur : c'est le câblage qui
+ *    parle, ce fichier ne fait que le transmettre.
+ */
+function budgetDeclare(argv) {
+  const i = argv.indexOf('--budget');
+  // ⚠️ `i === -1` EST NÉCESSAIRE et n'est PAS une garde de confort : sans elle,
+  //    `argv[i + 1]` vaudrait `argv[0]` — donc un premier argument NUMÉRIQUE
+  //    serait lu comme un budget alors qu'aucun `--budget` n'a été déclaré.
+  //    Ça ne se voit pas avec un argv réel (argv[0] = chemin de node), d'où un
+  //    test dédié qui rend le cas OBSERVABLE : sans lui, 7 mutants survivaient
+  //    ici, et la garde ne prouvait rien.
+  // ⚠️ La borne `i + 1 >= argv.length` a été RETIRÉE (05/08/2026) : elle était
+  //    REDONDANTE — `argv[i + 1]` vaut alors `undefined`, `Number(undefined)`
+  //    vaut `NaN`, et `Number.isInteger` le rejette déjà. On ÉLIMINE une
+  //    équivalence par construction, on ne la désactive JAMAIS avec un
+  //    commentaire Stryker.
+  if (i === -1) return undefined;
+  const n = Number(argv[i + 1]);
+  if (!Number.isInteger(n) || n < 0) return undefined; // valeur illisible = plancher
+  return n === 0 ? Infinity : n;
+}
+
 module.exports = {
+  budgetDeclare,
   parsePaquetArgs,
   sanitizeSessionId,
   scopeId,

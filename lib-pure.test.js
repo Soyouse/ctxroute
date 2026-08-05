@@ -283,3 +283,49 @@ test('parsePaquetArgs : indice HORS BORNES → repli sûr, jamais le paquet d\'u
   assert.deepStrictEqual(lib.parsePaquetArgs(['--paquet', '9', '--paquets', '3']), { paquet: 1, nbPaquets: 1 });
   assert.deepStrictEqual(lib.parsePaquetArgs(['--paquet', '4', '--paquets', '4']), { paquet: 4, nbPaquets: 4 });
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// budgetDeclare — le budget que le CABLAGE passe au moteur (05/08/2026)
+// ⚠️ Ferme un VERT QUI MENT : le cablage Codex declarait « aucune limite »
+//    depuis le 04/08, le moteur supposait 8000, et un skill de 76 000 c
+//    partait en 11 gestes au lieu d'1. Aucun test, aucun gate ne le voyait.
+// ⚠️ Semantique reprise MOT POUR MOT de Codex (binaire 0.146.0 : « `0`
+//    disables spilling ») — jamais une convention maison en parallele.
+// ═══════════════════════════════════════════════════════════════════════
+
+test('budgetDeclare : 0 = AUCUNE limite (convention Codex, pas la notre)', () => {
+  assert.strictEqual(lib.budgetDeclare(['node', 'x.js', '--budget', '0']), Infinity);
+});
+
+test('budgetDeclare : un entier positif est le budget, tel quel', () => {
+  assert.strictEqual(lib.budgetDeclare(['node', 'x.js', '--budget', '5000']), 5000);
+});
+
+test('budgetDeclare : absent = plancher framework (cablage ancien JAMAIS casse)', () => {
+  assert.strictEqual(lib.budgetDeclare(['node', 'x.js']), undefined);
+  assert.strictEqual(lib.budgetDeclare(['node', 'x.js', '--budget']), undefined, 'drapeau sans valeur');
+});
+
+test('budgetDeclare : valeur illisible = plancher, JAMAIS une borne inventee', () => {
+  // ⚠️ Un budget devine est pire qu'un plancher : il serait FAUX en silence.
+  assert.strictEqual(lib.budgetDeclare(['node', 'x.js', '--budget', 'abc']), undefined);
+  assert.strictEqual(lib.budgetDeclare(['node', 'x.js', '--budget', '-1']), undefined);
+  assert.strictEqual(lib.budgetDeclare(['node', 'x.js', '--budget', '1.5']), undefined);
+});
+
+test('budgetDeclare : cohabite avec les autres drapeaux (--paquet/--paquets)', () => {
+  assert.strictEqual(
+    lib.budgetDeclare(['node', 'x.js', '--paquet', '3', '--budget', '0', '--paquets', '12']),
+    Infinity
+  );
+});
+
+test('budgetDeclare : sans --budget, un 1er argument NUMERIQUE n est PAS pris pour un budget', () => {
+  // ⚠️ CAS FONDATEUR — sans lui, 7 mutants survivaient sur la garde `i === -1`.
+  //    Avec un argv reel (argv[0] = chemin de node) le defaut est INOBSERVABLE :
+  //    `Number('C:/.../node.exe')` vaut NaN, donc le bug se cache. Ici argv[0]
+  //    est numerique : retirer la garde ferait lire `argv[0]` comme un budget.
+  //    Ne JAMAIS supprimer ce cas au motif qu'il est « irrealiste ».
+  assert.strictEqual(lib.budgetDeclare(['5000', 'x.js']), undefined);
+  assert.strictEqual(lib.budgetDeclare(['0', 'x.js']), undefined, 'ni un faux Infinity');
+});

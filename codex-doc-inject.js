@@ -32,6 +32,11 @@ require('./deadline').arm();
 
 const { run, sortieDeny } = require('./porte-core');
 const { readStdinJson } = require('./stdin-json');
+const lib = require('./lib-pure');
+
+// ⚠️ `budgetDeclare` vit dans lib-pure.js (PUR, muté 100 %) et non ici : les
+//    DEUX émetteurs Codex en ont besoin, et un clone de parseur d'argument est
+//    exactement ce que jscpd interdit. La coquille ne fait que TRANSMETTRE.
 
 function emit(decision, fullDoc, systemMessage) {
   // ⚠️ `deny` (05/08/2026) — DIALECTE IDENTIQUE à Claude Code, contrairement à
@@ -62,6 +67,6 @@ function emit(decision, fullDoc, systemMessage) {
 }
 
 readStdinJson(
-  (data) => run(data, emit),
+  (data) => run(data, emit, { budget: lib.budgetDeclare(process.argv) }),
   () => process.exit(0)
 );

@@ -222,6 +222,48 @@ sa réserve** : observé, jamais une dépendance.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
+### ⑰ ✅ LIVRÉ 05/08/2026 — LE BUDGET SUIT LA LIMITE DÉCLARÉE (Codex : 11 gestes → 1)
+**LE DÉFAUT, et sa classe.** Le câblage Codex déclarait `additionalContextLimit = 0` depuis le
+04/08 — son commentaire disait même « c'est POUR ÇA que Codex n'a pas besoin de fragmentation ».
+**Personne ne l'avait dit au moteur** : la coquille ne passait aucun budget, le plancher de 8 000
+s'appliquait, et un skill de 76 000 c partait en **11 gestes au lieu d'1**. 995 tests verts,
+mutation 100 %, doctor 27/27, canari vivant. 🔴 **UN VERT QUI MENT — pas une panne, une
+DÉGRADATION SILENCIEUSE.** Aucun filet du repo n'est conçu pour ça : les gates vérifient qu'on ne
+CASSE rien, le canari que le tuyau est VIVANT, **rien ne mesure le DÉBIT**.
+🔴 **CLASSE D'ERREUR À RETENIR : tout ce qu'on DÉCLARE à un harnais doit être RELU par le moteur,
+jamais deviné en parallèle.** Deux endroits pour un même chiffre = divergence garantie.
+**FAIT** : `lib.budgetDeclare` (PUR, muté 100 %) lit `--budget N` ; les 2 émetteurs Codex le
+passent ; `budget.js` accepte `Infinity` comme valeur LÉGITIME ; `budget-declare-gate.test.js`
+exige l'égalité des deux chiffres DANS LE MÊME BLOC du câblage (+ negative-check en mémoire).
+**MESURES** : binaire Codex 0.146.0 — `additionalContextLimit` **18 occurrences** (contre **0 en
+0.144.6** : la clé n'existait pas, notre déclaration était INERTE) ; sa doc interne dit *« `null`
+uses 2,500 tokens; `0` disables spilling »*. Run Codex réel APRÈS fix : skill **entier, 0 morceau**.
+⚠️ **ASYMÉTRIE DÉCLARÉE** : rien de tel côté Claude Code. Là-bas la limite est IMPOSÉE et peut
+changer sans préavis — la coder serait une constante de harnais dans le moteur, interdit permanent.
+Règle déjà écrite dans budget.md : **négocier quand une autorité existe, plancher sinon.**
+⚠️ **Codex 0.146 a changé de stockage** : transcripts en `~/.codex/sessions/AAAA/MM/JJ/rollout-*.jsonl`
+(les docs décrivaient 0.144). Le `logs_*.sqlite` est de la TÉLÉMÉTRIE, pas un transcript.
+
+### ⑱ 🟠 BACKLOG — RIEN NE MESURE LE DÉBIT (né de ⑰, 05/08/2026)
+Tous nos filets répondent à « est-ce cassé ? » ou « est-ce vivant ? ». Aucun ne répond à
+**« livre-t-on à la bonne vitesse ? »**. Un système qui livre à 1/11 de son débit est
+parfaitement « fonctionnel » et parfaitement vert. ⇒ témoin de DÉBIT, à concevoir.
+
+### ⑲ 🟠 BACKLOG — UNE DÉCLARATION PAR HARNAIS (le squelette, suite de ⑯)
+Le contrat avec chaque harnais est ÉPARPILLÉ : budget dans le code, trames dans `settings.json`,
+limite dans `requirements.toml`, dialecte dans la coquille. **Personne ne possède l'ensemble** —
+3 bugs en 3 jours, même cause. CIBLE : une déclaration par harnais, lue par sa coquille, comparée
+au câblage réel par un gate. Brancher Gemini deviendrait **une ligne**.
+
+### ⑳ 🟠 BACKLOG — AUDITER TOUS LES NEGATIVE-CHECKS
+On a déjà découvert des gates INCAPABLES de rougir (`*-must-stay-pure`, 03/08). Vérifier que
+CHACUN peut, par sabotage. Un gate non saboté est un gate présumé mort.
+
+### ㉑ 🟢 BACKLOG — `tsc --checkJs` (décision mainteneur 05/08/2026)
+TypeScript **le vérificateur, jamais la syntaxe** : JSDoc + `tsc --noEmit`, zéro build, zéro
+artefact, le fichier exécuté reste le fichier écrit (un hook est spawné à chaque appel d'outil).
+Apporte l'analyse d'impact que la doctrine anti-couplage réclame. À faire APRÈS ⑲ (typer une
+architecture qu'on s'apprête à changer = du travail jeté).
 ### ⑯ ✅ LIVRÉ 05/08/2026 — LE TRANSPORT EST DEVENU UNE COUCHE
 **FAIT** : `emission-core.js` extrait (file + découpage + persistance du reliquat) ; `porte-core.js`
 et `session-inject.js` sont désormais des APPELANTS, aucun ne réimplémente rien. Les parties PURES

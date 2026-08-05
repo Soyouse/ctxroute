@@ -83,7 +83,13 @@ const TURN_PREFIX = 'turn-count-';
  *    TOUS les harnais. Le chiffre vient de la coquille, toujours.
  */
 function budgetPour(config, options) {
-  const duHarnais = options && Number.isFinite(options.budget) && options.budget > 0 ? options.budget : budget.DEFAUT_BUDGET;
+  // ⚠️ `Infinity` EST une valeur valide — « ce harnais ne borne rien ». Le
+  //    filtrer par `Number.isFinite` seul faisait retomber sur le PLANCHER de
+  //    8 000 alors que le tuyau acceptait tout : un skill partait en 7 morceaux
+  //    pour rien, en SILENCE, tout vert (mesuré sur Codex le 05/08/2026).
+  const b = options ? options.budget : undefined;
+  const declare = b === Infinity || (Number.isFinite(b) && b > 0);
+  const duHarnais = declare ? b : budget.DEFAUT_BUDGET;
   const c = config && config.budgetInjection;
   if (Number.isFinite(c) && c > 0) return Math.min(duHarnais, c);
   return duHarnais;

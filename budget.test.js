@@ -833,3 +833,46 @@ test('ORDONNER : entrees absentes/invalides = degradation, jamais un crash', () 
   assert.deepStrictEqual(ordonner([{ id: 'y', text: 'Y' }], undefined).map((s) => s.id), ['y']);
   assert.deepStrictEqual(ordonner(null, null), []);
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// BUDGET INFINI = « CE HARNAIS NE BORNE RIEN » (05/08/2026)
+// ⚠️ Cas DETERMINISTES obligatoires ici : Stryker n'execute PAS les
+//    property-tests. Une garde prouvee seulement par property laisse des
+//    mutants survivants et le score MENT (paye deux fois le 05/08).
+// ⚠️ DEFAUT REEL qu'ils scellent : `Number.isFinite(Infinity)` est FAUX, donc
+//    l'infini retombait sur le PLANCHER de 8 000 — on morcelait un skill en
+//    11 gestes alors que Codex acceptait tout d'un bloc, en SILENCE.
+// ═══════════════════════════════════════════════════════════════════════
+
+test('BUDGET INFINI : tout part en UNE trame, zero differe, contenu INTACT', () => {
+  const gros = 'X'.repeat(76000);
+  const p = planifierPaquets([{ id: 'gros', text: gros, label: 'skill' }], Infinity, 1);
+  assert.strictEqual(p.length, 1);
+  assert.strictEqual(p[0].differes.length, 0, 'un budget infini ne differe RIEN');
+  assert.ok(p[0].texte.includes(gros), 'contenu integral, jamais tronque');
+});
+
+test('BUDGET INFINI : ni sceau ni en-tete (rendu HISTORIQUE, donc parite)', () => {
+  // Le sceau ne sert qu'a rendre une TRONCATURE bruyante. Sans borne, il n'y a
+  // rien a signaler : annoncer un marqueur de fin serait du bruit pur.
+  const p = planifierPaquets([{ id: 'a', text: 'A'.repeat(50000), label: 'a' }], Infinity, 1);
+  assert.ok(!/###FIN:/.test(p[0].texte), 'aucun sceau quand rien ne peut etre tronque');
+  assert.ok(!/MORCEAU/.test(p[0].texte), 'aucun morcelage');
+});
+
+test('BUDGET INFINI vs PLANCHER : le meme corpus differe a 8000 et PAS a l infini', () => {
+  // ⚠️ LE TEMOIN DU BUG. Sans lui, un mutant qui retire le chemin `Infinity`
+  //    survit : les deux branches rendraient « 1 paquet », et seul le nombre
+  //    de DIFFERES distingue le plancher de l'absence de borne.
+  const segs = () => [{ id: 'g', text: 'Y'.repeat(76000), label: 'g' }];
+  assert.ok(planifierPaquets(segs(), 8000, 1)[0].differes.length > 0, 'temoin : a 8000 ca deborde');
+  assert.strictEqual(planifierPaquets(segs(), Infinity, 1)[0].differes.length, 0);
+});
+
+test('BUDGET : -Infinity et NaN retombent sur le PLANCHER (jamais un infini devine)', () => {
+  // Seul `Infinity` POSITIF veut dire « aucune limite ». Tout le reste est une
+  // valeur illisible : plancher, jamais une borne inventee.
+  const seg = () => [{ id: 'a', text: 'A'.repeat(20000), label: 'a' }];
+  assert.ok(planifierPaquets(seg(), -Infinity, 1)[0].differes.length > 0);
+  assert.ok(planifierPaquets(seg(), NaN, 1)[0].differes.length > 0);
+});
