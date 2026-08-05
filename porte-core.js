@@ -50,6 +50,37 @@ const STORE_PREFIX = 'doc-seen-';
 //    RELISENT. Le découpage, lui, est pur et déterministe : chacun le
 //    recalcule et n'émet que son indice. Purgé par ctxroute-reset.js.
 const PLAN_PREFIX = 'plan-';
+// ⚠️ FILE D'ÉMISSION (05/08/2026) — ce qui ne tient pas dans les N trames d'UN
+//    geste attend ici et repart au geste SUIVANT. Préfixe distinct, keyé par le
+//    scope d'agent, purgé par ctxroute-reset.js comme les autres.
+//
+//    POURQUOI ELLE EXISTE. `--paquets N` fixe le nombre de trames que le harnais
+//    spawne : la capacité d'UN appel est donc FINIE (N × capacité de trame). Le
+//    morcelage découpe tout correctement, mais au-delà de ce total les derniers
+//    morceaux n'avaient plus de trame où voyager — on les ANNONÇAIT puis on les
+//    JETAIT. C'était la seule perte réelle du framework, et elle était de notre
+//    fait, pas de celui du harnais.
+//
+// ⚠️ C'EST LE COMPORTEMENT DE L'ÉMETTEUR TCP, ET CE N'EST PAS UNE ANALOGIE
+//    DÉCORATIVE : fenêtre pleine ⇒ les données RESTENT dans le tampon
+//    d'émission et partent à la fenêtre suivante. Aucun protocole de transport
+//    ne jette parce que la fenêtre est pleine — canal borné, flux illimité.
+//    Conséquence directe : `--paquets N` n'est plus un PLAFOND de livraison,
+//    seulement un DÉBIT. On peut le baisser sans rien perdre (ça arrive sur
+//    plus de gestes), et aucune taille de doc n'est plus indélivrable.
+//
+// ⚠️ LA FILE PASSE TOUJOURS AVANT LE FRAIS — RFC 6455 : un message fragmenté
+//    n'est JAMAIS entrelacé avec un autre. Un document commencé se termine
+//    avant qu'un autre commence, sinon le récepteur ne peut plus recoller ses
+//    `MORCEAU j/m`. Ne JAMAIS trier, prioriser ni intercaler ici.
+//
+// ⚠️ ON STOCKE LE TEXTE, PAS UNE RÉFÉRENCE À RECALCULER. Deux raisons, aucune
+//    négociable : ① les N processus parallèles doivent voir EXACTEMENT la même
+//    entrée (le plan mémoïsé porte donc les segments, pas seulement les ids) ;
+//    ② une doc ÉDITÉE entre deux gestes ferait recoller des morceaux d'une
+//    version avec des morceaux d'une autre — un Frankenstein silencieux. Le
+//    résidu conservé est, par construction, exactement ce qui n'a pas été livré.
+const RELIQUAT_PREFIX = 'reliquat-';
 // Compteur de TOURS (porte turn-count.js, UserPromptSubmit) — préfixe distinct.
 const TURN_PREFIX = 'turn-count-';
 
@@ -149,7 +180,15 @@ function run(data, emit, options) {
     // Section critique sous lock (état par session, dédup par doc). Un corpus
     // 100% dumb ne produit aucune écriture (changed=false) — parité perf.
     const lockDir = path.join(paths.stateDir(), `.lock-doc-${lib.sanitizeSessionId(sessionId)}`);
-    const decouper = (inject) => budget.planifierPaquets(segmentsPour(inject), budgetMax, nbPaquets);
+    const decouper = (segs) => budget.planifierPaquets(segs, budgetMax, nbPaquets);
+    // Un morceau porte l'id `<doc>#<j>` (posé par `budget.morceler`). Tout ce qui
+    // raisonne en DOCUMENT (dédup avec la file, badge de la statusline) doit donc
+    // repasser par la base — sinon un document à moitié livré serait vu comme un
+    // document DIFFÉRENT de lui-même, et réinjecté en double.
+    const baseId = (id) => {
+      const i = id.indexOf('#');
+      return i === -1 ? id : id.slice(0, i);
+    };
     let res = withLock(lockDir, () => {
       // ⚠️ RELECTURE DU PLAN — le cœur du multi-paquets. Les N processus sont
       //    PARALLÈLES et ne peuvent pas se parler : un seul décide (et écrit
@@ -161,37 +200,74 @@ function run(data, emit, options) {
       //    GC de TTL — un déchet silencieux, exactement ce qu'on refuse.
       const clePlan = sessionId + '--inv-' + invocationId;
       const cache = fragmente ? store.loadState(PLAN_PREFIX, clePlan) : {};
-      if (Array.isArray(cache.inject)) {
-        return { r: { inject: cache.inject, decision: cache.decision }, paquets: decouper(cache.inject) };
+      // ⚠️ LE PLAN MÉMOÏSE LES **SEGMENTS**, PLUS SEULEMENT LES IDS (05/08/2026).
+      //    Depuis la file, l'entrée du découpage n'est plus dérivable des seuls
+      //    ids : elle mêle des morceaux HÉRITÉS de gestes précédents et des docs
+      //    fraîches. Les processus 2..N doivent voir EXACTEMENT ce qu'a vu le
+      //    premier — sinon leurs trames ne recollent plus. Ne JAMAIS revenir à
+      //    un cache d'ids « pour alléger » : ce serait rendre le découpage
+      //    non-reproductible, c'est-à-dire casser le multi-trames en silence.
+      if (Array.isArray(cache.segments)) {
+        return { segments: cache.segments, decision: cache.decision, paquets: decouper(cache.segments) };
       }
       const state = store.loadState(STORE_PREFIX, sessionId);
       const r = gate.decide(config, decls, matched, state, turnCount, acc.owner);
-      const paquets = decouper(r.inject);
-      // ⚠️ UNE DOC DIFFÉRÉE NE DOIT JAMAIS ÊTRE MARQUÉE « VUE ».
-      //    `gate.decide` écrit `{seen:true, sinceLastCall:0}` pour TOUT ce qu'il
-      //    décide d'injecter — il ignore (et doit ignorer) le budget, qui est
-      //    une contrainte de TRANSPORT, pas de décision. Sans cette remise en
-      //    état, une doc `once` évincée par manque de place serait consommée
-      //    sans jamais avoir été livrée : PERDUE POUR TOUTE LA SESSION, en
-      //    silence. C'est très exactement le défaut que ce chantier corrige —
-      //    le réintroduire ici serait le comble. NE PAS SUPPRIMER.
-      //    ⚠️ Les différés vivent dans le DERNIER paquet (c'est lui qui porte
-      //    l'annonce) — en trame unique, c'est le seul, donc parité exacte.
-      for (const d of paquets[paquets.length - 1].differes) {
-        if (Object.prototype.hasOwnProperty.call(state, d.id)) r.state[d.id] = state[d.id];
-        else delete r.state[d.id];
-      }
+
+      // ── LA FILE PASSE D'ABORD, LE FRAIS ENSUITE (RFC 6455 : jamais entrelacé) ──
+      // ⚠️ L'ORDRE N'EST PAS UNE PRÉFÉRENCE, C'EST LA CONDITION DU RECOLLAGE.
+      //    Un document fragmenté doit se terminer avant qu'un autre commence :
+      //    intercaler du frais au milieu de ses `MORCEAU j/m` laisserait le
+      //    récepteur incapable de savoir quel morceau appartient à quoi.
+      const file = store.loadState(RELIQUAT_PREFIX, sessionId);
+      const enAttente = Array.isArray(file.segments) ? file.segments : [];
+      // ⚠️ DÉDUP OBLIGATOIRE : une doc `dumb` est re-décidée à CHAQUE geste. Sans
+      //    ce filtre, une doc encore en cours de livraison serait ré-empilée
+      //    entière derrière ses propres morceaux — doublon de tokens ET
+      //    recollage impossible. La file fait AUTORITÉ tant qu'elle n'est pas
+      //    vidée : ce qu'elle porte ne peut pas être réémis en parallèle.
+      const dejaEnFile = new Set(enAttente.map((s) => baseId(s.id)));
+      const segments = enAttente.concat(segmentsPour(r.inject).filter((s) => !dejaEnFile.has(s.id)));
+
+      const paquets = decouper(segments);
+      // ⚠️ CE QUI N'EST PAS SORTI RETOURNE EN FILE — le geste qui a remplacé
+      //    « jeter » par « différer ». Les différés vivent dans le DERNIER
+      //    paquet (c'est lui qui porte l'annonce) ; en trame unique il n'y en a
+      //    qu'un, donc le même code couvre les deux harnais.
+      // ⚠️ ÉCRITURE INCONDITIONNELLE, y compris avec un reste VIDE : c'est ce
+      //    qui VIDE la file quand tout est enfin livré. Ne la rendre
+      //    conditionnelle qu'au non-vide ferait boucler la dernière livraison
+      //    à chaque geste, pour toujours.
+      store.saveState(RELIQUAT_PREFIX, sessionId, { segments: paquets[paquets.length - 1].differes });
+
+      // ⚠️ LA BOUCLE DE RESTAURATION D'ÉTAT DES DIFFÉRÉS A ÉTÉ SUPPRIMÉE ICI
+      //    (05/08/2026). Elle « dé-marquait » une doc différée pour que le geste
+      //    suivant la redécide, parce qu'un différé était alors PERDU. Ce n'est
+      //    plus vrai : le différé est EN VOL, la file garantit son arrivée. La
+      //    garder produirait l'inverse du but recherché — la doc serait à la
+      //    fois dans la file ET redécidée, donc livrée en double. La garantie
+      //    « jamais consommée sans être livrée » n'a pas disparu : elle a changé
+      //    de gardien, et son gardien est maintenant scellé par property.
       if (r.changed) store.saveState(STORE_PREFIX, sessionId, r.state);
-      if (fragmente) store.saveState(PLAN_PREFIX, clePlan, { inject: r.inject, decision: r.decision });
-      return { r, paquets };
+      if (fragmente) store.saveState(PLAN_PREFIX, clePlan, { segments, decision: r.decision });
+      return { segments, decision: r.decision, paquets };
     }, { fallback: null });
     // Lock indisponible → décider SANS état (jamais se taire, cf en-tête).
+    // ⚠️ NI LECTURE NI ÉCRITURE DE LA FILE SUR CE CHEMIN : sans lock, deux
+    //    processus pourraient consommer puis réécrire la file concurremment et
+    //    en perdre une partie. On dégrade donc au frais seul — l'ancien
+    //    comportement, jamais une corruption. La file reste intacte et repart au
+    //    geste suivant.
     if (!res) {
       const r = gate.decide(config, decls, matched, {}, turnCount, acc.owner);
-      res = { r, paquets: decouper(r.inject) };
+      const segments = segmentsPour(r.inject);
+      res = { segments, decision: r.decision, paquets: decouper(segments) };
     }
 
-    if (res.r.inject.length === 0) process.exit(0);
+    // ⚠️ `segments`, PAS `r.inject` : la file peut porter du contenu alors que
+    //    gate.decide n'a rien décidé de neuf (tout est déjà `seen`). Tester
+    //    l'ancien champ ferait sortir en silence avec une file pleine — la doc
+    //    n'arriverait alors JAMAIS. C'est le piège exact de ce chantier.
+    if (res.segments.length === 0) process.exit(0);
 
     // ⚠️ Un paquet VIDE sort en SILENCE (exit 0) : il n'a ni contenu ni annonce.
     //    En trame unique ce cas est impossible dès que `inject` est non vide —
@@ -211,12 +287,18 @@ function run(data, emit, options) {
       //    ferait croire à l'agent qu'il l'a reçue — le « vert qui ment ».
       //    ⚠️ En multi-paquets, c'est le contenu de CE paquet — chaque trame
       //    annonce ce qu'ELLE porte, jamais ce que les autres transportent.
-      const injected = plan.emis.filter((d) => acc.owner[d] === a.id);
+      //    ⚠️ `baseId` + dédup : une trame peut porter `foo#2` et `foo#3` du
+      //    MÊME document. Sans repli sur la base, aucun propriétaire ne serait
+      //    reconnu (le badge deviendrait muet dès qu'une doc est morcelée) et un
+      //    document compterait double. Un morceau hérité de la file dont la doc
+      //    ne matche plus n'a pas de propriétaire : il n'est pas annoncé, ce qui
+      //    est honnête — il est livré, pas attribué.
+      const injected = [...new Set(plan.emis.map(baseId))].filter((d) => acc.owner[d] === a.id);
       if (injected.length === 0) continue;
       const m = a.message(injected, { fullDoc, config, acc });
       if (m) msgs.push(m);
     }
-    emit(res.r.decision, fullDoc, msgs.join(' · '));
+    emit(res.decision, fullDoc, msgs.join(' · '));
   } catch {
     process.exit(0); // fail-open
   }

@@ -340,7 +340,7 @@ test('PAQUETS : 3 docs trop grosses pour une trame → livrées en 3 paquets, RI
     assert.strictEqual(porteuses.length, 1, 'doc ' + nom + ' livrée exactement une fois');
   }
   // ⚠️ Zéro annonce d'éviction : c'est TOUT le point du chantier.
-  for (const s of sorties) assert.ok(!s.includes('NON injectée'), 'aucune éviction résiduelle');
+  for (const s of sorties) assert.ok(!s.includes('DIFFÉRÉE'), 'aucun différé résiduel');
   // Numéros de séquence + marqueur COMMUN (recollage vérifiable malgré le parallélisme).
   sorties.forEach((s, i) => assert.ok(s.includes('PAQUET ' + (i + 1) + '/3'), 'paquet ' + (i + 1) + ' numéroté'));
   const marqueurs = sorties.map((s) => /###FIN:([0-9a-f]{8})###/.exec(s)[1]);
@@ -363,7 +363,11 @@ test('PAQUETS : une doc `once` N\'EST PAS consommée par le premier paquet', asy
 
 test('PAQUETS : sans identifiant d\'invocation → trame UNIQUE (dégradation, jamais casse)', async () => {
   // Un harnais qui n'expose pas d'identifiant d'invocation retombe sur le
-  // comportement d'aujourd'hui : une trame, et l'éviction est ANNONCÉE.
+  // comportement d'aujourd'hui : une trame, et le surplus est ANNONCÉ.
+  // ⚠️ Il n'est plus PERDU pour autant (05/08/2026) : la file l'émettra au geste
+  //    suivant. La dégradation porte donc sur le DÉBIT (une trame au lieu de N),
+  //    jamais sur la livraison. C'est ce qui rend Codex — qui n'a pas de
+  //    multi-trames — aussi complet que Claude Code, juste plus lent.
   troisDocs();
   const { code, stdout } = await run(
     { tool_name: 'Read', tool_input: { file_path: 'C:/proj/cible.js' }, session_id: 'sQ' },
@@ -372,7 +376,7 @@ test('PAQUETS : sans identifiant d\'invocation → trame UNIQUE (dégradation, j
   assert.strictEqual(code, 0);
   const ctx = parseOut(stdout).hookSpecificOutput.additionalContext;
   assert.ok(!ctx.includes('PAQUET '), 'aucun en-tête de paquet');
-  assert.ok(ctx.includes('NON injectée'), 'éviction annoncée, comme avant le chantier');
+  assert.ok(ctx.includes('DIFFÉRÉE'), 'le surplus est annoncé, jamais tu');
 });
 
 test('PAQUETS : un paquet sans contenu sort en SILENCE (exit 0, stdout vide)', async () => {
@@ -381,6 +385,82 @@ test('PAQUETS : un paquet sans contenu sort en SILENCE (exit 0, stdout vide)', a
   const { code, stdout } = await run(geste(), { args: ['--paquet', '4', '--paquets', '4'] });
   assert.strictEqual(code, 0);
   assert.strictEqual(stdout.trim(), '', 'aucune enveloppe vide émise');
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FILE D'ÉMISSION (05/08/2026) — LA preuve de bout en bout : « TOUT ARRIVE ».
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ SANS CE TEST, RIEN NE PROUVE LE CÂBLAGE. La property ⑧ prouve le MOTEUR
+//    pur (`budget.js`) ; ici on prouve la PLOMBERIE : que `porte-core.js`
+//    persiste vraiment le reliquat, le relit au geste suivant, le met en TÊTE,
+//    ne le duplique pas, et finit par vider la file. Un moteur juste câblé de
+//    travers rend exactement le même vert côté property.
+// ⚠️ Le corpus dépasse DÉLIBÉRÉMENT la capacité d'un appel (2 trames étroites),
+//    c'est-à-dire le régime qui, avant ce chantier, PERDAIT du contenu.
+test('FILE : un corpus plus gros que la capacité d\'UN appel arrive ENTIER sur plusieurs gestes', async () => {
+  // ⚠️ `once` À DESSEIN, et la distinction COMPTE (mesurée le 05/08/2026) :
+  //    un corpus `dumb` durablement au-dessus de la capacité ne vide JAMAIS sa
+  //    file — c'est CORRECT, pas un bug : `dumb` veut dire « réinjecte à chaque
+  //    geste », donc la file livre en ROTATION, indéfiniment, sans rien perdre.
+  //    La TERMINAISON ne se teste donc que sur un corpus qui cesse d'être
+  //    redécidé (`once`/`smart`) — et c'est justement le cas réel qui a ouvert
+  //    ce chantier : un skill `once` qui n'arrivait pas en entier.
+  for (let k = 0; k < 6; k++) {
+    writeDoc('f' + k + '.md', '---\nmatch: cible.js\nmode: once\n---\n' + String.fromCharCode(65 + k).repeat(700) + '\n');
+  }
+  fs.writeFileSync(CONFIG, JSON.stringify({ budgetInjection: 1200 }));
+
+  // ⚠️ ON S'ARRÊTE DÈS QUE LA FILE EST VIDE, on ne joue pas un nombre fixe de
+  //    gestes « avec de la marge ». Deux raisons :
+  //    ① c'est une assertion PLUS FORTE — le test prouve la TERMINAISON, là où
+  //      un compteur fixe ne prouve que « ça finit par arriver en 8 coups » ;
+  //    ② chaque geste coûte 2 spawns de `node` (~1,5 s pièce sous Windows) —
+  //      une marge prise à l'aveugle, c'est du temps de dev brûlé à chaque run.
+  //    La borne reste là comme DÉTECTEUR de boucle, jamais comme tolérance.
+  const vu = [];
+  let gestes = 0;
+  let fileVide = false;
+  while (!fileVide) {
+    assert.ok(gestes++ < 20, 'la file DOIT se vider — au-delà, c\'est une boucle');
+    for (let k = 1; k <= 2; k++) {
+      const { stdout } = await run(geste({ tool_use_id: 'toolu_geste' + gestes }), { args: ['--paquet', String(k), '--paquets', '2'] });
+      const out = parseOut(stdout);
+      if (out) vu.push(out.hookSpecificOutput.additionalContext);
+    }
+    const f = fs.readdirSync(STATE).filter((x) => x.startsWith('reliquat-'));
+    fileVide = f.length > 0 && JSON.parse(fs.readFileSync(path.join(STATE, f[0]), 'utf8')).segments.length === 0;
+  }
+  const tout = vu.join('\n');
+  for (let k = 0; k < 6; k++) {
+    const lettre = String.fromCharCode(65 + k);
+    assert.ok(tout.includes(lettre.repeat(700)), 'doc f' + k + ' finit par arriver EN ENTIER');
+  }
+  // ⚠️ La file doit se VIDER : sans terminaison, « tout arrive » serait vrai et
+  //    le système inutilisable (il ne livrerait plus jamais rien de neuf).
+  const reste = fs.readdirSync(STATE).filter((f) => f.startsWith('reliquat-'));
+  assert.strictEqual(reste.length, 1, 'un seul fichier de file, keyé par session');
+  const file = JSON.parse(fs.readFileSync(path.join(STATE, reste[0]), 'utf8'));
+  assert.deepStrictEqual(file.segments, [], 'la file est VIDE une fois tout livré');
+});
+
+test('FILE : purge PreCompact — un fragment orphelin ne survit JAMAIS à une compaction', async () => {
+  // ⚠️ Garder la file après compaction livrerait la FIN d'un document dont le
+  //    DÉBUT a disparu du contexte : illisible, et pire qu'une réinjection.
+  for (let k = 0; k < 4; k++) {
+    writeDoc('p' + k + '.md', '---\nmatch: cible.js\nmode: dumb\n---\n' + 'Z'.repeat(700) + k + '\n');
+  }
+  fs.writeFileSync(CONFIG, JSON.stringify({ budgetInjection: 1200 }));
+  await run(geste({ session_id: 'sFile', tool_use_id: 'toolu_x' }), { args: ['--paquet', '1', '--paquets', '2'] });
+  assert.ok(fs.readdirSync(STATE).some((f) => f.startsWith('reliquat-')), 'la file existe après un geste qui déborde');
+  const reset = (payload) => new Promise((resolve) => {
+    const child = execFile(process.execPath, [path.join(__dirname, 'ctxroute-reset.js')], {
+      encoding: 'utf8', env: { ...process.env, CTXROUTE_STATE_DIR: STATE, CTXROUTE_CONFIG_PATH: CONFIG },
+    }, (err) => resolve(err ? err.code : 0));
+    child.stdin.end(JSON.stringify(payload));
+  });
+  assert.strictEqual(await reset({ hook_event_name: 'PreCompact', session_id: 'sFile' }), 0);
+  assert.ok(!fs.readdirSync(STATE).some((f) => f.startsWith('reliquat-')), 'PreCompact la PURGE');
 });
 
 test('PAQUETS : indice hors bornes → trame unique, JAMAIS le contenu d\'un autre paquet', async () => {

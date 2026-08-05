@@ -103,14 +103,49 @@ function pied(marqueur) {
   return '\n\n###FIN:' + marqueur + '###';
 }
 
-// Annonce des segments qui ne rentrent pas. ⚠️ JAMAIS un silence : c'est la
-// ligne qui transforme une perte invisible en action possible.
+// Annonce des segments qui ne tiennent pas dans CETTE émission.
+//
+// ⚠️ SÉMANTIQUE CHANGÉE LE 05/08/2026 — ce n'est plus une PERTE, c'est un DÉLAI.
+//    Le texte disait « NON injectée(s) faute de place » : c'était vrai tant que
+//    l'appelant JETAIT le reliquat. Il le met désormais en FILE et le ré-émet
+//    aux appels suivants (`porte-core.js`, préfixe `reliquat-`) — exactement ce
+//    que fait un émetteur TCP quand la fenêtre est pleine : il DIFFÈRE, il ne
+//    jette pas. Annoncer une perte là où il n'y a qu'une attente ferait courir
+//    l'agent après des docs qui arrivent toutes seules au geste suivant.
+// ⚠️ UNE SEULE ANNONCE POUR LES DEUX CHEMINS (trame unique ET dernier paquet) :
+//    il y en avait deux (`annonce` / `annonceConfig`) parce qu'elles disaient
+//    des choses DIFFÉRENTES (« pas de place » vs « `--paquets N` trop petit »).
+//    Les deux causes ont fusionné en une seule — la fenêtre est pleine — donc
+//    les deux textes devaient fusionner aussi (loi anti-synonyme : un concept,
+//    un mot). 🛑 NE PAS réintroduire un message qui accuse la CONFIGURATION :
+//    `--paquets N` n'est plus un plafond de livraison, seulement un débit.
+// ⚠️ JAMAIS un silence pour autant : une doc retenue doit être NOMMÉE, sinon
+//    l'agent ne peut pas savoir qu'il lui manque quelque chose s'il agit tout
+//    de suite. C'est la ligne qui garde le différé HONNÊTE.
+// Nombre maximal de documents CITÉS. ⚠️ Ce n'est PAS un plafond de livraison :
+//    tout est livré quoi qu'il arrive, seule la LISTE est bornée.
+const MAX_CITES = 5;
+
 function annonce(differes) {
   if (differes.length === 0) return '';
-  const lignes = differes.map((s) => '   - ' + s.label);
+  // ⚠️ ON COMPTE DES DOCUMENTS, PAS DES MORCEAUX (bug MESURÉ le 05/08/2026).
+  //    Un différé est un morceau (`doc#1`, `doc#2`…) : une doc de 5 000 c sur un
+  //    budget de 600 en produit 56. La liste faisait donc 56 lignes et
+  //    DÉPASSAIT la trame à elle seule ⇒ plus aucune place pour du contenu ⇒
+  //    zéro émission ⇒ avec la file, une BOUCLE INFINIE (le même reliquat
+  //    représenté à chaque geste, éternellement). Dédupliquer par label ramène
+  //    ça à 1 ligne par document, ce qui est AUSSI la seule chose qui intéresse
+  //    le lecteur : « il me manque telle doc », jamais « il me manque le
+  //    morceau 37 ».
+  const labels = [...new Set(differes.map((s) => s.label))];
+  // ⚠️ LISTE BORNÉE : même dédupliquée, 300 docs feraient 300 lignes et le même
+  //    étouffement. L'annonce est INFORMATIVE (la file, elle, est la garantie) —
+  //    elle ne doit jamais pouvoir manger la trame qu'elle décrit.
+  const lignes = labels.slice(0, MAX_CITES).map((l) => '   - ' + l);
+  if (labels.length > MAX_CITES) lignes.push('   - … et ' + (labels.length - MAX_CITES) + ' autre(s)');
   return (
-    '\n\n⚠️ ' + differes.length + ' doc(s) NON injectée(s) faute de place dans cette trame.\n' +
-    '   Elles ne sont PAS optionnelles — lis-les si ton geste les touche :\n' +
+    '\n\n⚠️ ' + labels.length + ' doc(s) DIFFÉRÉE(S) — la trame est pleine, elles suivent au(x) prochain(s) appel(s) d\'outil.\n' +
+    "   Rien n'est perdu : elles sont en file, dans l'ordre. Si ton geste les touche MAINTENANT, lis-les :\n" +
     lignes.join('\n')
   );
 }
@@ -185,9 +220,22 @@ function planifier(segments, budget) {
   }
 
   // Rien ne rentre (un seul segment dépasse déjà à lui seul). On émet l'ANNONCE
-  // NUE : elle est minuscule et dit où lire. ⚠️ Ne JAMAIS émettre le segment
-  // tronqué à la place — ce serait rendre au harnais exactement le pavé qu'il
-  // coupe en silence, c'est-à-dire le défaut d'origine.
+  // NUE : elle est minuscule et dit ce qui suit.
+  // ⚠️ JUSTIFICATION RÉÉCRITE LE 05/08/2026 — l'ancienne était FAUSSE. Elle
+  //    disait : « ne JAMAIS émettre le segment tronqué, ce serait rendre au
+  //    harnais le pavé qu'il coupe EN SILENCE ». Or la doc officielle de Claude
+  //    Code (lue ce jour) établit que le dépassement n'est PAS silencieux : le
+  //    harnais range le surplus dans un fichier et en donne le chemin. La
+  //    prémisse est tombée ; la CONCLUSION reste juste, pour une raison
+  //    entièrement différente et qui, elle, ne dépend d'AUCUN harnais :
+  //    **ce qui ne sort pas ici n'est pas perdu — l'appelant le met en file et
+  //    le ré-émet au geste suivant** (`porte-core.js`). Émettre un pavé tronqué
+  //    ferait arriver DEUX fois le même début (une fois coupé, une fois par la
+  //    file) et casserait le recollage. Le respect de la borne EST ce qui rend
+  //    la file cohérente.
+  // 🛑 Ne pas « optimiser » en gonflant cette trame parce que le harnais a un
+  //    filet : dépendre de son filet, c'est bâtir sur ce qu'il peut retirer
+  //    demain sans dépréciation (cf CONTRAT, budget.md).
   const r = composer(liste, 0);
   return { texte: r.texte, emis: [], differes: r.differes, marqueur: r.marqueur };
 }
@@ -238,18 +286,17 @@ function enTetePaquet(marqueur, k, n) {
   );
 }
 
-// Reliquat = il manque des TRAMES, pas de la place. ⚠️ Sémantique DIFFÉRENTE de
-// `annonce()` : ici rien n'est « trop gros » (tout est morcelable) — c'est le
-// nombre de paquets DÉCLARÉS en configuration qui est insuffisant. C'est une
-// erreur d'EXPLOITATION avec sa solution, pas une fatalité de transport.
-function annonceConfig(reliquat) {
-  if (reliquat.length === 0) return '';
-  return (
-    '\n\n⚠️ ' + reliquat.length + ' morceau(x) non émis : le nombre de paquets déclarés est TROP PETIT.\n' +
-    "   Augmente `--paquets N` dans la configuration des hooks — rien n'est trop gros, il manque des trames."
-  );
-}
-
+// ⚠️ `annonceConfig()` SUPPRIMÉE le 05/08/2026 — elle disait « le nombre de
+//    paquets déclarés est TROP PETIT · augmente `--paquets N` ». Ce message
+//    était FAUX dans sa cause ET dans son remède :
+//    · sa CAUSE supposait que `--paquets N` soit un plafond de LIVRAISON. Ce
+//      n'est plus qu'un DÉBIT : ce qui ne tient pas dans cette émission part en
+//      file et arrive au geste suivant (`porte-core.js`). Rien n'est « non émis ».
+//    · son REMÈDE demandait à l'OPÉRATEUR de reconfigurer pour un phénomène
+//      normal de transport — la fenêtre est pleine, c'est tout. Un système qui
+//      réclame une intervention humaine à chaque flux un peu gros est
+//      exactement le toil que ce framework existe pour supprimer.
+//    Les deux chemins (trame unique / dernier paquet) partagent donc `annonce()`.
 // Rendu d'UN paquet. `reliquat` n'est jamais non-vide que sur le DERNIER.
 //
 // ⚠️ `scelle=false` ⇒ ENVELOPPE OMISE. C'EST L'ENVELOPPE QUI CÈDE, JAMAIS LE
@@ -258,10 +305,17 @@ function annonceConfig(reliquat) {
 //    « trop petit » inventé, et un message qui MENT sur sa cause). Le scellement
 //    est un CONFORT de détection ; livrer est le CONTRAT. Quand les deux ne
 //    tiennent pas ensemble, on livre. Dégradation EXPLICITE, jamais un silence.
+// ⚠️ `n === 1` ⇒ EN-TÊTE SIMPLE, jamais l'en-tête de paquet (05/08/2026).
+//    Depuis que la trame unique morcelle elle aussi (cf `planifierPaquets`), ce
+//    chemin sert AUSSI aux harnais sans multi-trames. Or `enTetePaquet` dirait
+//    « les 1 paquets arrivent DANS LE DÉSORDRE, recolle-les par leur numéro » :
+//    une consigne absurde et FAUSSE pour une trame seule. Un récepteur qui suit
+//    une consigne fausse est pire qu'un récepteur non informé.
 function composerPaquet(retenus, reliquat, k, n, marqueur, scelle) {
   const corps = retenus.map((s) => s.text).join(SEPARATEUR);
-  if (!scelle) return corps + annonceConfig(reliquat);
-  return enTetePaquet(marqueur, k, n) + corps + annonceConfig(reliquat) + pied(marqueur);
+  if (!scelle) return corps + annonce(reliquat);
+  const tete = n >= 2 ? enTetePaquet(marqueur, k, n) : enTete(marqueur);
+  return tete + corps + annonce(reliquat) + pied(marqueur);
 }
 
 // En-tête d'un MORCEAU de doc (uniquement quand une doc est répartie sur
@@ -308,7 +362,23 @@ function morceler(segments, capacite) {
     //    borne serait fausse. `Math.max(1, …)` garantit une progression stricte
     //    quelle que soit la trame — sans lui, une capacité minuscule ferait une
     //    boucle infinie ou ferait DISPARAÎTRE le contenu (bug réel, 03/08/2026).
-    const utile = Math.max(1, capacite - enTeteMorceau(s.label, 999, 999).length);
+    // ⚠️ L'EN-TÊTE DE MORCEAU CÈDE QUAND IL NE TIENT PAS — même doctrine que le
+    //    sceau : **livrer passe avant décrire.** Défaut PRÉEXISTANT révélé le
+    //    05/08/2026 : `Math.max(1, capacite - entête)` garantissait 1 caractère
+    //    utile, mais le morceau RENDU valait alors `entête + 1` — donc PLUS GROS
+    //    que la capacité qu'il est censé respecter. Personne ne le voyait parce
+    //    que rien n'obligeait à émettre ce morceau ; la garantie de progrès, si.
+    //    Résultat mesuré : une trame de 419 c pour un budget de 340.
+    // ⚠️ Sans en-tête, le morceau perd son `j/m` — c'est une PERTE DE
+    //    DESCRIPTION, jamais de contenu, et elle ne survient que sous une trame
+    //    plus petite que l'en-tête lui-même (régime absurde, hors production).
+    //    L'alternative serait un morceau indélivrable : le choix est fait.
+    // 🛑 Ne PAS « rétablir l'en-tête partout par principe » : ça réintroduirait
+    //    un morceau qui dépasse sa propre borne, donc une trame émise au-dessus
+    //    du budget — exactement ce que tout ce module empêche.
+    const largeurEntete = enTeteMorceau(s.label, 999, 999).length;
+    const avecEntete = capacite > largeurEntete;
+    const utile = avecEntete ? capacite - largeurEntete : Math.max(1, capacite);
 
     // Découpe sur FRONTIÈRES DE LIGNES (RFC 2046 § message/partial) : couper au
     // milieu d'une ligne casse la lisibilité pour rien. Une ligne plus longue
@@ -338,7 +408,11 @@ function morceler(segments, capacite) {
 
     const m = tranches.length;
     tranches.forEach((t, j) => {
-      morceaux.push({ id: s.id + '#' + (j + 1), label: s.label, text: enTeteMorceau(s.label, j + 1, m) + t });
+      morceaux.push({
+        id: s.id + '#' + (j + 1),
+        label: s.label,
+        text: (avecEntete ? enTeteMorceau(s.label, j + 1, m) : '') + t,
+      });
     });
   }
   return morceaux;
@@ -375,8 +449,24 @@ function planifierPaquets(segments, budget, nbPaquets) {
   const n = Number.isInteger(nbPaquets) && nbPaquets >= 2 ? nbPaquets : 1;
 
   // ── CHEMIN DE PARITÉ ── tient en une trame ⇒ comportement d'avant, à l'octet.
+  // ⚠️ LA CONDITION `n === 1 ||` A ÉTÉ RETIRÉE LE 05/08/2026 — c'était un TROU,
+  //    et le seul qui rendait une doc RÉELLEMENT indélivrable.
+  //    Avant : `n === 1` renvoyait le résultat de `planifier`, qui ne morcelle
+  //    PAS. Une doc plus lourde que la trame sortait donc à ZÉRO contenu, juste
+  //    annoncée — pour toujours. Sans file c'était une perte ; AVEC la file
+  //    c'est pire, une BOUCLE : le même reliquat serait représenté à chaque
+  //    geste sans jamais progresser d'un octet.
+  //    Maintenant : dès qu'il y a du surplus, on passe par le morcelage, même à
+  //    une seule trame. La boucle des paquets 1..N-1 tourne alors zéro fois et
+  //    seul le dernier (= le seul) est composé — le code est le MÊME, il livre
+  //    juste sur plusieurs GESTES au lieu de plusieurs trames.
+  // ⚠️ C'EST CE QUI REND CODEX AUSSI COMPLET QUE CLAUDE CODE. Codex n'a pas de
+  //    multi-trames ; il a désormais la même garantie de livraison intégrale,
+  //    avec un DÉBIT plus faible. Ne JAMAIS rétablir le court-circuit `n === 1`
+  //    « pour la parité » : la parité visée est celle du CAS QUI TIENT (ligne
+  //    ci-dessous), jamais celle du cas qui déborde.
   const solo = planifier(liste, max);
-  if (n === 1 || solo.differes.length === 0) {
+  if (solo.differes.length === 0) {
     const out = [solo];
     for (let i = 1; i < n; i++) out.push(paquetVide());
     return out;
@@ -428,25 +518,82 @@ function planifierPaquets(segments, budget, nbPaquets) {
   //    survivant éternel (mesuré 03/08/2026). Doctrine du parc : on ÉLIMINE
   //    l'équivalence par construction, on ne la désactive JAMAIS.
   let differesFinaux = reste;
+  // Ce qu'on CITE dans l'annonce — normalement identique à ce qu'on diffère.
+  // Il s'en écarte dans le seul cas de la garantie de progrès ci-dessous.
+  let cites = reste;
+  // ⚠️ PAS DE BORNE DE DÉPART « OPTIMISÉE » ICI — TENTÉE PUIS RETIRÉE le
+  //    05/08/2026, et il ne faut PAS la réintroduire sans une mesure NEUVE.
+  //    L'idée était de sauter au premier `k` ayant une chance (somme brute des
+  //    textes ≤ max), pour éviter que la boucle ne recompose la chaîne entière
+  //    à chaque essai. Elle était CORRECTE et strictement sans effet sur le
+  //    résultat — et c'est précisément le problème : **2 mutants ÉQUIVALENTS,
+  //    donc 2 survivants éternels** (score tombé à 98,85 %, sous le seuil 99).
+  //    Doctrine du parc, écrite plus haut dans ce fichier : on ÉLIMINE
+  //    l'équivalence par construction, on ne la DÉSACTIVE jamais.
+  //    ⚠️ Et le besoin n'était pas réel : la lenteur mesurée venait d'un budget
+  //    de 400 caractères — plus PETIT que l'enveloppe elle-même (~330), un
+  //    régime absurde qui n'existe pas en production. Au budget réel (8 000),
+  //    un reliquat de 500 Ko fait ~65 morceaux : la boucle est instantanée.
+  // 🛑 Si un jour un corpus RÉEL rend ceci lent, la réponse n'est pas de
+  //    remettre une borne inobservable : c'est de rendre le coût observable
+  //    (mesure) puis de changer l'ALGORITHME, pas d'ajouter un raccourci que
+  //    aucun test ne peut distinguer.
   for (let k = reste.length; k >= 1; k--) {
     const essai = reste.slice(0, k);
     const laisses = reste.slice(k);
     if (composerPaquet(essai, laisses, n, n, marqueur, scelle).length <= max) {
       dernier = essai;
       differesFinaux = laisses;
+      cites = laisses;
       break;
     }
+  }
+
+  // ⚠️ GARANTIE DE PROGRÈS — SANS ELLE, LA FILE EST UNE BOUCLE INFINIE.
+  //    (Défaut MESURÉ le 05/08/2026 par simulation de la boucle réelle :
+  //    budget 600, une doc de 5 000 c ⇒ 56 morceaux ⇒ ZÉRO émis, indéfiniment.)
+  //    La boucle ci-dessus peut ne rien retenir : l'annonce, même bornée, peut à
+  //    elle seule remplir une trame minuscule. Tant qu'on JETAIT le reliquat,
+  //    c'était une perte ponctuelle ; maintenant qu'on le REPRÉSENTE au geste
+  //    suivant, un tour sans progrès se répète POUR TOUJOURS et plus rien
+  //    n'avance jamais.
+  //    On force donc UN morceau — `morceler` garantit qu'il tient dans la trame
+  //    — et on SACRIFIE L'ANNONCE pour lui faire de la place. C'est la doctrine
+  //    déjà appliquée au sceau : **livrer passe avant décrire.** Une trame qui
+  //    ne décrit pas son reliquat reste honnête (la file le livrera) ; une trame
+  //    qui ne livre rien ne l'est pas.
+  // 🛑 NE JAMAIS supprimer ce chemin en le prenant pour un cas d'école : il est
+  //    la SEULE chose qui rende la terminaison certaine. Property ⑧.
+  if (dernier.length === 0 && reste.length > 0) {
+    dernier = [reste[0]];
+    differesFinaux = reste.slice(1);
+    cites = [];
   }
   groupes.push(dernier);
 
   return groupes.map((retenus, i) => {
     const differes = i === n - 1 ? differesFinaux : [];
-    // ⚠️ Un paquet SANS contenu ET SANS annonce n'est PAS émis (texte vide ⇒ la
-    //    coquille sort en silence). Émettre une enveloppe vide coûterait des
-    //    tokens pour annoncer du néant, à chaque geste.
-    if (retenus.length === 0 && differes.length === 0) return paquetVide();
+    // ⚠️ CE QU'ON COMPOSE ≠ CE QU'ON RAPPORTE, dans le seul cas du progrès
+    //    forcé : la trame n'affiche pas l'annonce (pas la place) mais le
+    //    reliquat RÉEL est bien rendu à l'appelant, qui le remet en file. Ne
+    //    JAMAIS réaligner les deux « par symétrie » — ce serait soit réafficher
+    //    l'annonce qui étouffe la trame, soit PERDRE le reliquat en le taisant
+    //    à l'appelant, c'est-à-dire ressusciter le défaut d'origine.
+    const aCiter = i === n - 1 ? cites : [];
+    // ⚠️ Un paquet SANS contenu n'est PAS émis (texte vide ⇒ la coquille sort en
+    //    silence). Émettre une enveloppe pour annoncer du néant coûterait des
+    //    tokens à CHAQUE geste de CHAQUE agent.
+    // ⚠️ LA CONDITION `&& differes.length === 0` A ÉTÉ RETIRÉE le 05/08/2026 :
+    //    la GARANTIE DE PROGRÈS la rend REDONDANTE par construction — dès qu'il
+    //    reste quelque chose, un morceau est forcé dans le dernier paquet, donc
+    //    « rien de retenu » implique désormais « rien de différé ». Une garde
+    //    redondante est un mutant ÉQUIVALENT (survivant éternel) : doctrine du
+    //    parc, on l'élimine, on ne la désactive pas.
+    // 🛑 Si la garantie de progrès disparaissait un jour, CETTE ligne devrait
+    //    revenir — elles ne sont pas indépendantes.
+    if (retenus.length === 0) return paquetVide();
     return {
-      texte: composerPaquet(retenus, differes, i + 1, n, marqueur, scelle),
+      texte: composerPaquet(retenus, aCiter, i + 1, n, marqueur, scelle),
       emis: retenus.map((s) => s.id),
       differes,
       // ⚠️ Descellé ⇒ marqueur VIDE : annoncer un sceau absent du texte serait

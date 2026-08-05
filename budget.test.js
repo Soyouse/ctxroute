@@ -85,7 +85,7 @@ test('MIXTE : ce qui ne rentre pas est DIFFÉRÉ, compté et NOMMÉ', () => {
   assert.ok(r.emis.length > 0, 'au moins un émis');
   assert.ok(r.differes.length > 0, 'au moins un différé');
   assert.strictEqual(r.emis.length + r.differes.length, 6); // CONSERVATION
-  assert.ok(r.texte.includes(r.differes.length + ' doc(s) NON injectée(s)'));
+  assert.ok(r.texte.includes(r.differes.length + ' doc(s) DIFFÉRÉE(S)'));
   for (const d of r.differes) assert.ok(r.texte.includes(d.label), 'label cité : ' + d.label);
 });
 
@@ -204,8 +204,8 @@ test('EN-TÊTE : texte EXACT — c\'est le contrat lu par l\'agent, pas un ornem
 test('ANNONCE : texte EXACT, préfixe de liste et séparateur de lignes', () => {
   const r = planifier(segs(6, 300), 1200);
   assert.ok(r.differes.length >= 2, 'il faut ≥ 2 différés pour observer le joint');
-  assert.ok(r.texte.includes('\n\n⚠️ ' + r.differes.length + ' doc(s) NON injectée(s) faute de place dans cette trame.\n'));
-  assert.ok(r.texte.includes('   Elles ne sont PAS optionnelles — lis-les si ton geste les touche :\n'));
+  assert.ok(r.texte.includes('\n\n⚠️ ' + r.differes.length + ' doc(s) DIFFÉRÉE(S) — la trame est pleine, elles suivent au(x) prochain(s) appel(s) d\'outil.\n'));
+  assert.ok(r.texte.includes("   Rien n'est perdu : elles sont en file, dans l'ordre. Si ton geste les touche MAINTENANT, lis-les :\n"));
   assert.ok(r.texte.includes('   - ' + r.differes[0].label));
   // Le joint entre deux différés DOIT être un retour ligne (sinon liste illisible).
   assert.ok(r.texte.includes('   - ' + r.differes[0].label + '\n   - ' + r.differes[1].label));
@@ -213,10 +213,10 @@ test('ANNONCE : texte EXACT, préfixe de liste et séparateur de lignes', () => 
 
 test('SCELLÉ SANS différé : aucune annonce parasite', () => {
   // ⚠️ Tue le mutant qui supprimerait le court-circuit `differes.length === 0` :
-  //    on annoncerait « 0 doc(s) NON injectée(s) » sur un bloc complet.
+  //    on annoncerait « 0 doc(s) DIFFÉRÉE(S) » sur un bloc complet.
   const r = planifier([seg('a', 600)], 1000);
   assert.deepStrictEqual(r.differes, []);
-  assert.ok(!r.texte.includes('NON injectée'));
+  assert.ok(!r.texte.includes('DIFFÉRÉE'));
   assert.ok(!r.texte.includes('Stryker'));
 });
 
@@ -365,15 +365,25 @@ test('FRONTIÈRE du remplissage : un paquet PLEIN À RAS BORD est valide', () =>
   assert.deepStrictEqual(serre[1].differes.map((d) => d.id), ['c', 'd']);
 });
 
-test('RELIQUAT = « pas assez de TRAMES », jamais « trop gros » (erreur de CONFIG)', () => {
-  // ⚠️ Sémantique NEUVE (03/08/2026) : plus rien n'est « trop gros » — tout est
-  //    morcelable. S'il reste des morceaux, c'est que `--paquets N` est trop
-  //    petit : une erreur d'exploitation, avec sa solution dans le message.
+test('RELIQUAT = un DÉLAI, jamais « trop gros » NI une erreur de CONFIG', () => {
+  // ⚠️ Sémantique NEUVE (05/08/2026), et c'est la 2ᵉ révision de ce test — la
+  //    1ʳᵉ (03/08) disait « c'est `--paquets N` qui est trop petit, corrige ta
+  //    config ». C'était encore un jugement porté sur l'EXPLOITANT. Depuis la
+  //    file d'émission (`porte-core.js`), le reliquat n'est plus qu'une fenêtre
+  //    pleine : il part au geste suivant, comme dans tout protocole de
+  //    transport. `--paquets N` est un DÉBIT, plus un plafond.
+  // 🛑 NE JAMAIS refaire dire à ce message « augmente N » : ce serait remettre
+  //    un humain dans la boucle pour un phénomène normal — le toil que ce
+  //    framework existe pour supprimer.
   const p = planifierPaquets(quatre400(), 1145, 2);
   const dernier = p[p.length - 1];
   assert.ok(dernier.differes.length > 0, 'avec 2 trames pour 4 docs, il reste forcément des morceaux');
-  assert.ok(dernier.texte.includes('le nombre de paquets déclarés est TROP PETIT'));
-  assert.ok(dernier.texte.includes('--paquets N'), 'le message dit COMMENT corriger');
+  assert.ok(dernier.texte.includes('DIFFÉRÉE(S)'), 'différé, pas perdu');
+  assert.ok(!dernier.texte.includes('TROP PETIT'), 'aucune accusation portée sur la configuration');
+  assert.ok(!dernier.texte.includes('non émis'), 'ne jamais annoncer une perte là où il y a une attente');
+  for (const d of dernier.differes) {
+    assert.ok(dernier.texte.includes(d.label), 'tout différé reste NOMMÉ : ' + d.label);
+  }
   // …et avec assez de trames, le reliquat disparaît : rien n'était trop gros.
   const assez = planifierPaquets(quatre400(), 1145, 8);
   assert.deepStrictEqual(assez.flatMap((x) => x.differes), [], 'assez de trames ⇒ tout passe');
@@ -519,20 +529,37 @@ test('MARQUEUR : sensible au CONTENU et au NOMBRE de paquets', () => {
 });
 
 test('PAQUETS — nbPaquets invalide ⇒ trame UNIQUE (cascade, jamais un découpage bancal)', () => {
+  // ⚠️ RÉVISÉ LE 05/08/2026 : « trame unique » veut toujours dire UNE trame —
+  //    mais plus « on renonce au surplus ». Un nombre de paquets invalide ne
+  //    doit jamais faire perdre du contenu, seulement réduire le DÉBIT.
   const l = () => segs(6, 300);
   for (const mauvais of [undefined, null, 0, 1, -3, 2.5, NaN, 'x']) {
     const p = planifierPaquets(l(), 1200, mauvais);
     assert.strictEqual(p.length, 1, 'nbPaquets=' + String(mauvais));
-    assert.deepStrictEqual(p, [planifier(l(), 1200)]);
+    assert.deepStrictEqual(p, planifierPaquets(l(), 1200, 1), 'toutes les valeurs invalides sont ÉQUIVALENTES à 1');
   }
   assert.strictEqual(planifierPaquets(l(), 1200, 2).length, 2, 'le premier nombre VALIDE est 2');
 });
 
-test('PAQUETS — n=1 AVEC éviction : strictement le rendu de planifier()', () => {
-  // ⚠️ Le chemin de parité doit tenir MÊME quand il y a des différés — sinon un
-  //    harnais mono-paquet recevrait un format de paquet sans raison.
-  const l = () => segs(6, 300);
-  assert.deepStrictEqual(planifierPaquets(l(), 1200, 1), [planifier(l(), 1200)]);
+test('PAQUETS — n=1 : parité PARFAITE si tout tient, MORCELAGE dès qu\'il y a du surplus', () => {
+  // ⚠️ CE TEST A ÉTÉ INVERSÉ LE 05/08/2026, et c'est le cœur du chantier.
+  //    Il exigeait « n=1 avec éviction ⇒ STRICTEMENT le rendu de planifier() ».
+  //    C'était un TROU déguisé en parité : `planifier` ne morcelle pas, donc une
+  //    doc plus lourde que la trame n'arrivait JAMAIS sur un harnais mono-trame
+  //    (Codex). Avec la file, ce n'était plus une perte mais une BOUCLE.
+  //    La parité qui compte est celle du cas QUI TIENT — la voici, à l'octet.
+  const tient = () => segs(2, 300);
+  assert.deepStrictEqual(planifierPaquets(tient(), 8000, 1), [planifier(tient(), 8000)]);
+
+  // Dès qu'il y a du surplus, on morcelle et on émet — au lieu de renoncer.
+  const deborde = () => segs(6, 300);
+  const p = planifierPaquets(deborde(), 1200, 1);
+  assert.strictEqual(p.length, 1, 'toujours UNE seule trame');
+  assert.ok(p[0].emis.length > 0, 'du contenu SORT, contrairement au comportement d\'avant');
+  assert.ok(p[0].differes.length > 0, 'le reste est rendu à l\'appelant, qui le met en file');
+  // ⚠️ Une trame seule ne doit JAMAIS porter l'en-tête « PAQUET k/N » : elle
+  //    dirait « recolle les 1 paquets », une consigne fausse.
+  assert.ok(!p[0].texte.includes('PAQUET '), 'en-tête simple, jamais un en-tête de paquet');
 });
 
 test('PAQUETS — budget absurde ⇒ défaut FRAMEWORK (cascade autorité ①)', () => {
@@ -622,11 +649,138 @@ test('EN-TÊTE DE MORCEAU : texte EXACT (les 3 champs du motif RFC 2046)', () =>
   assert.strictEqual(m[3], m[4], 'le TOTAL est cohérent dans la phrase');
 });
 
-test('RELIQUAT : message EXACT, avec la solution dedans', () => {
+test('RELIQUAT : message EXACT — UNE seule annonce pour les DEUX chemins', () => {
+  // ⚠️ Ce test scelle la FUSION du 05/08/2026 : `annonce()` (trame unique) et
+  //    `annonceConfig()` (dernier paquet) disaient deux choses différentes pour
+  //    UNE seule situation — la fenêtre est pleine. Deux textes = deux vérités
+  //    qui divergent au premier changement. Ici on vérifie que le dernier
+  //    paquet rend EXACTEMENT la même phrase que la trame unique.
   const p = planifierPaquets(quatre400(), 1145, 2);
   const t = p[1].texte;
-  assert.ok(t.includes('⚠️ 2 morceau(x) non émis : le nombre de paquets déclarés est TROP PETIT.'));
-  assert.ok(t.includes("   Augmente `--paquets N` dans la configuration des hooks — rien n'est trop gros, il manque des trames."));
+  const n = p[1].differes.length;
+  assert.ok(t.includes('\n\n⚠️ ' + n + ' doc(s) DIFFÉRÉE(S) — la trame est pleine, elles suivent au(x) prochain(s) appel(s) d\'outil.\n'));
+  assert.ok(t.includes("   Rien n'est perdu : elles sont en file, dans l'ordre. Si ton geste les touche MAINTENANT, lis-les :\n"));
+  // MÊME phrase que le chemin trame unique — sinon la fusion serait cosmétique.
+  const solo = planifier(segs(6, 300), 1200);
+  const ligne = (x) => x.split('\n').find((l) => l.includes('DIFFÉRÉE(S)')).replace(/\d+/, 'N');
+  assert.strictEqual(ligne(t), ligne(solo.texte), 'une seule formulation, partagée');
+});
+
+// ⚠️ CE TEST VIT ICI, PAS DANS LE FICHIER PROPERTY — ET C'EST UNE RÈGLE, PAS UN
+//    RANGEMENT. Stryker n'exécute PAS les property-tests (lents, non
+//    déterministes) : une garde prouvée UNIQUEMENT par property laisse ses
+//    mutants SURVIVRE, et le score ment. Mesuré le 05/08/2026 : l'annonce
+//    bornée écrite en property a fait tomber la mutation de 100 % à 98,85 %
+//    (5 survivants sur `MAX_CITES`), alors que le comportement ÉTAIT testé.
+// 🛑 Toute nouvelle garde déterministe : son cas va dans `budget.test.js`.
+// ⚠️ CAS FONDATEUR DE LA FILE — le blocage RÉEL trouvé le 05/08/2026 par
+//    simulation de la boucle de `porte-core.js`, AVANT toute mise en prod.
+//    Trame UNIQUE (le régime de Codex), budget 600, doc de 5 000 c ⇒ 56
+//    morceaux ⇒ l'annonce citait les 56 et remplissait la trame à elle seule
+//    ⇒ ZÉRO contenu émis, à chaque geste, POUR TOUJOURS.
+// ⚠️ IL VIT ICI ET PAS EN PROPERTY, pour la MÊME raison que l'annonce bornée :
+//    Stryker n'exécute pas les property-tests. Écrit là-bas, il laissait 5
+//    mutants survivre sur la garantie de progrès — le filet le plus critique du
+//    module n'était donc prouvé par AUCUN test que la mutation puisse voir.
+// 🛑 Ne JAMAIS le supprimer : si le comportement change, on INVERSE l'attendu.
+test('CAS FONDATEUR (file) : trame unique + doc geante => progres STRICT, jamais de boucle', () => {
+  const doc = () => ({ id: 'geante', text: 'x'.repeat(5000), label: 'geante.md' });
+  let file = [doc()];
+  let tours = 0;
+  const livres = new Set();
+  while (file.length > 0) {
+    assert.ok(tours++ < 200, 'progres strict exige : au-dela, il y a une boucle');
+    const paquets = planifierPaquets(file, 600, 1);
+    const emis = paquets.flatMap((p) => p.emis);
+    assert.ok(emis.length > 0, 'chaque geste avance d\'au moins un morceau');
+    for (const id of emis) livres.add(id);
+    file = paquets[paquets.length - 1].differes;
+  }
+  assert.ok(tours > 1, 'la doc a bien ete livree en PLUSIEURS gestes');
+  assert.ok(livres.size > 1, 'plusieurs morceaux distincts livres');
+});
+
+test('PROGRÈS FORCÉ : la trame SACRIFIE l\'annonce, mais rend TOUJOURS le reliquat', () => {
+  // ⚠️ C'est le point le plus subtil du module : ce qu'on COMPOSE (sans annonce,
+  //    faute de place) diffère de ce qu'on RAPPORTE (le reliquat complet, que
+  //    l'appelant remet en file). Les deux DOIVENT diverger ici — les réaligner
+  //    « par symétrie » ferait soit étouffer la trame, soit PERDRE le reliquat.
+  const p = planifierPaquets([{ id: 'g', text: 'x'.repeat(5000), label: 'geante.md' }], 600, 1);
+  const seule = p[0];
+  assert.ok(seule.emis.length > 0, 'du contenu SORT malgré tout (garantie de progrès)');
+  assert.ok(seule.differes.length > 0, 'et le reliquat est RENDU à l\'appelant');
+  // Le texte, lui, ne porte AUCUNE annonce : il n'y avait pas la place.
+  assert.ok(!seule.texte.includes('DIFFÉRÉE'), 'annonce sacrifiée : livrer passe avant décrire');
+  assert.ok(!seule.texte.includes('Stryker'), 'aucun label parasite dans la trame');
+});
+
+test('ANNONCE : SEUL le dernier paquet la porte — jamais les précédents', () => {
+  // ⚠️ Sans ce cas, `i === n - 1` est indiscernable de `true` : chaque trame
+  //    répéterait la liste des différés, multipliant le bruit par N et
+  //    risquant de faire déborder des paquets qui tenaient.
+  const docs = Array.from({ length: 30 }, (_, k) => ({
+    id: 'e' + k, text: 'w'.repeat(900), label: 'e' + k + '.md',
+  }));
+  const p = planifierPaquets(docs, 3000, 3);
+  assert.ok(p[p.length - 1].texte.includes('DIFFÉRÉE(S)'), 'le DERNIER annonce');
+  for (let i = 0; i < p.length - 1; i++) {
+    assert.ok(!p[i].texte.includes('DIFFÉRÉE'), 'le paquet ' + (i + 1) + ' se tait');
+    assert.deepStrictEqual(p[i].differes, [], 'et ne rapporte aucun reliquat');
+  }
+});
+
+test('MORCELER : le morceau ne dépasse JAMAIS sa capacité, sur TOUTE la plage', () => {
+  // ⚠️ BALAYAGE, pas un point : la frontière critique est là où l'en-tête de
+  //    morceau vaut EXACTEMENT la capacité. Un `>` mis en `>=` y donnerait une
+  //    part utile NULLE — donc une boucle infinie et un morceau hors borne.
+  //    Tester une seule capacité laisse ce point de bascule invisible.
+  const doc = () => [{ id: 'd', text: Array.from({ length: 40 }, (_, i) => 'ligne' + i).join('\n'), label: 'd.md' }];
+  for (let cap = 20; cap <= 120; cap++) {
+    const m = morceler(doc(), cap);
+    assert.ok(m.length > 0, 'capacité ' + cap + ' : au moins un morceau');
+    for (const x of m) {
+      assert.ok(x.text.length > 0, 'capacité ' + cap + ' : jamais un morceau VIDE');
+      assert.ok(x.text.length <= cap, 'capacité ' + cap + ' dépassée : ' + x.text.length);
+    }
+  }
+});
+
+test('PAQUET VIDE : ni contenu ni reliquat ⇒ rendu STRICTEMENT vide (silence)', () => {
+  // ⚠️ Émettre une enveloppe pour annoncer du néant coûterait des tokens à
+  //    CHAQUE geste de CHAQUE agent. La coquille sort en silence sur texte vide.
+  const p = planifierPaquets(segs(6, 300), 1200, 4);
+  const vides = p.filter((x) => x.emis.length === 0 && x.differes.length === 0);
+  assert.ok(vides.length > 0, 'avec 4 trames pour un petit corpus, il en reste des vides');
+  for (const v of vides) {
+    assert.deepStrictEqual(v, { texte: '', emis: [], differes: [], marqueur: '' });
+  }
+});
+
+test('ANNONCE BORNÉE : elle compte des DOCUMENTS et ne peut pas manger la trame', () => {
+  const docs = Array.from({ length: 30 }, (_, k) => ({
+    id: 'd' + k, text: 'y'.repeat(900), label: 'doc' + k + '.md',
+  }));
+  const p = planifierPaquets(docs, 3000, 2);
+  const dernier = p[p.length - 1];
+  const t = dernier.texte;
+  assert.ok(dernier.differes.length > 5, 'le cas est bien atteint');
+
+  // ① DÉDUP : le compte annoncé est celui des DOCUMENTS distincts.
+  const attendus = new Set(dernier.differes.map((d) => d.label)).size;
+  assert.ok(t.includes(attendus + ' doc(s) DIFFÉRÉE(S)'), 'compte en DOCUMENTS');
+
+  // ② PLAFOND : la liste est tronquée, avec le reliquat CHIFFRÉ.
+  assert.ok(t.includes('… et ' + (attendus - 5) + ' autre(s)'), 'liste tronquée et chiffrée');
+  const lignes = t.split('\n').filter((l) => l.startsWith('   - '));
+  assert.strictEqual(lignes.length, 6, '5 citations + la ligne de reste, jamais plus');
+
+  // ③ FRONTIÈRE EXACTE du plafond : à 5 docs on cite TOUT, à 6 on tronque.
+  //    ⚠️ Sans ces deux cas, `>` et `>=` sont indiscernables (mutant survivant).
+  const nDocs = (n) => Array.from({ length: n }, (_, k) => ({ id: 'x' + k, text: 'z'.repeat(700), label: 'x' + k + '.md' }));
+  const cinq = planifierPaquets(nDocs(6), 1500, 1);
+  assert.ok(!cinq[0].texte.includes('autre(s)'), '5 différés ⇒ tous cités, aucune troncature');
+  const six = planifierPaquets(nDocs(7), 1500, 1);
+  assert.ok(six[0].texte.includes('… et 1 autre(s)'), '6 différés ⇒ on tronque à 5 + 1 restant');
 });
 
 test('capacitePaquet : nbPaquets NON entier retombe sur la largeur minimale', () => {

@@ -60,7 +60,14 @@ readStdinJson(
       //    purge par PRÉFIXE session : le maître ET tous ses sous-agents
       //    (pire cas fail-open = une réinjection, jamais un état gelé).
       const scoped = lib.scopeId(data.session_id, data.agent_id);
-      for (const prefix of ['doc-seen-', 'ctxroute-seen-', 'turn-count-', 'plan-']) {
+      // ⚠️ CINQUIÈME STORE (05/08/2026) : 'reliquat-' = la FILE D'ÉMISSION
+      //    (`porte-core.js`). La compaction VIDE le contexte réel : ce qui
+      //    attendait d'y arriver n'a plus de destination, et les docs seront de
+      //    toute façon redécidées à neuf par la cadence. Garder la file
+      //    livrerait, après compaction, la fin d'un document dont le début a
+      //    disparu — un fragment orphelin, illisible. La purger est donc le
+      //    comportement CORRECT, pas une perte.
+      for (const prefix of ['doc-seen-', 'ctxroute-seen-', 'turn-count-', 'plan-', 'reliquat-']) {
         // ⚠️ 'plan-' se balaie TOUJOURS par préfixe : sa clé porte un suffixe
         //    d'invocation (`--inv-…`), donc la suppression ciblée d'un chemin
         //    exact ne le trouverait jamais.

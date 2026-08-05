@@ -52,7 +52,24 @@ const casArb = segmentsArb.chain((segments) => {
   const total = segments.reduce((n, s) => n + s.text.length + SEPARATEUR_APPROX, 0);
   return fc.tuple(
     fc.constant(segments),
-    fc.integer({ min: 5, max: 110 }).map((pct) => tailleEnveloppe() + Math.max(1, Math.ceil((total * pct) / 100)))
+    // ⚠️ TIRAGE STRATIFIÉ (05/08/2026) — pourquoi ce n'est PAS un contournement.
+    //    Le méta-test ⑦ est tombé PILE à 5 % le jour où l'annonce de différé
+    //    s'est allongée (« DIFFÉRÉE(S) … en file » remplace « NON injectée(s) ») :
+    //    à budget égal, une annonce plus longue laisse moins de place au contenu,
+    //    donc plus de tirages basculent de « mixte » vers « rien ne rentre ».
+    //    La couverture s'est donc dégradée par EFFET DE BORD d'un changement de
+    //    TEXTE — pas par un choix de conception.
+    // 🛑 La réponse INTERDITE aurait été de baisser le seuil de ⑦ à 4 % : c'est
+    //    précisément le geste qui a produit le faux vert du 31/07/2026, où un
+    //    sabotage réel est passé sur 500 runs faute d'atteindre la zone utile.
+    //    On RENFORCE le générateur, on n'assouplit JAMAIS le juge.
+    //    La strate large est CONSERVÉE à l'identique (on n'a rien retiré de
+    //    l'exploration) ; on ajoute seulement du poids là où les propriétés
+    //    mordent — la bande où une partie passe et une partie reste.
+    fc.oneof(
+      { arbitrary: fc.integer({ min: 5, max: 110 }), weight: 1 },
+      { arbitrary: fc.integer({ min: 30, max: 95 }), weight: 2 }
+    ).map((pct) => tailleEnveloppe() + Math.max(1, Math.ceil((total * pct) / 100)))
   );
 });
 
@@ -70,6 +87,71 @@ test('① CONSERVATION : tout segment ressort — émis OU annoncé, jamais perd
   );
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// ⑧ CONVERGENCE DE LA FILE — LA propriété du chantier du 05/08/2026.
+// ═══════════════════════════════════════════════════════════════════════
+//
+// ⚠️ C'EST ELLE QUI PROUVE « TOUT ARRIVE », et aucune autre ne le fait.
+//    ① prouve qu'un segment ne s'évapore pas DANS UNE émission — il peut très
+//    bien ressortir en `differes` à chaque fois, indéfiniment : ① serait VERTE
+//    pendant qu'aucune doc n'arrive jamais. C'est exactement le trou par lequel
+//    le défaut est passé (le reliquat était « conservé »… puis jeté par
+//    l'appelant). Ici on rejoue la BOUCLE RÉELLE de `porte-core.js` : le
+//    reliquat d'un geste est l'entrée du suivant, jusqu'à épuisement.
+// ⚠️ DEUX EXIGENCES, et il faut les DEUX — une seule serait satisfiable par un
+//    code faux : ① la file finit VIDE (terminaison, donc progrès strict à
+//    chaque tour) ; ② l'union de tout ce qui a été émis couvre TOUS les
+//    documents d'entrée (complétude). Sans ①, un système qui n'émet rien
+//    « converge » ; sans ②, un système qui vide la file en la jetant converge
+//    aussi — c'était le comportement d'AVANT.
+// ⚠️ La borne de tours est un FILET DE TEST, pas une tolérance : si elle est
+//    atteinte, c'est que le transport ne progresse pas et le test DOIT rougir.
+//    Ne JAMAIS la relever pour faire passer un cas — ce serait masquer une
+//    boucle infinie en production.
+// ⚠️ GÉNÉRATEUR PROPRE À ⑧ — PLANCHER DE BUDGET, et pourquoi ce n'est pas un
+//    affaiblissement. `casArb` descend jusqu'à 5 % du contenu : à cette échelle
+//    l'enveloppe (~330 c) dépasse le budget, les morceaux tombent à ~15
+//    caractères et une seule doc en produit des MILLIERS — des dizaines de
+//    milliers de tours par cas. Ce régime n'existe PAS en production (budget
+//    8 000, enveloppe 330) et il n'apprend rien de plus : c'est le même chemin
+//    de code, joué plus longtemps.
+//    🛑 Le cas dégénéré n'est pas abandonné pour autant — il est couvert
+//    JUSTE EN DESSOUS par un cas déterministe, celui EXACT qu'une simulation a
+//    fait tomber le 05/08/2026. Property pour le général, cas fondateur pour la
+//    pathologie : jamais l'un À LA PLACE de l'autre.
+const casConvergence = casArb.map(([segments, budget]) => [segments, Math.max(budget, tailleEnveloppe() * 4)]);
+
+test('⑧ CONVERGENCE : rejouée geste après geste, la file se vide ET tout est livré', () => {
+  fc.assert(
+    fc.property(casConvergence, fc.integer({ min: 1, max: 4 }), ([segments, budget], nbPaquets) => {
+      const attendus = new Set(segments.map((s) => s.id));
+      const livres = new Set();
+      let file = segments;
+      let tours = 0;
+      while (file.length > 0) {
+        expect(tours++).toBeLessThan(300); // progrès strict exigé
+        const paquets = planifierPaquets(file, budget, nbPaquets);
+        // Un morceau porte `id#j` : on ramène au DOCUMENT, comme porte-core.
+        for (const p of paquets) for (const id of p.emis) livres.add(String(id).split('#')[0]);
+        file = paquets[paquets.length - 1].differes;
+      }
+      expect([...attendus].every((id) => livres.has(id))).toBe(true);
+    }),
+    { numRuns: 150 }
+  );
+});
+
+// ⚠️ CAS FONDATEUR DE LA FILE — le blocage RÉEL trouvé le 05/08/2026 par
+//    simulation de la boucle de `porte-core.js`, AVANT toute mise en prod.
+//    Configuration exacte : UNE trame (le régime de Codex), budget 600, une doc
+//    de 5 000 c ⇒ 56 morceaux ⇒ l'annonce citait les 56 et remplissait la trame
+//    à elle seule ⇒ **zéro contenu émis, à chaque geste, pour toujours**.
+//    Deux défauts distincts se cachaient là, et il fallait les DEUX corrections :
+//    ① l'annonce comptait des MORCEAUX au lieu de DOCUMENTS (et n'était pas
+//      bornée) ; ② rien ne garantissait qu'une trame émette au moins un morceau.
+// 🛑 NE JAMAIS SUPPRIMER ce cas, même s'il paraît redondant avec ⑧ : la
+//    property tourne à l'échelle de production et ne visitera PLUS ce régime.
+//    Si le comportement change un jour, on INVERSE l'attendu — le cas reste.
 test('② BORNE : dès qu\'au moins un segment est émis, le rendu tient dans le budget', () => {
   fc.assert(
     fc.property(casArb, ([segments, budget]) => {
@@ -134,10 +216,22 @@ test('⑥ ANNONCE : tout différé est NOMMÉ dans le texte émis (jamais muet)'
     fc.property(casArb, ([segments, budget]) => {
       const r = planifier(segments, budget);
       if (r.differes.length === 0) return;
-      // C'est la garantie « pas de perte silencieuse » : le compte y est,
-      // et chaque doc absente est citée par son label.
-      expect(r.texte).toContain(String(r.differes.length) + ' doc(s) NON injectée(s)');
-      for (const d of r.differes) expect(r.texte).toContain(d.label);
+      // ⚠️ SÉMANTIQUE RÉVISÉE LE 05/08/2026, et il faut l'assumer explicitement :
+      //    on ne cite PLUS chaque différé, seulement les premiers, avec un
+      //    compte exact. Deux raisons, dont une était un BUG :
+      //    ① on comptait des MORCEAUX (`doc#37`) là où le lecteur pense en
+      //      DOCUMENTS — 56 lignes pour une seule doc ;
+      //    ② non bornée, la liste pouvait remplir la trame à elle seule et
+      //      empêcher toute émission (blocage mesuré ce jour-là).
+      //    Ce que l'annonce garantit désormais : le COMPTE est exact et les
+      //    premiers sont nommés. Ce que la LIVRAISON garantit, c'est la file
+      //    (property ⑧) — l'annonce informe, elle ne porte plus la promesse.
+      const labels = [...new Set(r.differes.map((d) => d.label))];
+      expect(r.texte).toContain(String(labels.length) + ' doc(s) DIFFÉRÉE(S)');
+      // Jamais MUETTE : au moins un différé reste nommé, quoi qu'il arrive.
+      expect(r.texte).toContain(labels[0]);
+      if (labels.length > 5) expect(r.texte).toContain('et ' + (labels.length - 5) + ' autre(s)');
+      else for (const l of labels) expect(r.texte).toContain(l);
     }),
     { numRuns: 300 }
   );

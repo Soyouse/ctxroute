@@ -101,7 +101,12 @@ n'est PAS faite — voir le chantier ⑨ ci-dessous, qu'elle a révélé.
    PUBLIC** (vérifié `gh repo view`), donc minutes illimitées ; la séparation des workflows reste
    justifiée par le TEMPS DE RETOUR, plus par le quota.
 
-### ⑭ 🔴 CAUSE RACINE DU RELIQUAT — LA PRÉMISSE DU MÉCANISME EST FAUSSE (05/08/2026)
+### ⑭ ✅ CAUSE RACINE DU RELIQUAT — LIVRÉE le 05/08/2026 (voir ⑬ pour ce qui a été construit)
+⚠️ **CE QU'IL FAUT RETENIR, ET C'EST CONTRE-INTUITIF : le fait ci-dessous a servi à COMPRENDRE,
+jamais à s'appuyer dessus.** Le correctif retenu (file d'émission, ⑬) ne dépend d'AUCUN
+comportement du harnais : aucune trame ne dépasse jamais son budget, donc le spill n'est même
+pas ATTEINT. Si Anthropic le retirait demain, rien ne changerait chez nous. C'est le test du
+CONTRAT (`budget.md`), et il passe.
 **DOC OFFICIELLE, lue ce jour** (`docs.claude.com/en/docs/claude-code/hooks` → 301 vers
 `code.claude.com/docs/en/hooks`), citation EXACTE :
 > *« Hook output strings, including `additionalContext`, `systemMessage`, and plain stdout, are
@@ -135,7 +140,7 @@ l'effet. **Aucune promesse d'Anthropic dans l'équation.**
 que pour cesser de JETER, jamais pour caler une constante dessus.
 ---
 
-## 📐 AUDIT D'EXÉCUTION DE ⑭ — ce qu'on modifie, exactement (05/08/2026)
+## 📐 AUDIT D'EXÉCUTION DE ⑭ — ✅ EXÉCUTÉ le 05/08/2026 (conservé : le CONTRAT ci-dessous reste la loi)
 
 ### LE CONTRAT, D'ABORD — c'est lui qui rend le reste indépendant du harnais
 > **Le framework ÉMET tout ce qu'il a décidé d'injecter. Sa promesse s'arrête à l'émission.**
@@ -217,36 +222,54 @@ sa réserve** : observé, jamais une dépendance.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
-### ⑬ 🟡 FILE DE RELIQUAT — devient FACULTATIF après ⑭ — trou de conception, VU EN RÉEL le 05/08/2026
-**Observé en session** : `⚠️ 12 morceau(x) non émis : le nombre de paquets déclarés est TROP
-PETIT` — le skill `webzenon-infra` n'est pas arrivé en entier.
-**MESURES** : budget 8 000 c/trame · capacité utile **7 658 c** (enveloppe déduite) ·
-**capacité TOTALE = 12 × 7 658 = 91 896 c** · ce seul skill pèse **75 927 c ⇒ 10 trames sur 12**.
-Avec les docs fichier de l'appel en plus, le plafond saute.
-**POURQUOI UNE LIMITE EXISTE** (ce n'est pas un bug d'implémentation) : `N` = le NOMBRE de
-DÉCLARATIONS du hook dans `settings.json`. Le harnais spawne EXACTEMENT ce qui est déclaré — on
-ne peut pas créer une 13ᵉ trame pendant l'appel. La capacité d'UN appel d'outil est donc FINIE
-et fixée à froid.
-🔴 **LE MAINTENEUR A RAISON : « rien ne doit être non émis ».** Et le protocole dont on se
-réclame le dit aussi — **ni RFC 2046 ni RFC 6455 ni TCP ne JETTENT quoi que ce soit quand la
-fenêtre est pleine : ils DIFFÈRENT.** Nous, on annonce et on abandonne. L'annonce évite le
-silence (c'est déjà ça, et ça a marché), mais elle ne remplace pas la livraison. **Le slogan
-« le framework LIVRE TOUT » est donc FAUX au-delà de 91 896 c — le dire ainsi était une
-approximation, elle est corrigée ici.**
-✅ **CIBLE (la seule qui ferme vraiment le trou)** : le canal n'est pas UNE trame, c'est le FLUX
-des appels d'outils. Le reliquat doit être **mis en file persistante** (`state/`) et **émis en
-priorité aux appels SUIVANTS**, jusqu'à épuisement. « Non émis » devient « émis au tour d'après ».
-C'est exactement la continuation de RFC 6455 et la fenêtre glissante de TCP.
-⚠️ **NE PAS coder ça à la volée** : la file touche l'état partagé, l'ORDRE (le rank porte la
-priorité), la dédup avec la cadence `once`/`smart`, et surtout le **déterminisme du plan
-mémoïsé** (les N processus doivent tous calculer le MÊME plan sans se coordonner — une file lue
-par 12 processus parallèles est précisément le piège de concurrence déjà documenté). Signal
-« état mutable partagé » ⇒ la doctrine impose TLA+ **ou** un point de sérialisation unique.
-Concevoir d'abord, mesurer, puis livrer.
-**Palliatif disponible en attendant, à ARBITRER par le mainteneur** : monter `--paquets` de 12 à
-~24 (capacité ×2). **Coût mesuré le 03/08 : 12 process node à vide = ~4 s par appel d'outil, dont
-96 % de démarrage de node** ⇒ 24 trames ≈ 8 s. C'est cher et ça ne fait que repousser le mur :
-le vrai correctif est la file.
+### ⑬ ✅ FILE DE RELIQUAT — LIVRÉE le 05/08/2026 (le trou est FERMÉ, plus de réserve)
+⚠️ **JUGEMENT RENVERSÉ, RÉÉCRIT (pilotage.md) : cette section disait « FACULTATIF après ⑭ ».
+C'était FAUX**, et la décision du mainteneur l'a tranché : ⑭ seul (« émettre au-delà du budget et
+laisser le harnais spiller ») aurait envoyé le surplus dans un FICHIER, pas dans le contexte.
+Exigence retenue : **tout arrive DANS LE CONTEXTE, à 100 %, sans dépendre d'aucun filet du
+harnais.** La file n'est donc pas un complément de ⑭ — elle EST le mécanisme.
+
+**LE DÉFAUT (observé en session)** : `12 morceau(x) non émis : le nombre de paquets déclarés est
+TROP PETIT` — un skill de projet n'arrivait pas en entier. **MESURES** : budget 8 000 c/trame ·
+capacité utile **7 658 c** · capacité TOTALE **12 × 7 658 = 91 896 c** · ce seul skill pesait
+**75 927 c ⇒ 10 trames sur 12**. Avec les docs fichier du même appel, le plafond sautait.
+**POURQUOI CE PLAFOND EXISTE** : `N` = le nombre de DÉCLARATIONS du hook dans `settings.json`. Le
+harnais spawne exactement ce qui est déclaré — on ne peut pas créer une 13ᵉ trame pendant l'appel.
+La capacité d'UN appel est donc finie et fixée à froid. Dimensionner `N` sur « le plus gros
+contenu connu » = capacity planning statique, c'est-à-dire du bricolage : le jour où le contenu
+grossit, tout est bloqué.
+
+✅ **LA SOLUTION, ET ELLE EST CELLE DU PROTOCOLE DONT ON SE RÉCLAME** : ni RFC 2046, ni RFC 6455,
+ni TCP ne jettent quoi que ce soit quand la fenêtre est pleine — **ils DIFFÈRENT**. Le canal
+n'est pas UNE trame, c'est le FLUX des appels d'outils. Le reliquat est désormais **persisté**
+(store `reliquat-`) et **ré-émis EN TÊTE aux appels suivants**, jusqu'à épuisement. `--paquets N`
+n'est plus un plafond de livraison, seulement un **DÉBIT** — on peut le baisser sans rien perdre.
+**Le palliatif « monter N à 24 » est donc ÉCARTÉ définitivement** (il coûtait ~8 s/geste, 96 % en
+démarrage de node, et ne faisait que repousser le mur).
+
+**CE QUI A ÉTÉ LIVRÉ** (détail des invariants → `budget.md`, `porte.md`, `reset.md` injectables) :
+file `reliquat-` sous le lock existant · plan mémoïsé portant les SEGMENTS (les N processus
+doivent voir la même entrée) · dédup par doc de base (`doc#3` → `doc`) · ordre strict, file avant
+frais (RFC 6455 : jamais entrelacé) · purge PreCompact (5 stores) · suppression de la boucle de
+restauration d'état des différés, devenue nuisible (livraison en double).
+
+🔴 **TROIS DÉFAUTS TROUVÉS EN CONSTRUISANT, tous par SIMULATION de la boucle réelle avant mise en
+prod — aucun n'était visible tant qu'on jetait le reliquat** :
+① l'annonce citait des **MORCEAUX** (56 lignes pour UNE doc) et remplissait la trame ⇒ zéro
+   contenu émis, à chaque geste, **pour toujours**. Corrigé : dédup par document + 5 citations max.
+② rien ne garantissait qu'une trame émette au moins un morceau ⇒ boucle infinie. Corrigé :
+   **garantie de progrès** (on force un morceau, on sacrifie l'annonce — *livrer avant décrire*).
+③ `morceler` pouvait rendre un morceau **plus gros que sa propre borne** (419 c pour un budget de
+   340) quand l'en-tête de morceau dépassait la capacité — défaut PRÉEXISTANT, masqué parce que
+   rien n'obligeait à émettre ce morceau. Corrigé : l'en-tête de morceau cède aussi.
+④ `n === 1` court-circuitait vers `planifier()`, **qui ne morcelle pas** ⇒ sur un harnais
+   mono-trame (Codex) une doc trop lourde n'arrivait JAMAIS. Corrigé : le morcelage vaut aussi à
+   une trame. **Codex a désormais la même garantie que Claude Code, avec un débit plus faible.**
+
+**PREUVES** : property ⑧ CONVERGENCE (la boucle rejouée : la file se vide ET tout est livré —
+elle seule prouve « tout arrive », ① ne prouvait que « rien ne s'évapore dans UNE émission ») +
+cas fondateur déterministe du blocage mesuré + test d'annonce bornée. Générateur ⑦ renforcé par
+tirage stratifié (jamais le seuil abaissé).
 
 ### ⑫ ✅ FAUX ROUGE DU DIFFÉRENTIEL DE PORTE — trouvé ET fermé le 05/08/2026
 `porte-differential.test.js` est passé au ROUGE après **deux lignes ajoutées à des docs du parc**,
