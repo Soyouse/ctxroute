@@ -57,10 +57,46 @@ SUPPOSITION jusqu'à aujourd'hui, c'est maintenant vérifié à chaque session.
 Filet mono-harnais. Si OpenAI change son contrat de hooks, ça meurt en SILENCE. Seule inconnue à
 MESURER : format du transcript Codex + marqueur d'appel d'outil. Détail section ②.
 
-### ③ `additionalContextLimit` — POSÉ MAIS INERTE
-Clé ABSENTE du binaire 0.144.6 (mesuré, méthode validée par 5 témoins). **0.146.0 est
-disponible.** Reste à faire : mettre Codex à jour → re-mesurer la clé dans le binaire → injection
-volumineuse réelle de bout en bout. À faire AVEC ② (le canari est le témoin qui manque).
+### ③ `additionalContextLimit` — ✅ ACTIF (05/08/2026), et 2 pannes trouvées au passage
+**Codex mis à jour 0.144.6 → 0.146.0.** Re-mesure du binaire : `additionalContextLimit` passe de
+**0 à 18 occurrences** (`additional_context_limit` : 2). Le réglage posé le 04/08 n'est donc plus
+inerte : il AGIT. Doctor **66 ok / 0 problème** après mise à jour, réglage toujours déclaré sur
+les 2 émetteurs.
+
+**DEUX PANNES BLOQUANTES trouvées en tentant la preuve de bout en bout** (aucune n'aurait été
+vue sans un run RÉEL — c'est l'argument entier du canari, appliqué à la main) :
+1. 🔴 **`[features].codex_hooks` DÉPRÉCIÉ en 0.146** (le binaire le dit au démarrage) → renommé
+   `hooks = true`. Les hooks tournaient ENCORE, mais un flag déprécié finit RETIRÉ : ce jour-là,
+   toute l'injection Codex serait morte **en silence** (fail-open partout). Corrigé à la seconde.
+2. 🔴 **`model = "gpt-5-codex"` REFUSÉ côté serveur** pour un compte ChatGPT (400,
+   « not supported ») → Codex ne démarrait plus AUCUN tour. **Clé RETIRÉE, pas remplacée** : un
+   modèle épinglé remeurt à chaque rotation de catalogue ; sans la clé, Codex prend son défaut,
+   supporté par construction. Run réel OK après correction (20 460 tokens, réponse correcte).
+
+**PREUVE PARTIELLE, et c'est dit** : l'injection Codex VIT (doc `paths.md` retrouvée dans le
+rollout comme message `developer`, scellée, `[source: …]` présent). Mais la preuve VOLUMÉTRIQUE
+n'est PAS faite — voir le chantier ⑨ ci-dessous, qu'elle a révélé.
+
+### ⑨ 🔴 CODEX 0.146 = « CODE MODE » : le skill n'atteint plus l'agent (NOUVEAU, 05/08/2026)
+**Mesuré, pas supposé.** Sur un run réel visant `Desktop/ctxroute/paths.js` :
+· la porte Codex a bien tourné (état de session créé) ;
+· l'injection est arrivée : **1 415 caractères, `paths.md` SEULE**, scellée, sans reliquat ;
+· **`skill/ctxroute` (42 848 c) est ABSENT du rollout**, et **rien ne l'annonce** ;
+· `explain.js` sur le payload reconstruit rend pourtant `✓ skill/ctxroute source=skill cadence=once`.
+**⇒ le payload RÉEL du hook diffère de ce qu'on peut reconstruire depuis le rollout.**
+Fait nouveau qui l'explique probablement : **0.146 n'appelle plus le shell directement**. Le modèle
+émet un `custom_tool_call` nommé **`exec`** dont l'`input` est du **JavaScript** :
+`const r = await tools.shell_command({command:"Get-Content … ctxroute\\paths.js", workdir:"…"})`.
+Le chemin n'est donc plus un paramètre, il est **enfoui dans du code, avec double échappement**.
+⚠️ **NE PAS « corriger » le moteur à l'aveugle** — piège prouvé le 31/07 (3 sondes fausses, une
+session perdue, un faux verdict « le moteur est en cause »). **ORDRE OBLIGATOIRE** : ① CAPTURER le
+payload réel du hook Codex (le journaliser depuis la coquille, en tmpdir) ; ② le rejouer dans
+`explain.js` ; ③ seulement alors décider — et la réponse sera probablement en **DONNÉES**
+(enrichir `match`) avant d'être dans le moteur (contrat d'extension §7 : « un trou de matching se
+règle d'abord en données »).
+⚠️ **Gravité** : côté Codex, tout skill/doc dont le déclencheur passe par un chemin enfoui dans du
+code mode est MUET — sans aucun signal. C'est exactement la classe de panne que le canari existe
+pour voir, et Codex n'a toujours pas de canari (chantier ②).
 
 ### ④ RETRAIT DE `confirm` — ✅ FAIT (05/08/2026, GO du mainteneur)
 **CIBLE ATTEINTE, intégralement.** `confirm` et `ask` n'existent plus nulle part : ni dans le
