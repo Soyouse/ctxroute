@@ -133,12 +133,87 @@ n'est pas plus mal qu'en jetant · seuil abaissé ⇒ le SCEAU le rend bruyant e
 l'effet. **Aucune promesse d'Anthropic dans l'équation.**
 ⚠️ **NE PAS coder 10 000 en dur** : le budget reste fourni par la COQUILLE. On ne consomme ce fait
 que pour cesser de JETER, jamais pour caler une constante dessus.
-**TRAVAIL RESTANT** (non fait — le cœur est muté 100 %, property-based et couvert par 2
-différentiels ; le bâcler serait pire que le trou) : ① `planifier` + `planifierPaquets` émettent
-tout ② l'annonce devient un AVERTISSEMENT de dépassement, plus un constat d'abandon ③ `differes`
-devient vide par construction ⇒ vérifier la boucle de `porte-core.js` qui restaure l'état des
-différés (elle devient inerte, elle doit le rester par sécurité) ④ property « rien n'est jamais
-différé » ⑤ re-mutation, 2 différentiels, doc + skill.
+---
+
+## 📐 AUDIT D'EXÉCUTION DE ⑭ — ce qu'on modifie, exactement (05/08/2026)
+
+### LE CONTRAT, D'ABORD — c'est lui qui rend le reste indépendant du harnais
+> **Le framework ÉMET tout ce qu'il a décidé d'injecter. Sa promesse s'arrête à l'émission.**
+
+🛑 **CE QUE LE HARNAIS FAIT DU SURPLUS N'EST PAS NOTRE PROMESSE, ET NE DOIT JAMAIS LE DEVENIR.**
+Le spill (« saved to a file … preview and file path ») est un comportement **OBSERVÉ ET DOCUMENTÉ
+AUJOURD'HUI**, jamais un contrat sur lequel on s'appuie. Raison, à ne pas perdre : Anthropic n'a
+jamais publié d'interface pour bâtir un système par-dessus les hooks — **rien ne les engage à
+prévenir**, et un comportement non pensé comme une API disparaît sans dépréciation.
+⚠️ **Test de non-dépendance, à s'appliquer à chaque ligne écrite** : « si le harnais jetait
+purement et simplement le surplus demain, notre code changerait-il ? » **La réponse DOIT être
+non.** Émettre tout est gagnant dans les deux mondes — spill présent ⇒ récupérable · spill absent
+⇒ pas plus mal qu'en jetant, puisque c'est ce qu'on fait déjà. **On ne parie pas, on ne perd pas.**
+🛑 Interdits permanents : coder `10000` (ou toute constante du harnais) dans le moteur · lire /
+sonder le fichier de spill · faire dépendre une décision de son existence · écrire une doc qui
+promet que « le surplus est récupérable ».
+
+### ① `budget.js` — `planifier()` (trame unique : Codex et tout harnais sans multi-trames)
+Aujourd'hui : boucle décroissante `for (k = liste.length; k >= 1; k--)` qui RETIRE des segments
+jusqu'à tenir dans `max` ; le reste part en `differes` (annoncé, jamais livré). Plus le cas final
+« rien ne rentre » qui émet l'annonce NUE, **zéro contenu**.
+Cible : **plus aucune boucle de retrait.** On compose avec TOUT, on émet. Si le texte dépasse
+`max`, on préfixe un AVERTISSEMENT de dépassement. `differes` sort **toujours vide**.
+⚠️ Le commentaire scellé « ne JAMAIS émettre le segment tronqué » est à RÉÉCRIRE, pas à
+supprimer : sa prémisse (« le harnais coupe en silence ») est fausse, mais la trace de l'erreur
+doit rester, datée.
+
+### ② `budget.js` — `planifierPaquets()` (dernier paquet)
+Les paquets 1..N-1 gardent leur remplissage glouton **inchangé** — c'est le débit normal, et c'est
+lui qui préserve la parité. Seul le DERNIER change : il prend **tout le reste**, quelle que soit
+la taille. `differesFinaux` disparaît.
+
+### ③ `annonceConfig()` → `annonceDepassement()`
+Le message actuel (« morceau(x) non émis … `--paquets N` TROP PETIT ») **décrit un abandon** et
+accuse la config. Il devient un **avertissement de dépassement** : cette trame dépasse le budget
+de N caractères, tout est émis, augmente `--paquets` ou `budgetInjection` pour livrer en direct.
+🛑 Ne PAS y écrire ce que le harnais fera du surplus (cf contrat).
+
+### ④ `porte-core.js` — la boucle de restauration d'état des différés (~l.180)
+`differes` devenant vide par construction, cette boucle devient du **code mort** ⇒ mutant
+ÉQUIVALENT ⇒ survivant éternel. La doctrine du repo est explicite : « on ÉLIMINE l'équivalence par
+construction, on ne la désactive JAMAIS » ⇒ **SUPPRIMER la boucle**, et transférer sa garantie à
+la property ⑤-a (qui la rend inutile au lieu de la rendre muette).
+
+### ⑤ TESTS ANTI-RÉGRESSION — c'est ici que ça se joue, pas dans le code
+- **a. Property ① DURCIE (`budget.property.test.js`)** — elle dit aujourd'hui *« tout segment
+  ressort — émis OU annoncé »*. **C'est cette disjonction qui a AUTORISÉ le bug** : jeter en
+  annonçant satisfaisait la propriété. Nouvelle forme : **`∀ segments, ∀ budget, ∀ n : union des
+  `emis` de tous les paquets === tous les ids d'entrée`**, et `differes` vide partout. Plus de
+  « ou ».
+- **b. Negative-check du durcissement** : réintroduire un différé sur une COPIE ⇒ la property DOIT
+  rougir. Sans lui, on ne saura jamais qu'elle mord (leçon des gates de pureté inertes du 03/08).
+- **c. Gate statique de NON-DÉPENDANCE** : aucun fichier du moteur ne contient `10000`, `spill`,
+  ni de lecture du fichier de débordement — seulement des commentaires datés. C'est le gate qui
+  matérialise le contrat ci-dessus, et il est **gratuit**.
+- **d. Test de bout en bout** : un corpus qui dépasse largement N×budget ⇒ **toutes** les docs
+  apparaissent dans la concaténation des N trames. La preuve directe, sans raisonnement.
+
+### ⑥ RE-PROUVER (aucune de ces preuves n'est optionnelle)
+mutation **100 %** (break 99, cliquet jamais baissé) · `porte-differential` + `mcp-differential`
+(le rendu change au-delà du budget) · `npm test` complet · doctor sur les 2 câblages réels.
+
+### ⑦ DOC & SKILL
+`budget.md`, `couverture.md`, skill + miroirs : remplacer « livré OU signalé » par **« livré,
+toujours »**, et inscrire le contrat + les interdits permanents. ⚠️ Écrire le fait du spill **avec
+sa réserve** : observé, jamais une dépendance.
+
+### CE QUE ÇA DONNE — pourquoi c'est scalable ET maintenable
+- **Plus AUCUNE limite interne au framework.** Le contenu n'est plus jamais jugé : ni trop gros,
+  ni trop petit. La seule variable devient le **débit** (`--paquets N` × `budgetInjection`), qui
+  change la RÉPARTITION, jamais le contenu livré.
+- **Deux réglages, zéro nouveau mot** : la taille (`budgetInjection`, plafonnée par `Math.min` au
+  budget du harnais) et le nombre (`--paquets N`, forcément côté harnais puisque c'est lui qui
+  lance les processus). Petite machine ⇒ on baisse, ça livre en plus de trames, **jamais moins**.
+- **La classe de bug est éteinte par construction** : la property ⑤-a rend un abandon
+  IMPOSSIBLE à faire passer, quelle que soit la future implémentation.
+- **Le code rétrécit** : deux boucles de retrait et un champ (`differes`) disparaissent. On enlève
+  du code pour supprimer un défaut — le meilleur signe qu'on tenait le mauvais bout.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
