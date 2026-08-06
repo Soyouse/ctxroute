@@ -498,7 +498,20 @@ Piste restante si un jour l'annonce doit être vue AVANT la mort : un `codex exe
 **nightly** (jamais au pre-push — cf CLAUDE.md « gate JAMAIS bloquant »), scannant stderr sur
 `deprecat`. À ne poser que si une 2ᵉ dépréciation fait réellement mal.
 
-### ⑨ 🟠 CODEX : `skill/ctxroute` ABSENT d'un run réel — CAUSE INCONNUE (05/08/2026)
+### ⑨ ✅ RÉSOLU 06/08/2026 — LE SKILL N'ÉTAIT PAS ABSENT, IL ARRIVAIT EN MORCEAUX
+**MÉTHODE** : run Codex RÉEL dans le périmètre, puis lecture du transcript. ⚠️ Le log terminal ne
+montre PAS l'`additionalContext` (il part au modèle) — conclure de son absence, c'est se tromper
+d'observable. La vérité est dans `~/.codex/sessions/AAAA/MM/JJ/rollout-*.jsonl`.
+⚠️ **Codex 0.146 a changé de stockage** (les docs décrivaient 0.144) ; `logs_*.sqlite` = TÉLÉMÉTRIE,
+pas un transcript.
+**CE QU'ON A VU** : `⟦ skill/ctxroute — MORCEAU 1/7 ⟧`. Le skill arrivait bien, en **7 morceaux** —
+mon 1er grep cherchait `[source: skill/ctxroute]`, étiquette qui vit à la FIN du document, donc dans
+le morceau 7 jamais atteint dans un run court. **L'outil de mesure mentait, pas le framework.**
+**CAUSE RÉELLE** : ⑰ — le moteur ignorait la limite déclarée et appliquait son plancher de 8 000.
+Corrigé ; run de vérification : skill ENTIER, zéro morceau. ⇒ **plus aucune inconnue sur Codex.**
+
+<details><summary>Constat d'origine (conservé)</summary>
+### ⑨ (historique) CODEX : `skill/ctxroute` ABSENT d'un run réel — CAUSE INCONNUE (05/08/2026)
 ⚠️ **CE CHANTIER S'APPELAIT « CODE MODE : le skill n'atteint plus l'agent ». Ce titre était FAUX**
 et il est réécrit ici plutôt qu'annoté (cf `pilotage.md` : un jugement renversé se réécrit).
 **LE FAIT MESURÉ, lui, tient** — run réel visant `Desktop/ctxroute/paths.js` :
@@ -542,6 +555,8 @@ règle d'abord en données »).
 mais le FAIT demeure — un savoir attendu n'est pas arrivé et **rien ne l'a annoncé**. C'est
 exactement la classe de panne que le canari existe pour voir, et Codex n'a toujours pas de canari
 (chantier ②). Le silence, lui, est confirmé comme le vrai défaut.
+
+</details>
 
 ### ④ RETRAIT DE `confirm` — ✅ FAIT (05/08/2026, GO du mainteneur)
 **CIBLE ATTEINTE, intégralement.** `confirm` et `ask` n'existent plus nulle part : ni dans le
