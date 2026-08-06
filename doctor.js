@@ -394,6 +394,45 @@ function checkWiring(settingsPath) {
   const porte = commands.filter((c) => /doc-inject\.js/.test(c) && !c.includes('legacy-mcp-inject'));
   check('la PORTE (doc-inject.js) est câblée — sinon plus AUCUNE doc injectée', porte.length >= 1,
     'doc-inject.js absent de settings.json : depuis la fusion, c\'est LUI qui injecte TOUTES les docs. Mort silencieux.');
+
+  // ── UNE SEULE DÉCLARATION DE PORTE (06/08/2026) — ANTI-RETOUR AUX N PROCESSUS.
+  //
+  // 🔴 POURQUOI CE CHECK EXISTE : déclarer la porte N fois lance N processus
+  //    PARALLÈLES qui se partagent la file d'émission. Ils écrivent tous le
+  //    même état, chacun sur une photo différente du monde ⇒ un morceau peut
+  //    être ÉMIS et malgré tout laissé en file, donc RELIVRÉ au geste suivant.
+  //    Défaut MESURÉ le 06/08/2026 dans un transcript réel : le morceau 7/8 du
+  //    skill `ctxroute` livré DEUX FOIS. Repéré à l'œil nu par le mainteneur —
+  //    aucun des 1000+ tests ne regardait cet invariant.
+  //
+  // 🛑 ET L'ORDRE N'EST PAS RATTRAPABLE À N>1 : le harnais rend les sorties
+  //    dans l'ordre où les processus FINISSENT. Mesuré sur 74 gestes : 69
+  //    utilisaient ≥2 trames, donc 93 % arrivaient dans le désordre. Les
+  //    ordonner exigerait qu'un processus ATTENDE ses pairs — une coordination
+  //    entre PAIRS ÉGAUX, que rien ne tranche, et qui sérialiserait 12 spawns
+  //    à chaque appel d'outil.
+  //
+  // ⚠️ CE N'EST PAS UNE PERTE DE CAPACITÉ. Depuis la file (05/08/2026), N ne
+  //    règle QUE le débit : ce qui ne tient pas dans la trame attend et repart
+  //    au geste suivant. À 1, tout arrive encore — en plus de gestes, jamais en
+  //    moins de contenu. Mesuré : médiane 3 trames par geste, donc 3 gestes.
+  //
+  // ⚠️ C'EST AUSSI LA POSITION DE L'INDUSTRIE, pas une préférence locale :
+  //    ouvrir N connexions parallèles était la ruse de HTTP/1.1 ; HTTP/2 puis
+  //    HTTP/3 l'ont abandonnée pour UNE connexion multiplexée. « Plus de
+  //    tuyaux » est la vieille méthode ; le standard est un tuyau, mieux utilisé.
+  //
+  // 🛑 NE JAMAIS « assouplir » ce check en autorisant N>1 sous un drapeau : le
+  //    désordre et la course reviendraient avec, et un utilisateur ne peut pas
+  //    consentir à un défaut qu'il ne verra que des semaines plus tard.
+  check('la porte est déclarée UNE SEULE FOIS (N processus = doublons + désordre)',
+    porte.length === 1,
+    `doc-inject.js est déclaré ${porte.length} fois dans settings.json. Les N processus sont PARALLÈLES : ils se partagent la file d'émission, d'où des morceaux livrés DEUX FOIS (mesuré le 06/08/2026), et le harnais rend leurs sorties dans le désordre. Ne garder qu'UNE déclaration : la file livre déjà tout, sur plusieurs gestes s'il le faut.`);
+
+  const multi = porte.filter((c) => /--paquets\s+(?!1\b)\d+/.test(c));
+  check('aucune déclaration ne demande plusieurs trames (`--paquets N>1`)',
+    multi.length === 0,
+    `Déclaration(s) avec --paquets N>1 : ${multi.join(' | ')}. Ce réglage n'a plus qu'une valeur correcte (1) — il ne gagne rien (la file livre tout de toute façon) et rouvre la course entre processus.`);
   for (const c of porte) {
     const m = /([A-Za-z]:[\\/][^"]*?|\/[^"]*?)doc-inject\.js/.exec(c);
     if (!m) continue;

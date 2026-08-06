@@ -1065,8 +1065,13 @@ tué le 31/07 sur `mcp:`, réapparu ailleurs.
 
 ---
 
-## 🔴 3 OUVERTS sur 4 — manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
-> ③ FERMÉ le 04/08/2026 (et requalifié en PANNE, pas en doc inexacte). Restent ①, ②, ④.
+## 🟠 2 OUVERTS sur 4 — manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
+> ③ FERMÉ le 04/08/2026 (requalifié en PANNE, pas en doc inexacte). ① FERMÉ le 05/08/2026
+> (sonde canari dans le doctor — `grep -c canari doctor.js` = 20, cf le ✅ de la section ① plus bas).
+> **Restent ② et ④.** ⚠️ Cet en-tête a annoncé « 3 OUVERTS / restent ①②④ » pendant 24 h APRÈS la
+> fermeture de ① : un lecteur croyait un chantier grave encore ouvert. C'est exactement ce
+> qu'interdit `pilotage.md` — un jugement renversé se RÉÉCRIT, il ne s'empile pas. Corrigé le
+> 06/08/2026, après que le mainteneur a demandé un état des lieux.
 
 > ⚠️ Les 3 premiers sont des trous que J'AI CRÉÉS la nuit du 03→04/08 en posant le canari, et que
 > l'audit de session a d'abord RATÉS. Ils sont classés par gravité, pas par facilité.
@@ -2068,3 +2073,72 @@ appel Stripe RÉEL en lecture seule OK (doc injectée, geste non bloqué) ·
 1057 tests · mutation 100,00 % · 0 violation · doctor 14/14.
 🛑 **`create_refund` n'a PAS été appelé pour « voir le blocage »** : un échec du
 garde-fou déclencherait un remboursement RÉEL. Vérifier ≠ muter, toujours.
+
+---
+
+## ㉔ UN SEUL PROCESSUS — les 12 paquets étaient un ANTIPATTERN (06/08/2026, LIVRÉ)
+
+**DÉCLENCHEUR : le mainteneur, à l'œil nu.** Il voit les badges arriver dans le désordre
+(`morceau 1/8`, puis `5/8`, puis `2/8`…) et demande « pourquoi ça affiche pas dans l'ordre ? ».
+Puis il remarque une doc « incrustée au milieu du skill ». Deux observations visuelles — aucun
+test ne regardait ni l'une ni l'autre.
+
+**CE QUE LA MESURE A TROUVÉ (transcript réel, pas une théorie) :**
+- ordre d'arrivée dans le transcript : `1, 3, 2, 6, 7, 5, 4, 8, 9` — donc le désordre est EN AMONT
+  de l'affichage, pas dans le terminal ;
+- **le morceau 7/8 livré DEUX FOIS**, à deux gestes distincts (marqueurs `2bc5f3df` puis
+  `03d7e9f2`), les 7 autres une seule. **Un doublon, pas une perte** — d'où l'aveuglement des
+  tests : `budget.property` prouve la CONSERVATION, et un segment livré 2× est parfaitement
+  « conservé ». Conservation et unicité sont deux propriétés, on n'en avait qu'une ;
+- distribution sur **74 gestes** : 1 trame ×5 · 2 ×27 · 3 ×22 · 4 ×10 · 5-9 ×8 · **12 ×1**.
+  Médiane = 3. **Les 12 trames n'ont servi à fond qu'UNE fois sur 74**, pour ~4 s de spawn node
+  payées à CHAQUE appel d'outil ;
+- **69 gestes sur 74 utilisaient ≥2 trames ⇒ 93 % arrivaient en désordre.** Ce n'était pas un cas
+  rare, c'était le régime permanent.
+
+**CAUSE RACINE.** N déclarations = N processus PARALLÈLES qui se partagent la file d'émission.
+Chacun lit, décide, réécrit — sur une photo différente du monde. 🛑 **Le lock ne protège pas de
+ça** : il sérialise les ÉCRITURES, il n'empêche pas une SECONDE DÉCISION prise sur un état déjà
+modifié. Reproduit en test déterministe (volet ③ de `emission-doublon.test.js`, ROUGE : les 5
+morceaux déjà sortis repartaient), puis le volet a été RETIRÉ parce que sa cause a disparu.
+
+**POURQUOI L'ORDRE N'ÉTAIT PAS RATTRAPABLE.** Le harnais rend les sorties dans l'ordre où les
+processus FINISSENT. Les ordonner exigerait qu'un processus ATTENDE ses pairs : **coordination
+entre PAIRS ÉGAUX**, que rien ne tranche — le signal d'alarme de CLAUDE.md. Et ça sérialiserait
+12 spawns à chaque geste.
+
+**CE QUE ÇA NE COÛTE PAS.** Depuis la file (⑮/⑯, 05/08), `--paquets N` ne réglait plus que le
+DÉBIT : le surplus attend et repart au geste suivant. Passer à 1 ne retire donc AUCUNE capacité —
+un contenu de n'importe quelle taille arrive encore, en plus de gestes (médiane : 3). Le seul
+changement observable : ce qui arrivait en 1 geste arrive en ~3.
+
+**ÉTAT DE L'ART, vérifié le 06/08/2026 (sources datées, cf `budget-paquets-reference.md`).**
+Ouvrir N connexions parallèles était la ruse de **HTTP/1.1** ; **HTTP/2 puis HTTP/3 l'ont
+abandonnée** pour UNE connexion multiplexée — « opening parallel connections for HTTP/3 would be
+unnecessary and wasteful ». gRPC 2026 dit la même chose pour les gros messages : **découper en
+flux sur un canal**, avec backpressure et **file BORNÉE** (la nôtre l'est : dédup par document).
+⇒ **« Plus de tuyaux » est la vieille méthode ; le standard est un tuyau, mieux utilisé.**
+On avait réinventé l'antipattern de 2015.
+
+**LIVRÉ.**
+- `settings.json` : **12 déclarations → 1** (sauvegarde `settings.json.bak-avant-n1-20260806`).
+- `emission-doublon.test.js` : 3 volets (émis∩file = ∅ · aucun doublon intra-geste · 6 gestes
+  successifs sans relivraison).
+- `doctor.js --settings` : **2 checks anti-retour** (UNE déclaration · aucun `--paquets N>1`),
+  rougissement PROUVÉ par sabotage sur copie. C'est le seul endroit possible : le câblage vit
+  HORS du repo, aucun test d'ici ne peut le voir.
+- Docs : `paquet-unique.md` (neuve) + `porte.md` et `budget.md` RÉÉCRITES (leurs lignes « déclarés
+  N fois » et « 12 × 7 658 = 91 896 c » étaient devenues fausses — réécrites, pas empilées).
+- Preuves : **1066 tests verts**, doctor **33 ok / 0 problème** sur le câblage réel.
+
+🛑 **NE JAMAIS rouvrir N>1, même sous un drapeau.** Le désordre et la course reviendraient avec, et
+un utilisateur ne peut pas consentir à un défaut qu'il ne découvrira que des semaines plus tard.
+
+⚠️ **DEUX LEÇONS DE MÉTHODE, à ne pas perdre.**
+① **1066 tests, mutation 100 %, doctor vert — et deux défauts visibles à l'œil nu.** Les tests
+prouvaient ce qu'on avait pensé à prouver. L'observation humaine reste le seul détecteur de ce
+qu'on n'a pas imaginé : quand le mainteneur dit « c'est bizarre », c'est une MESURE à instruire,
+jamais un ressenti à rassurer.
+② **J'ai commencé par sonder le binaire de Claude Code pour retrouver la limite de 10 000 c —
+qui est DOCUMENTÉE, et déjà écrite dans `budget.md`.** Doc-first violé une fois de plus (cf le
+🔴 OUVERT du 04/08). La doc injectable m'a rattrapé en vol.
