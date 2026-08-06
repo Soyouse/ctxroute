@@ -282,7 +282,20 @@ function run(data, emit, options) {
       const m = a.message(injected, { fullDoc, config, acc });
       if (m) msgs.push(m);
     }
-    emit(res.decision, fullDoc, msgs.join(' · '));
+    // ⚠️ SUFFIXE DE MORCEAUX — AJOUTÉ UNE SEULE FOIS, ICI (06/08/2026).
+    //    Il décrit la TRAME, pas une source : le calculer dans chaque
+    //    `message()` le dupliquerait 4 fois (jscpd) et le ferait diverger au
+    //    premier adaptateur ajouté. Le badge devient « 🧩 skill: ctxroute
+    //    (morceau 3/7) » au lieu de 7 lignes rigoureusement identiques.
+    // ⚠️ CONCATÉNÉ APRÈS le join, JAMAIS injecté dans `fullDoc` : c'est de la
+    //    description destinée à l'humain, elle ne consomme pas le budget et ne
+    //    peut donc RIEN évincer.
+    // ⚠️ SI TOUS LES MESSAGES SONT MUETS, LE SUFFIXE L'EST AUSSI : un badge
+    //    réduit à « (morceau 3/7) », sans dire de QUOI, serait plus inquiétant
+    //    que pas de badge — et `showNotification: false` doit rester un silence
+    //    TOTAL, jamais un silence partiel qui laisse fuiter un fragment.
+    const badge = msgs.join(' · ');
+    emit(res.decision, fullDoc, badge === '' ? '' : badge + budget.suffixeMorceaux(plan.emis));
   } catch {
     // fail-open : on RÉPOND « rien à injecter », on ne tue pas le processus.
   }

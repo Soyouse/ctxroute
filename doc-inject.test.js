@@ -501,3 +501,63 @@ test('NEGATIVE : une doc SANS enforce ne bloque JAMAIS (contrat de parité)', as
   const { stdout } = await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'enf3' });
   assert.strictEqual(parseOut(stdout).hookSpecificOutput.permissionDecision, 'allow');
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// LISIBILITÉ DU TRANSPORT — le badge dit « morceau j/m » (06/08/2026)
+// ═══════════════════════════════════════════════════════════════════════
+// 🛑 CE TEST EST UN ANTI-INERTE, PAS UN DOUBLON de budget.test.js. Les
+//    fonctions pures `partMorceau`/`suffixeMorceaux` peuvent être parfaites ET
+//    NON BRANCHÉES : seule la COQUILLE écrit `systemMessage`. Sans un spawn
+//    RÉEL, on aurait un badge muet avec 100 % de mutation — le « vert qui ne
+//    voit rien », le pire défaut du dépôt. Ne JAMAIS le remplacer par un test
+//    unitaire sur budget.js.
+// ⚠️ ORIGINE : un skill livré en 7 morceaux affichait SEPT badges identiques.
+//    Lu comme un emballement du framework alors que la livraison était normale.
+
+test('BADGE : une doc MORCELÉE annonce sa position — jamais N badges identiques', async () => {
+  // Budget volontairement petit pour FORCER le morcelage sur une trame unique.
+  // ⚠️ LA DOC DOIT DÉPASSER LE PLANCHER (8 000 c) — la coquille Claude Code ne
+  //    lit PAS `--budget` : ce drapeau n'existe que côté Codex et session, dont
+  //    les harnais DÉCLARENT une limite. Ici le budget vient du plancher
+  //    conservateur. Ma 1re version passait ce drapeau inexistant : le test
+  //    était VERT sur le mauvais chemin, exactement le défaut qu'il traque.
+  writeDoc('gros.md', '---\nmatch: server.js\nmode: dumb\n---\n' + 'L\n'.repeat(6000));
+  const { code, stdout } = await run(
+    { tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'badge1' },
+  );
+  assert.strictEqual(code, 0);
+  const out = parseOut(stdout);
+  assert.match(out.systemMessage, /^📄 doc: gros \(morceau 1\/\d+\)$/, 'le badge porte la position du morceau');
+  assert.ok(out.hookSpecificOutput.additionalContext.includes('MORCEAU 1/'), 'et le contenu est bien un morceau');
+});
+
+test('BADGE : une doc qui TIENT n a AUCUN suffixe (parité à l octet)', async () => {
+  // ⚠️ LE CAS NORMAL. Si ce test rougissait, tous les différentiels de parité
+  //    tomberaient avec lui : le badge d'une livraison entière ne doit RIEN
+  //    gagner. C'est la contrepartie obligatoire du test précédent.
+  writeDoc('petit.md', '---\nmatch: server.js\nmode: dumb\n---\ncontenu court\n');
+  const { stdout } = await run({ tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'badge2' });
+  assert.strictEqual(parseOut(stdout).systemMessage, '📄 doc: petit');
+});
+
+test('BADGE : le badge FICHIER ignore showNotification — y compris MORCELÉ (parité)', async () => {
+  // ⚠️ ASYMÉTRIE RÉELLE, VOLONTAIRE, ET QUI SURPREND : le badge FICHIER ne lit
+  //    PAS `showNotification` (parité protect-files, à l'octet), alors que ceux
+  //    de MCP et `tool` le respectent. Je l'ai découverte en écrivant ce test :
+  //    ma 1re version exigeait le silence et rougissait — j'ai failli
+  //    « harmoniser » les trois, c'est-à-dire changer une voie EN PRODUCTION
+  //    pour faire passer une attente que j'avais inventée.
+  // 🛑 Ce test ANCRE donc l'asymétrie au lieu de la corriger. Si un jour elle
+  //    doit tomber, ce sera une décision explicite, avec les différentiels
+  //    relancés — jamais l'effet de bord d'un test mal écrit.
+  // ⚠️ L'invariant « jamais un suffixe orphelin » vit, lui, dans porte-core.js
+  //    (badge vide ⇒ suffixe supprimé) et se prouve sur `suffixeMorceaux`.
+  fs.writeFileSync(CONFIG, JSON.stringify({ showNotification: false, mode: 'dumb' }));
+  writeDoc('gros.md', '---\nmatch: server.js\nmode: dumb\n---\n' + 'L\n'.repeat(6000));
+  const { stdout } = await run(
+    { tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'badge3' },
+  );
+  const out = parseOut(stdout);
+  assert.ok(out.hookSpecificOutput.additionalContext.includes('MORCEAU 1/'), 'la LIVRAISON continue');
+  assert.match(out.systemMessage, /^📄 doc: gros \(morceau 1\/\d+\)$/, 'badge fichier INCHANGÉ par showNotification (parité)');
+});

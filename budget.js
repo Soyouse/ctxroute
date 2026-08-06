@@ -420,7 +420,18 @@ function morceler(segments, capacite) {
     const m = tranches.length;
     tranches.forEach((t, j) => {
       morceaux.push({
-        id: s.id + '#' + (j + 1),
+        // ⚠️ L'id PORTE le `j/m`, il ne se contente pas du numéro (06/08/2026).
+        //    Le TOTAL n'existait NULLE PART ailleurs que dans le texte de
+        //    l'en-tête : le badge ne pouvait donc pas dire « morceau 3/7 », et
+        //    l'agent voyait 7 lignes identiques « 🧩 skill: ctxroute » sans
+        //    savoir que c'était UN document. C'est de la description, jamais de
+        //    la livraison — mais un transport qu'on ne peut pas LIRE se prend
+        //    pour une panne (rapporté par le mainteneur : « ça fait peur »).
+        // ⚠️ `baseId` coupe au PREMIER `#` : `doc#3/7` → `doc`, inchangé. Un
+        //    morceau re-morcelé (capacité abaissée entre deux gestes) donne
+        //    `doc#3/7#2/4` — la base reste `doc`, d'où la lecture du DERNIER
+        //    `#` dans `partMorceau`. Ne JAMAIS lire le premier.
+        id: s.id + '#' + (j + 1) + '/' + m,
         label: s.label,
         text: (avecEntete ? enTeteMorceau(s.label, j + 1, m) : '') + t,
       });
@@ -668,6 +679,63 @@ function baseId(id) {
 }
 
 /**
+ * `doc#3/7` → `{ j: 3, m: 7 }` · document entier → `null`.
+ *
+ * ⚠️ LIT LE DERNIER `#`, JAMAIS LE PREMIER — l'inverse de `baseId`, et c'est
+ *    VOULU : un morceau remis en file puis re-morcelé (capacité abaissée entre
+ *    deux gestes) porte `doc#3/7#2/4`. La BASE est au début, la POSITION à la
+ *    fin. Lire le premier `#` rendrait `3/7#2/4`, donc un NaN silencieux.
+ * ⚠️ TOTALE — rend `null` sur tout ce qui n'est pas un morceau (id sans `#`,
+ *    suffixe malformé, ancien format `doc#3` d'une file écrite AVANT le
+ *    06/08/2026 et relue après). Ce dernier cas est RÉEL : la file survit à un
+ *    redéploiement. Un badge muet est correct ; un badge qui affiche `3/NaN`
+ *    ferait douter de la livraison elle-même, alors qu'elle est intacte.
+ */
+function partMorceau(id) {
+  if (typeof id !== 'string') return null;
+  const i = id.lastIndexOf('#');
+  if (i === -1) return null;
+  const mm = /^(\d+)\/(\d+)$/.exec(id.slice(i + 1));
+  return mm ? { j: Number(mm[1]), m: Number(mm[2]) } : null;
+}
+
+/**
+ * Suffixe de badge annonçant que la trame porte des MORCEAUX : ` (morceau 3/7)`.
+ *
+ * ⚠️ POURQUOI CE SUFFIXE EXISTE (06/08/2026) : sans lui, un skill livré en 7
+ *    morceaux affichait SEPT lignes identiques « 🧩 skill: ctxroute ». Le
+ *    mainteneur l'a lu comme un emballement du framework — « ça fait peur » —
+ *    alors que c'était une livraison normale et unique. **Un transport correct
+ *    mais illisible se fait prendre pour une panne**, et un système qu'on croit
+ *    en panne finit débranché. La transparence n'est donc pas cosmétique.
+ * ⚠️ DESCRIPTION, JAMAIS LIVRAISON : ce suffixe ne peut RIEN évincer — il est
+ *    calculé APRÈS le découpage, sur ce qui est déjà retenu, et n'entre pas dans
+ *    le budget de la trame. Ne JAMAIS l'y faire entrer : ce serait rendre le
+ *    contenu otage de son propre commentaire (doctrine « livrer passe avant
+ *    décrire », déjà payée deux fois sur l'annonce et l'en-tête de morceau).
+ * ⚠️ UN SEUL par document (dédup par base, PREMIER morceau présent) : une trame
+ *    peut porter `doc#2/7` ET `doc#3/7`, ce qui afficherait deux fois le même
+ *    document. Plusieurs documents morcelés dans la même trame sont joints par
+ *    ` · `, le séparateur déjà utilisé pour les messages de sources.
+ * ⚠️ Rend `''` quand rien n'est morcelé — le cas NORMAL, donc badge INCHANGÉ à
+ *    l'octet. C'est ce qui garde la parité des différentiels.
+ */
+function suffixeMorceaux(emis) {
+  if (!Array.isArray(emis)) return '';
+  const vus = new Set();
+  const parts = [];
+  for (const id of emis) {
+    const p = partMorceau(id);
+    if (!p) continue;
+    const base = baseId(id);
+    if (vus.has(base)) continue;
+    vus.add(base);
+    parts.push(p.j + '/' + p.m);
+  }
+  return parts.length === 0 ? '' : ' (morceau ' + parts.join(' · ') + ')';
+}
+
+/**
  * ORDRE D'ÉMISSION — la file d'abord, le frais ensuite.
  *
  * ⚠️ CE N'EST PAS UNE PRÉFÉRENCE, C'EST LA CONDITION DU RECOLLAGE (RFC 6455) :
@@ -692,4 +760,4 @@ function ordonner(enAttente, frais) {
 //    travers `planifierPaquets` laissait ses frontières intestables : 6 mutants
 //    y survivaient le 03/08/2026 alors que tout le reste du module était à 100 %.
 //    Ce n'est PAS une extension d'API publique — aucune coquille ne l'appelle.
-module.exports = { planifier, planifierPaquets, capacitePaquet, morceler, baseId, ordonner, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };
+module.exports = { planifier, planifierPaquets, capacitePaquet, morceler, baseId, partMorceau, suffixeMorceaux, ordonner, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe };

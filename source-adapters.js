@@ -66,13 +66,39 @@ const fileAdapter = {
       acc.owner[m.doc] = this.id;
     }
   },
-  // '📄 doc: …' octet-identique à protect-files (label du fullDoc ENTIER —
-  // premier tag [source:] — parité avant justesse, cf gate.docLabel).
+  // '📄 doc: …' — la PARITÉ protect-files exige que ce badge IGNORE
+  // `showNotification`, contrairement à ceux de MCP et tool. Ne PAS
+  // « harmoniser » : ce serait changer une voie en production pour de
+  // l'esthétique. Le LABEL, lui, est partagé (cf labelDoc).
   message(injected, ctx) {
-    const label = gate.docLabel(ctx.fullDoc);
+    const label = labelDoc(injected, ctx);
     return label ? '📄 doc: ' + label : '';
   },
 };
+
+/**
+ * Nom court du document annoncé par le badge « 📄 doc: … ».
+ *
+ * ⚠️ DEUX SOURCES, DANS CET ORDRE, et ce n'est pas un détail (06/08/2026) :
+ *    ① le tag `[source: …]` du texte émis — c'est la PARITÉ protect-files, à
+ *       l'octet, et elle doit rester le chemin nominal ;
+ *    ② à défaut, le label que l'adaptateur a DÉJÀ posé dans `acc.labels`.
+ * ⚠️ ② N'EST PAS DÉCORATIF — BUG RÉEL : le tag `[source:]` vit à la FIN du
+ *    document, donc **aucun morceau sauf le dernier ne le porte**. Une doc
+ *    morcelée tombait alors sur le fallback « titre markdown » de `docLabel`,
+ *    qui attrapait le PIED DE SCEAU : le badge affichait
+ *    « 📄 doc: ##FIN:7426e64b### ». Corrigé des deux côtés (regex ATX conforme
+ *    CommonMark dans gate.js + ce repli), parce qu'une seule des deux
+ *    corrections laisserait soit un faux nom, soit AUCUN nom.
+ * 🛑 NE JAMAIS inverser l'ordre : lire `acc.labels` d'abord changerait le badge
+ *    du cas nominal et casserait les différentiels de parité.
+ */
+function labelDoc(injected, ctx) {
+  const parTag = gate.docLabel(ctx.fullDoc);
+  if (parTag) return parTag;
+  const brut = ctx.acc.labels[injected[0]];
+  return brut ? String(brut).split(/[\\/]/).pop().replace(/\.md$/, '') : '';
+}
 
 // ── SOURCE « MCP » : docs/mcp/ du repo, sélection pure sources/mcp.js ──
 const mcpAdapter = {
@@ -185,9 +211,11 @@ const toolAdapter = {
       /* fail-open LOCAL — une panne ici ne fait jamais taire les autres sources */
     }
   },
+  // Contrairement au badge FICHIER, celui-ci respecte `showNotification` —
+  // asymétrie héritée, volontaire, documentée. Label partagé (cf labelDoc).
   message(injected, ctx) {
     if (!lib.shouldShowNotification(ctx.config)) return '';
-    const label = gate.docLabel(ctx.fullDoc);
+    const label = labelDoc(injected, ctx);
     return label ? '📄 doc: ' + label : '';
   },
 };

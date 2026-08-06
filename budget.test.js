@@ -20,7 +20,7 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
-import { planifier, planifierPaquets, capacitePaquet, morceler, baseId, ordonner, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, capacitePaquet, morceler, baseId, partMorceau, suffixeMorceaux, ordonner, DEFAUT_BUDGET, TAILLE_MARQUEUR, empreinte, tailleEnveloppe } from './budget.js';
 
 // Fixtures = THUNKS (cf. perTest ci-dessus).
 const seg = (id, n, label) => ({ id, text: 'x'.repeat(n), label: label || id + '.md' });
@@ -278,7 +278,10 @@ test('SEGMENT GÉANT : MORCELÉ et LIVRÉ — l\'indélivrabilité est impossibl
   const p = planifierPaquets([seg('enorme', 5000), { id: 'petit', text: 'y'.repeat(100), label: 'petit.md' }], 1200, 9);
   const emis = p.flatMap((x) => x.emis);
   assert.deepStrictEqual(emis.filter((id) => id.startsWith('enorme')),
-    ['enorme#1', 'enorme#2', 'enorme#3', 'enorme#4', 'enorme#5', 'enorme#6', 'enorme#7'],
+    // ⚠️ `#j/m` et non `#j` (06/08/2026) : l'id porte le TOTAL, seul endroit où
+    //    il existe hors du texte de l'en-tête. C'est ce qui permet au badge de
+    //    dire « morceau 3/7 » au lieu de 7 lignes identiques.
+    ['enorme#1/7', 'enorme#2/7', 'enorme#3/7', 'enorme#4/7', 'enorme#5/7', 'enorme#6/7', 'enorme#7/7'],
     'le géant est découpé en 7 morceaux, TOUS livrés');
   assert.ok(emis.includes('petit'), 'et il ne stérilise aucun paquet');
   assert.deepStrictEqual(p.flatMap((x) => x.differes.map((d) => d.id)), [], 'RIEN de différé : tout est passé');
@@ -612,7 +615,7 @@ test('capacitePaquet : à la capacité EXACTE la doc reste entière, un caractè
   assert.ok(pile.some((p) => p.emis.includes('a')), 'à la capacité exacte : livrée ENTIÈRE, sans découpe');
   const trop = planifierPaquets([seg('a', cap + 1), seg('b', 5000)], 8000, 3);
   const emisA = trop.flatMap((p) => p.emis).filter((id) => id.startsWith('a'));
-  assert.deepStrictEqual(emisA, ['a#1', 'a#2'], 'un caractère de plus ⇒ découpée en 2, et LIVRÉE');
+  assert.deepStrictEqual(emisA, ['a#1/2', 'a#2/2'], 'un caractère de plus ⇒ découpée en 2, et LIVRÉE');
 });
 
 test('LIGNE MONSTRE : une seule ligne plus longue qu\'une trame est débitée', () => {
@@ -875,4 +878,80 @@ test('BUDGET : -Infinity et NaN retombent sur le PLANCHER (jamais un infini devi
   const seg = () => [{ id: 'a', text: 'A'.repeat(20000), label: 'a' }];
   assert.ok(planifierPaquets(seg(), -Infinity, 1)[0].differes.length > 0);
   assert.ok(planifierPaquets(seg(), NaN, 1)[0].differes.length > 0);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LISIBILITÉ DU TRANSPORT — `partMorceau` / `suffixeMorceaux` (06/08/2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// ⚠️ POURQUOI CES TESTS EXISTENT : un skill livré en 7 morceaux affichait SEPT
+//    badges rigoureusement identiques. Le mainteneur l'a lu comme un
+//    emballement du framework — « ça fait peur » — alors que la livraison était
+//    normale et unique. Un transport correct mais ILLISIBLE se fait prendre
+//    pour une panne, et un système qu'on croit en panne finit débranché.
+//    La transparence du badge n'est donc pas cosmétique : c'est ce qui empêche
+//    de « réparer » un moteur qui n'a rien.
+
+test('partMorceau: `doc#3/7` rend la position ET le total', () => {
+  assert.deepStrictEqual(partMorceau('doc#3/7'), { j: 3, m: 7 });
+});
+
+test('partMorceau: document ENTIER (aucun `#`) → null, jamais un faux morceau', () => {
+  assert.strictEqual(partMorceau('doc'), null);
+});
+
+test('partMorceau: lit le DERNIER `#` — un morceau RE-MORCELÉ garde sa position réelle', () => {
+  // Cas RÉEL : capacité abaissée entre deux gestes ⇒ un morceau de la file est
+  // redécoupé et porte `doc#3/7#2/4`. Lire le PREMIER `#` rendrait `3/7#2/4`,
+  // donc un NaN silencieux dans le badge. La base, elle, reste `doc`.
+  assert.deepStrictEqual(partMorceau('doc#3/7#2/4'), { j: 2, m: 4 });
+  assert.strictEqual(baseId('doc#3/7#2/4'), 'doc');
+});
+
+test('partMorceau: ANCIEN format `doc#3` (file écrite avant le 06/08/2026) → null', () => {
+  // La file SURVIT à un redéploiement : un id de l'ancien format sera relu par
+  // le nouveau code. Badge muet = correct ; `3/NaN` ferait douter d'une
+  // livraison pourtant intacte.
+  assert.strictEqual(partMorceau('doc#3'), null);
+});
+
+test('partMorceau: un id SANS `#` qui RESSEMBLE à une position → null', () => {
+  // ⚠️ C'EST CE CAS QUI REND LA GARDE `i === -1` NÉCESSAIRE, et Stryker l'a
+  //    prouvé : sans elle, `slice(0)` rend l'id ENTIER et la regex accepterait
+  //    `1/2` — un document nommé ainsi serait annoncé « morceau 1/2 » alors
+  //    qu'il est livré INTÉGRALEMENT. Un badge qui invente un fractionnement
+  //    est pire que pas de badge : il ferait chercher des morceaux inexistants.
+  assert.strictEqual(partMorceau('1/2'), null);
+});
+
+test('partMorceau: TOTALE — ne jette sur aucune entrée (chemin fail-open)', () => {
+  for (const x of [undefined, null, 42, {}, [], 'doc#', 'doc#a/b', 'doc#1/', 'doc#/2']) {
+    assert.strictEqual(partMorceau(x), null, 'entrée ' + JSON.stringify(x));
+  }
+});
+
+test('suffixeMorceaux: rien de morcelé → chaîne VIDE (badge inchangé à l octet)', () => {
+  // C'est le cas NORMAL et c'est ce qui garde la parité des différentiels.
+  assert.strictEqual(suffixeMorceaux(['a', 'b']), '');
+});
+
+test('suffixeMorceaux: un document morcelé → ` (morceau 3/7)`', () => {
+  assert.strictEqual(suffixeMorceaux(['skill/ctxroute#3/7']), ' (morceau 3/7)');
+});
+
+test('suffixeMorceaux: DEUX morceaux du MÊME document → cité UNE fois', () => {
+  // Une trame peut porter `doc#2/7` ET `doc#3/7` : sans dédup par base, le
+  // badge afficherait deux fois le même document.
+  assert.strictEqual(suffixeMorceaux(['d#2/7', 'd#3/7']), ' (morceau 2/7)');
+});
+
+test('suffixeMorceaux: deux documents DIFFÉRENTS morcelés → joints par ` · `', () => {
+  assert.strictEqual(suffixeMorceaux(['a#1/2', 'b#4/9']), ' (morceau 1/2 · 4/9)');
+});
+
+test('suffixeMorceaux: mélange entier + morcelé → seul le morcelé est annoncé', () => {
+  assert.strictEqual(suffixeMorceaux(['entier', 'a#1/3']), ' (morceau 1/3)');
+});
+
+test('suffixeMorceaux: TOTALE — entrée non-tableau → chaîne vide, jamais un jet', () => {
+  for (const x of [undefined, null, 'a#1/2', 42]) assert.strictEqual(suffixeMorceaux(x), '');
 });

@@ -1978,3 +1978,37 @@ Preuves : 866 tests · doctor VERT sur les deux harnais · couplage vert (47 mod
 injection réelle re-prouvée par spawn (positif 3 428 c. / négatif silencieux).
 ⚠️ Il ne reste `mcp-doc` NULLE PART, sauf les deux mentions HISTORIQUES de ce document et le
 worktree périmé `mcp-doc-hooks-paquets`.
+
+## ㉓ LISIBILITÉ DU TRANSPORT — le badge dit « morceau j/m » (06/08/2026, LIVRÉ)
+
+**Déclencheur** : le mainteneur voit SEPT lignes `🧩 skill: ctxroute` identiques sur un
+seul geste et demande « ça fait peur, c'est normal ? ». La livraison était parfaitement
+normale — un skill de ~76 Ko découpé en 7 morceaux — mais **rien dans le badge ne le
+disait**. Verdict : un transport correct mais ILLISIBLE se fait prendre pour une panne,
+et un système qu'on croit en panne finit débranché. La transparence n'est pas cosmétique.
+
+**Livré** : l'id d'un morceau porte désormais `#j/m` (le TOTAL n'existait nulle part hors
+du texte de l'en-tête) ; `partMorceau` + `suffixeMorceaux` (purs, mutés 100 %) ; suffixe
+composé UNE fois dans `porte-core.js`. Badge : `📄 doc: gros (morceau 1/2)`.
+
+**BUG PRÉEXISTANT TROUVÉ PAR LE TEST ANTI-INERTE** — et c'est lui le vrai gain : le tag
+`[source:]` vit à la FIN d'un document, donc **aucun morceau sauf le dernier ne le porte**.
+`docLabel` retombait alors sur son fallback « titre markdown », dont la regex acceptait un
+`#` collé au texte, et attrapait le PIED DE SCEAU : le badge d'une doc morcelée affichait
+`📄 doc: ##FIN:7426e64b###`. Corrigé des DEUX côtés (regex ATX conforme CommonMark +
+repli sur `acc.labels`) — l'un sans l'autre laisse soit un faux nom, soit aucun nom.
+
+**Deux erreurs de MA part, écrites ici pour mes successeurs** :
+- j'ai d'abord testé avec `--budget 900` sur la coquille Claude Code, **qui ne lit pas ce
+  drapeau** (il n'existe que côté Codex/session) : le test était vert sur le mauvais
+  chemin, exactement le défaut qu'il traquait ;
+- j'ai failli « harmoniser » les trois `message()` alors que le badge FICHIER ignore
+  VOLONTAIREMENT `showNotification` (parité protect-files). Un test mal écrit a bien
+  failli changer une voie EN PRODUCTION. Le test ANCRE désormais l'asymétrie.
+
+**Incident** : une édition intermédiaire a laissé `message: messageDoc` avec la fonction
+pas encore écrite ⇒ les 12 hooks ont crié pendant ~2 min. **Fail-open confirmé en réel** :
+aucun geste bloqué, rien de corrompu, injection rétablie et prouvée par le doctor.
+
+**Preuves** : 1034 tests · mutation 100,00 % (0 survivant) · les 2 différentiels de parité
+verts · dependency-cruiser 0 violation · jscpd 0,55 % · doctor 14/14.

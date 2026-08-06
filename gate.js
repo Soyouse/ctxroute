@@ -281,7 +281,19 @@ function docLabel(doc) {
   const s = String(doc);
   const src = s.match(/\[source:\s*([^\]]+)\]/);
   if (src) return src[1].split(/[\\/]/).pop().replace(/\.md$/, '');
-  const title = s.match(/^#\s*(.+)$/m);
+  // ⚠️ ESPACE OBLIGATOIRE APRÈS LES `#` — BUG RÉEL corrigé le 06/08/2026.
+  //    L'ancienne forme `^#\s*(.+)$` acceptait `#` collé au texte, donc elle
+  //    prenait le PIED DE SCEAU `###FIN:7426e64b###` pour un titre : le badge
+  //    d'une doc morcelée affichait « 📄 doc: ##FIN:7426e64b### » au lieu du
+  //    nom du document. Le premier morceau ne porte pas le tag `[source:]`
+  //    (il vit à la FIN du document), donc ce fallback était atteint pour de
+  //    vrai — ce n'était pas un cas théorique.
+  // ⚠️ CONFORME À COMMONMARK, ce n'est pas un choix maison : « the opening
+  //    sequence of # characters must be followed by spaces or tabs, or by the
+  //    end of line ». `###FIN:xxx###` n'est donc PAS un titre ATX. Ne JAMAIS
+  //    relâcher cette regex pour « attraper plus de titres » : elle
+  //    attraperait à nouveau nos propres marqueurs de transport.
+  const title = s.match(/^#{1,6}[ \t]+(.+)$/m);
   return title ? title[1].slice(0, 40) : '';
 }
 
