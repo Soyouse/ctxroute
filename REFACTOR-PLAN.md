@@ -845,7 +845,19 @@ sessions et un audit). **Gate posé** : tout bloc ```json du README est confront
 clé (1er niveau, `servers.*`, `defaults.*`), + negative-check sur l'exemple exact qui a menti.
 README corrigé ET complété (cascade 4 étages, `defaults`, `note`).
 
-### ② `note: |` perd les lignes suivantes EN SILENCE — 🔴 PIÈGE OUVERT, garde RETIRÉE
+### ② `note: |` perdait les lignes suivantes EN SILENCE — ✅ FERMÉ le 06/08/2026
+> **RÉÉCRIT, pas empilé** (règle de ce document) : ce paragraphe a décrit un piège
+> OUVERT du 05/08 au 06/08. Il est désormais **fermé**, et le texte ci-dessous
+> reste parce qu'il porte la LEÇON DE COUCHE, qui elle ne périme pas.
+> **FIX** : `parse()` comprend les blocs YAML (`|` littéral, `>` replié,
+> désindentation sur le minimum, chomping clip). **AUCUNE exception par clé** —
+> la règle est « `|`/`>` SUIVI d'une ligne INDENTÉE », donc valable partout ; une
+> exception sur `note` aurait laissé le piège armé pour la clé suivante.
+> **La prédiction du paragraphe ci-dessous était JUSTE** : le fix appartenait bien
+> à `parse()`, seule couche qui voit encore la ligne suivante et lève l'ambiguïté
+> avec `match: "|"`. Mutation ramenée à 100 % dont **5 mutants ÉLIMINÉS PAR
+> CONSTRUCTION** (garde `typeof` inobservable, branche `indents` inatteignable,
+> boucle indexée → consommée, condition absorbée par le `trimEnd`).
 Trouvé par **simulation adversariale** :
 ```yaml
 note: |
@@ -1857,7 +1869,20 @@ Pistes non tranchées : budget par tour plus élevé · priorité (un `🛑` pas
 confort) · **scinder plus agressivement** (le format « <10 lignes » n'est PAS tenu par tout le
 corpus — plusieurs docs du parc font 20-30 lignes) · évincer d'abord les `once` déjà consommés.
 
-### ② AUCUNE DÉFENSE CONTRE UNE DOC QUI MENT — le plus grave
+### ② UNE DOC QUI MENT — 🟠 PART DÉCIDABLE FERMÉE le 06/08/2026, le reste OUVERT
+> **RÉÉCRIT** : ce paragraphe disait « AUCUNE défense ». C'est devenu FAUX, mais
+> le remplacer par « fermé » serait tout aussi faux — d'où l'état exact ci-dessous.
+> ✅ **LIVRÉ** : `doc-drift-gate.test.js` — toute doc du framework qui cite un
+> fichier `.js` doit prouver qu'il EXISTE (repo · `sources/` · parc). Ferme la
+> classe qui arrive MÉCANIQUEMENT : le renommage, que personne ne voit parce
+> qu'il ne touche pas les docs qui parlent du fichier renommé. Mesure d'abord :
+> 32 docs, 936 littéraux, 64 fichiers, **0 introuvable** (sans la racine parc,
+> 8 faux rouges). Rougissement prouvé par sabotage temporaire.
+> 🛑 **CE QUI RESTE OUVERT, et ce n'est pas un détail** : un gate ne prouvera
+> JAMAIS qu'une doc dit VRAI. Les 3 docs de l'incident du 03/08 citaient des
+> littéraux qui EXISTAIENT (`stdio:'ignore'`, `ONSTART`) — elles auraient passé
+> ce gate. La piste restante (valeur d'un littéral confrontée au code) n'est
+> PAS décidable en général : ne pas la promettre, ne pas la bricoler.
 Le 03/08, **TROIS docs enseignaient l'INVERSE du code** : `pw-mcp-child-guard.md` imposait le
 `stdio:'ignore'` qui ÉTAIT le défaut à corriger · `pw-mcp-transports.md` affirmait « pas conforme
 au 404 » deux heures après la mise en conformité · `pw-mcp-concierge.md` décrivait `ONSTART`,
