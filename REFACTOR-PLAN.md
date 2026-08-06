@@ -1782,7 +1782,13 @@ Contrat = skill §« Porter le framework sur un NOUVEAU HARNAIS » (moteur INTOU
 - [x] Phase 3 — FAIT 19/07/2026, câblé + PROUVÉ END-TO-END dans un run Codex VIVANT (`codex exec --dangerously-bypass-hook-trust` : doc porte.md retrouvée dans le transcript du run). **Faits de TERRAIN (contre la doc)** : ① Codex 0.144 IGNORE `~/.codex/hooks.json` quand config.toml existe → câblage = `config.toml` [[hooks.*]] UNIQUEMENT (hooks.json renommé .ignored-by-codex-0144.bak) ; ② payload hook réel : `tool_name: "Bash"` MÊME quand le function_call du modèle s'appelle shell_command → le Bash-scan du moteur marche tel quel ; ③ pas d'agent_id (confirmé live). protect-files retiré du câblage même geste ; doctor --codex-hooks config.toml = 37/37 ; doctor auto à chaque SessionStart Codex. TRUST RÉSOLU 0-HUMAN (19/07/2026 soir) : câblage déplacé en politique machine `C:\ProgramData\OpenAI\Codex\requirements.toml` (hooks MANAGÉS, doc officielle : « trusted by policy ») — PROUVÉ par run `codex exec` SANS bypass (PreToolUse/PostToolUse exécutés + doc dans le transcript). Aucun /hooks requis, ni pour le mainteneur ni pour le cousin (Phase 4 : poser le même requirements.toml chez lui). Piège annexe corrigé : config.toml avait 9 clés mcp_servers DUPLIQUÉES (manuel vs bloc sync) = Codex REFUSAIT de démarrer ; + model gpt-5-codex MORT avec compte ChatGPT (à changer, cf modèles cache gpt-5.5/5.6).
 - [ ] Phase 4 — distribution cousin : repo de parc en git pull (JAMAIS de copie manuelle) + doctor comme gate d'installation sur sa machine. ACCÈS GITHUB POSÉ 19/07/2026 : l'associé invité en READ ONLY sur Soyouse/ctxroute — il FORK et propose des PR, SEUL le propriétaire merge (master intouchable par construction ; branch protection impossible en privé gratuit — GitHub Pro si un jour accès write direct voulu)
 
-## 20/07/2026 — 🔴 BACKLOG : INJECTION TRONQUÉE EN SILENCE (défaut VÉCU, prioritaire)
+## 20/07/2026 — ✅ FERMÉ : INJECTION TRONQUÉE EN SILENCE (défaut VÉCU — cause SUPPRIMÉE)
+
+> ✅ **FERMÉ. Statut corrigé le 06/08/2026** — l'en-tête est resté `🔴 prioritaire` pendant deux
+> semaines APRÈS la résolution. La cause n'existe plus : le transport multi-trames (03/08) morcelle
+> ce qui déborde, la FILE (05/08) garde le surplus au lieu de le jeter, et le SCEAU rend une
+> troncature du harnais BRUYANTE au lieu de silencieuse. L'indélivrabilité est impossible par
+> construction. Le récit ci-dessous est conservé pour la classe d'erreur — pas comme un chantier.
 
 **Classe d'erreur** : le hook a fonctionné, le marqueur était vert, **et le contenu n'est pas arrivé**.
 Vécu deux fois dans une même session, sur deux repos différents.
@@ -1853,7 +1859,12 @@ n'a pas lieu du tout. Prévention > runbook. Aucune modification du moteur n'ét
 
 ---
 
-## 🔴 DEUX DÉFAUTS DU MOTEUR, OBSERVÉS EN USAGE RÉEL (session pw-mcp-proxy, 03/08/2026)
+## 🟠 DEUX DÉFAUTS DU MOTEUR — ① FERMÉ, ② à moitié (session pw-mcp-proxy, 03/08/2026)
+
+> Statut de l'en-tête corrigé le 06/08/2026 : il annonçait `🔴 DEUX DÉFAUTS` alors que ① est
+> ✅ RÉSOLU depuis le 03/08 et que la part DÉCIDABLE de ② est fermée depuis le 06/08. Reste
+> ouverte la seule part INDÉCIDABLE de ② : « une doc dit VRAI » ne se prouve pas mécaniquement
+> (`doc-drift-gate` ne vérifie que l'EXISTENCE des fichiers cités).
 
 ### ① ✅ RÉSOLU (03/08/2026) — ÉVICTION : il déclarait une doc OBLIGATOIRE puis ne la livrait pas
 
