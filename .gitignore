@@ -1,6 +1,15 @@
 state/
-docs/mcp/*.md
-!docs/mcp/*.md.example
+# ⚠️ `**` OBLIGATOIRE — TROU DE FUITE trouvé le 06/08/2026 sur un repo PUBLIC.
+#    `docs/mcp/*.md` ne couvrait QUE le niveau 1 (serveur). Les niveaux 2 et 3
+#    — `docs/mcp/{server}/{tool}.md`, `{subTool}.md` — n'étaient PAS ignorés,
+#    alors que ce sont les docs les plus SPÉCIFIQUES, donc les plus susceptibles
+#    de nommer un client, un montant, un identifiant. Le trou dormait depuis la
+#    création de la granularité 3 niveaux : personne n'avait encore écrit de doc
+#    de niveau 2. Une classe d'erreur dormante n'est pas une classe absente.
+#    Scellé par `gitignore-gate.test.js` (règle testée sur chemins FICTIFS, donc
+#    valable sur un clone vierge) — rougissement prouvé par sabotage réel.
+docs/mcp/**/*.md
+!docs/mcp/**/*.md.example
 docs/session/*.md
 !docs/session/*.md.example
 node_modules/
