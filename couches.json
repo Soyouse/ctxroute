@@ -1,33 +1,45 @@
 {
   "_pourquoi": "MANIFESTE DES COUCHES — le tableau CAPACITÉS × COUCHES (06/08/2026). Trois défauts en trois jours étaient trois cases de ce tableau : le transport orchestré dans un seul émetteur (⑯), `process.exit` dans deux cœurs partagés (⑯bis), `console.log` dans guard-core (3e instance, trouvée par le scan AST et non à l'oeil). Ce ne sont pas trois découvertes : ce sont trois cases jamais remplies. Une fois le tableau écrit, il n'y a plus de classe de bug d'architecture à découvrir — il n'y a que des cases.",
-
   "_lire_avant_de_modifier": "🛑 ÉLARGIR CE TABLEAU EST PRESQUE TOUJOURS LA MAUVAISE RÉPONSE. Un gate rouge veut dire que le FICHIER est dans la mauvaise couche, ou qu'il fait un travail qui ne lui appartient pas. Ajouter une capacité pour faire taire le rouge désarme le garde-fou en silence — et personne ne le verra jamais. Si tu crois vraiment devoir élargir : la justification est OBLIGATOIRE (`justifications`), et le volet inverse du gate rougit dès qu'elle devient périmée.",
-
   "_ce_que_ce_manifeste_ne_couvre_pas": "Les IMPORTS (fs, path, child_process, modules de harnais) ne sont PAS ici : c'est le travail de dependency-cruiser, déjà en place (`lib-pure-must-stay-pure`, `sources-must-not-know-the-harness`). Ne JAMAIS dupliquer ces règles ici — deux outils pour un même invariant divergent. Ici : uniquement ce qu'un graphe de dépendances NE PEUT PAS voir, c'est-à-dire les GLOBALS et la syntaxe.",
-
   "capacites": {
     "exit": {
       "pattern": "process.exit($$$)",
       "libelle": "tuer le processus",
-      "pourquoi": "Le cycle de vie appartient à la COQUILLE — seule à connaître le harnais et son contrat de sortie. Un coeur qui meurt est intestable et inappelable depuis un autre contexte."
+      "pourquoi": "Le cycle de vie appartient à la COQUILLE — seule à connaître le harnais et son contrat de sortie. Un coeur qui meurt est intestable et inappelable depuis un autre contexte.",
+      "temoin": "process.exit(0);"
     },
     "stdout": {
       "pattern": "console.log($$$)",
       "libelle": "écrire la sortie",
-      "pourquoi": "Sérialiser la réponse appartient à la COQUILLE (motif des frameworks web : un handler ne sérialise jamais). Un coeur REND un verdict."
+      "pourquoi": "Sérialiser la réponse appartient à la COQUILLE (motif des frameworks web : un handler ne sérialise jamais). Un coeur REND un verdict.",
+      "temoin": "console.log('x');"
     },
     "env": {
       "pattern": "process.env",
       "libelle": "lire l'environnement",
-      "pourquoi": "Un module PUR doit rendre le même résultat pour les mêmes entrées. Lire l'environnement le rend non-déterministe, donc non mutable proprement par Stryker."
+      "pourquoi": "Un module PUR doit rendre le même résultat pour les mêmes entrées. Lire l'environnement le rend non-déterministe, donc non mutable proprement par Stryker.",
+      "temoin": "const v = process.env.CTXROUTE_X;"
     },
     "argv": {
       "pattern": "process.argv",
       "libelle": "lire les arguments",
-      "pourquoi": "Les arguments sont le CÂBLAGE, donc du dialecte d'appelant. Un coeur les reçoit en paramètre, il ne les lit jamais."
+      "pourquoi": "Les arguments sont le CÂBLAGE, donc du dialecte d'appelant. Un coeur les reçoit en paramètre, il ne les lit jamais.",
+      "temoin": "const a = process.argv;"
+    },
+    "shell": {
+      "_pourquoi_une_REGLE_et_pas_un_motif": "MESURÉ le 06/08/2026 : le motif `{ shell: true }` ne trouve QUE l'objet à UNE seule propriété. Le cas RÉEL — `{ encoding: 'utf8', shell: true, maxBuffer: N }` — n'était PAS détecté, et `$$$` ne le rattrape pas. Une règle `kind: pair` attrape les 3 formes (multi-propriétés, mono-propriété, affectation) et ignore la CHAÎNE 'shell: true'. 🛑 Ne JAMAIS revenir à un motif ici : ce serait une règle INERTE, verte en étant aveugle — exactement ce que ce gate existe pour rendre impossible.",
+      "regle": [
+        "kind: pair",
+        "all:",
+        "  - has: { field: key, regex: \"^shell$\" }",
+        "  - has: { field: value, regex: \"^true$\" }"
+      ],
+      "libelle": "faire interpréter la commande par un shell",
+      "pourquoi": "INTERDIT À TOUTES LES COUCHES, coquilles comprises. `shell: true` fait passer la commande par l'interpréteur DU SYSTÈME : `cmd` sous Windows, `/bin/sh` sous Linux et macOS. Le même code se comporte donc différemment selon la machine. VÉCU le 06/08/2026 : `process.exit($$$)` passé à `/bin/sh` = `Syntax error: \"(\" unexpected` — vert en local, ROUGE en CI, et surtout SCAN VIDE, donc un gate aveugle qui serait passé au vert. Remède : appeler le binaire EN DIRECT (`node_modules/.../ast-grep`), jamais via un shell ni via `npx`.",
+      "temoin": "execFileSync('a', [], { encoding: 'utf8', shell: true, maxBuffer: 1 });"
     }
   },
-
   "couches": [
     {
       "nom": "noyau-pur",
@@ -38,16 +50,25 @@
     {
       "nom": "coeur-partage",
       "quoi": "Orchestre, partagé par tous les harnais. I/O autorisée, mais aucun dialecte ni cycle de vie.",
-      "fichiers": ["*-core.js"],
+      "fichiers": [
+        "*-core.js"
+      ],
       "autorise": []
     },
     {
       "nom": "coquille",
       "quoi": "Parle le dialecte d'UN harnais, ou est un outil en ligne de commande. C'est ici — et NULLE PART ailleurs — que vivent la sortie et la mort du processus.",
-      "fichiers": ["*"],
-      "autorise": ["exit", "stdout", "env", "argv"]
+      "fichiers": [
+        "*"
+      ],
+      "autorise": [
+        "exit",
+        "stdout",
+        "env",
+        "argv"
+      ]
     }
   ],
-
-  "justifications": {}
+  "justifications": {},
+  "_doc_temoin": "⚠️ `temoin` = UNE LIGNE DE CODE RÉELLE que la capacité DOIT détecter. Le gate l'écrit dans un fichier temporaire et exige qu'elle soit trouvée. C'est ce qui rend une règle INERTE impossible — le défaut le plus dangereux du dépôt (un gate vert parce qu'il ne voit rien). Mesuré le 06/08/2026 : le motif `{ shell: true }` ne trouvait PAS `{ encoding: 'utf8', shell: true, maxBuffer: N }`, la forme qui avait justement causé la CI rouge. Le témoin DOIT donc être la forme RÉELLE rencontrée, jamais un cas d'école simplifié. 🛑 Toute capacité AJOUTÉE sans témoin est refusée par le gate."
 }

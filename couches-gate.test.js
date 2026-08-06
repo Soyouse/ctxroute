@@ -42,6 +42,7 @@
 import { test } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import assert from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -105,14 +106,43 @@ function binaireAstGrep() {
   return bin;
 }
 
-function occurrences(pattern) {
+// ⚠️ DEUX FORMES, ET LE CHOIX N'EST PAS COSMÉTIQUE (mesuré le 06/08/2026) :
+//    · `pattern` — suffit pour une expression (`process.exit($$$)`).
+//    · `regle` — OBLIGATOIRE dès qu'on vise une PROPRIÉTÉ d'objet. Le motif
+//      `{ shell: true }` ne trouve QUE l'objet à une seule propriété : le cas
+//      réel `{ encoding: 'utf8', shell: true, maxBuffer: N }` lui échappe, et
+//      `$$$` ne le rattrape pas. Une règle `kind: pair` attrape les 3 formes.
+//    🛑 Un motif là où il faut une règle = une règle INERTE, verte en étant
+//       aveugle. C'est précisément ce que ce gate existe pour rendre impossible
+//       — d'où la VÉRIFICATION par sabotage plus bas, sur chaque capacité.
+function argumentsScan(def, cible) {
+  const base = def.pattern
+    ? ['run', '--pattern', def.pattern, '--lang', 'js', '--json=compact']
+    : ['scan', '--inline-rules',
+        ['id: couche-capacite', 'language: JavaScript', 'severity: error', 'rule:']
+          .concat(def.regle.map((l) => '  ' + l)).join('\n'),
+        '--json=compact'];
+  return cible ? base.concat([cible]) : base;
+}
+
+/**
+ * @param {object} def  capacité (pattern OU regle)
+ * @param {string} [cible]  chemin ABSOLU à scanner ; absent ⇒ tout le dépôt.
+ *
+ * ⚠️ `ast-grep` RESPECTE `.gitignore` (mesuré le 06/08/2026, 3e aveuglement de
+ *    la journée). Les témoins écrits dans `state/` — ignoré — étaient donc
+ *    INVISIBLES, et le test anti-inerte accusait à tort les 5 capacités. Ils
+ *    vivent maintenant dans le tmpdir de l'OS, hors de toute portée de
+ *    `.gitignore`. 🛑 Conséquence à retenir : si quelqu'un gitignore un jour un
+ *    dossier de SOURCES, ce gate deviendrait aveugle dessus SANS RIEN DIRE.
+ *    C'est le volet « existence » qui l'attraperait — ne jamais le retirer.
+ */
+function occurrences(def, cible) {
   let out = '';
   try {
-    out = execFileSync(
-      binaireAstGrep(),
-      ['run', '--pattern', pattern, '--lang', 'js', '--json=compact'],
-      { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
-    );
+    out = execFileSync(binaireAstGrep(), argumentsScan(def, cible), {
+      cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
+    });
   } catch (e) {
     out = (e && e.stdout) || '';
   }
@@ -121,6 +151,8 @@ function occurrences(pattern) {
   const rels = [];
   for (const m of r) {
     let rel = String(m.file).split(SEP).join('/');
+    // Cible explicite (témoin hors dépôt) : on rend le chemin tel quel.
+    if (cible) { rels.push(rel); continue; }
     if (rel.startsWith(repo.split(SEP).join('/'))) rel = rel.slice(repo.length + 1);
     if (pertinent(rel)) rels.push(rel);
   }
@@ -131,7 +163,7 @@ test('GATE : aucune couche n exerce une capacité qu elle n a pas', () => {
   const purs = noyauPur();
   const fautes = [];
   for (const [cap, def] of Object.entries(manifeste.capacites)) {
-    for (const rel of occurrences(def.pattern)) {
+    for (const rel of occurrences(def)) {
       const couche = coucheDe(rel, purs);
       if (autorisees(couche).has(cap)) continue;
       if (manifeste.justifications[rel + '/' + cap]) continue;
@@ -147,11 +179,55 @@ test('GATE : aucune couche n exerce une capacité qu elle n a pas', () => {
   );
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// ⚠️ LA GARANTIE QUI TIENT TOUT LE RESTE : AUCUNE RÈGLE NE PEUT ÊTRE INERTE
+// ═══════════════════════════════════════════════════════════════════════
+// Le défaut le plus DANGEREUX de ce dépôt n'est pas un gate rouge, c'est un
+// gate VERT QUI NE VOIT RIEN. Il est arrivé deux fois le 06/08/2026 :
+//   ① `shell: true` faisait rendre un scan VIDE sous `/bin/sh` (CI rouge) ;
+//   ② le motif `{ shell: true }` ne trouvait PAS `{ encoding, shell: true, … }`,
+//      c'est-à-dire la forme EXACTE qui venait de causer ①.
+// Dans les deux cas, la règle « existait » et ne protégeait RIEN.
+// ⇒ CHAQUE capacité porte un TÉMOIN : une ligne de code réelle qu'elle DOIT
+//   détecter. On l'écrit sur disque, on scanne, on exige la détection.
+// ⚠️ DÉRIVÉ du manifeste : une capacité AJOUTÉE demain est couverte le jour où
+//   elle est écrite, sans que personne pense à rien. C'est la seule forme qui
+//   tienne dans un dépôt écrit par des agents et relu par personne.
+// ⚠️ Le témoin DOIT être la forme RÉELLE rencontrée, jamais un cas d'école
+//   simplifié — sinon il prouve la détection d'un cas qui n'arrive pas.
+test('ANTI-INERTE : chaque capacité DÉTECTE réellement son témoin', () => {
+  // ⚠️ HORS DU DÉPÔT, et ce n'est pas un détail : `ast-grep` respecte
+  //    `.gitignore`. Écrits dans `state/` (ignoré), les témoins étaient
+  //    INVISIBLES et ce test accusait les 5 capacités d'être inertes alors
+  //    qu'elles fonctionnaient. Le tmpdir de l'OS échappe à toute règle
+  //    d'ignore — et ne pollue pas l'arbre de travail.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-temoins-'));
+  const aveugles = [];
+  const sansTemoin = [];
+  try {
+    for (const [cap, def] of Object.entries(manifeste.capacites)) {
+      if (typeof def.temoin !== 'string' || def.temoin === '') { sansTemoin.push(cap); continue; }
+      const tmp = path.join(dir, 'temoin-' + cap + '.js');
+      fs.writeFileSync(tmp, def.temoin + '\n');
+      const vu = occurrences(def, tmp).length > 0;
+      if (!vu) aveugles.push(cap + ' — témoin NON détecté : ' + def.temoin);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  assert.deepStrictEqual(sansTemoin, [], 'Capacité(s) SANS témoin — impossible de prouver qu elles voient quoi que ce soit : ' + sansTemoin.join(', '));
+  assert.deepStrictEqual(
+    aveugles, [],
+    'RÈGLE(S) INERTE(S) — elles passent au vert en ne voyant RIEN :\n  ' + aveugles.join('\n  ')
+      + '\n⇒ un `pattern` ne suffit pas pour une PROPRIÉTÉ d objet : passer à `regle` (kind: pair).'
+  );
+});
+
 test('GATE (existence) : le scan voit bien du code', () => {
   // ⚠️ Un gate qui n'analyse RIEN passe au vert : c'est le pire des deux mondes.
   //    Vécu avec les règles `*-must-stay-pure`, inertes pendant des mois.
   //    `process.exit` existe forcément — toutes les coquilles en ont une.
-  assert.ok(occurrences('process.exit($$$)').length >= 5,
+  assert.ok(occurrences({ pattern: 'process.exit($$$)' }).length >= 5,
     'scan suspect : ast-grep ne trouve presque rien, le GATE est cassé (pas le dépôt)');
 });
 
@@ -167,7 +243,7 @@ test('GATE (volet inverse) : une justification périmée rougit', () => {
     const def = manifeste.capacites[cap];
     if (!def) { mortes.push(cle + ' (capacité inconnue)'); continue; }
     if (autorisees(coucheDe(rel, purs)).has(cap)) { mortes.push(cle + ' (déjà autorisé par sa couche)'); continue; }
-    if (!occurrences(def.pattern).includes(rel)) mortes.push(cle + ' (le fichier ne fait plus ça)');
+    if (!occurrences(def).includes(rel)) mortes.push(cle + ' (le fichier ne fait plus ça)');
   }
   assert.deepStrictEqual(mortes, [], 'Justification(s) PÉRIMÉE(S), à retirer :\n  ' + mortes.join('\n  '));
 });
@@ -199,7 +275,7 @@ test('NEGATIVE : ast-grep ignore une MENTION en commentaire ou en chaîne', () =
   fs.mkdirSync(path.dirname(tmp), { recursive: true });
   fs.writeFileSync(tmp, "// process.exit(0) en commentaire\nconst s = 'process.exit(0)';\nmodule.exports = s;\n");
   try {
-    const trouves = occurrences('process.exit($$$)');
+    const trouves = occurrences({ pattern: 'process.exit($$$)' });
     assert.ok(!trouves.some((f) => f.endsWith('.tmp-couches-negatif.js')),
       'ast-grep a compté une MENTION comme un appel — le gate produirait des faux positifs.');
   } finally {
