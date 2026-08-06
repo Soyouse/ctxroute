@@ -83,15 +83,35 @@ function pertinent(rel) {
     && !rel.startsWith('coverage/');
 }
 
-// ⚠️ ast-grep PARSE, nous DÉCIDONS. On ne lui délègue pas la notion de couche :
-//    elle vit ici, en un seul endroit, lisible et testable.
+// ⚠️ LE BINAIRE EN DIRECT, JAMAIS `npx` NI UN SHELL (corrigé le 06/08/2026,
+//    CI ROUGE au premier push). Avec `shell: true`, la commande est passée à
+//    l'interpréteur du système : sous `cmd` (Windows) ça marche, sous `/bin/sh`
+//    (Linux, donc la CI) les PARENTHÈSES de `process.exit($$$)` sont une erreur
+//    de syntaxe — `/bin/sh: Syntax error: "(" unexpected`. Le scan rendait donc
+//    ZÉRO résultat et le gate serait passé VERT EN ÉTANT AVEUGLE.
+// ⚠️ C'EST LE VOLET « EXISTENCE » QUI A ATTRAPÉ ÇA, pas un humain : il a refusé
+//    d'être vert avec un scan vide. Ne JAMAIS le retirer comme un doublon.
+// ⚠️ LEÇON PLUS LARGE : une mesure faite sur UNE machine ne prouve rien. Le
+//    local lit la config réelle du poste, la CI un clone vierge sur un autre OS.
+function binaireAstGrep() {
+  const nom = process.platform === 'win32' ? 'ast-grep.exe' : 'ast-grep';
+  const bin = path.join(repo, 'node_modules', '@ast-grep', 'cli', nom);
+  // ⚠️ PANNE BRUYANTE, jamais un scan vide : un gate qui ne trouve rien parce
+  //    que son OUTIL manque passerait au vert en étant aveugle. C'est la même
+  //    classe que les `*-must-stay-pure` inertes — le pire des deux mondes.
+  if (!fs.existsSync(bin)) {
+    throw new Error('ast-grep INTROUVABLE (' + bin + ') — le gate des couches ne peut pas juger. `npm ci`.');
+  }
+  return bin;
+}
+
 function occurrences(pattern) {
   let out = '';
   try {
     out = execFileSync(
-      'npx',
-      ['ast-grep', 'run', '--pattern', pattern, '--lang', 'js', '--json=compact'],
-      { cwd: repo, encoding: 'utf8', shell: true, maxBuffer: 64 * 1024 * 1024 }
+      binaireAstGrep(),
+      ['run', '--pattern', pattern, '--lang', 'js', '--json=compact'],
+      { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
     );
   } catch (e) {
     out = (e && e.stdout) || '';
