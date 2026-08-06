@@ -47,9 +47,18 @@ function matchingDocs(config, { toolName, toolInput }) {
 // Decl (vocabulaire gate.js) d'une doc MCP. `fm` = frontmatter parsé de LA doc
 // (l'auteur propose) ; valeur absente OU invalide → fallback config serveur
 // (l'utilisateur/global dispose, cf lib-pure). TOTAL : ne throw jamais.
-// ⚠️ Une decl ne porte QUE de la cadence : une source INFORME, elle ne décide
-//    rien (le refus `enforce` est résolu par gate.js). `confirm` a été retiré
-//    du framework le 05/08/2026 — ne pas réintroduire de clé de décision ici.
+// 🛑 CE COMMENTAIRE A CAUSÉ UN BUG — CORRIGÉ LE 06/08/2026. Il disait « une decl
+//    ne porte QUE de la cadence », et cette phrase, JUSTE sur le fond (une source
+//    n'arbitre rien, `gate.js` tranche), a été lue comme « donc ne recopie pas
+//    `enforce` ». Résultat : `enforce` accepté par `validateMcp`, documenté
+//    partout, et INERTE sur le canal MCP — là où vit l'incident FONDATEUR du
+//    framework (le clic de paiement Stripe). Découvert en l'armant pour de vrai.
+// ⚠️ LA DISTINCTION EXACTE, à ne plus confondre : une decl TRANSPORTE ce que
+//    l'auteur a déclaré (mode, threshold, driftUnit, enforce) ; elle ne RÉSOUT
+//    aucune cascade et ne prend aucune décision. Transporter ≠ décider.
+// 🛑 TOUTE clé de décision DOIT être recopiée ici — `declfor-gate.test.js` la
+//    dérive de `gate.js` et rougit si une seule manque. Ne pas s'y fier de
+//    mémoire : la relecture a laissé passer `enforce` pendant 24 h.
 function declFor(config, server, fm) {
   const data = fm || {};
   const decl = {
@@ -63,6 +72,12 @@ function declFor(config, server, fm) {
   //    (driftUnitForDoc), UNIQUE point de cascade. Pas de per-serveur : `servers`
   //    ne porte AUCUNE cadence (scellé config-gate, décision 17/07/2026).
   if (DRIFT_UNITS.includes(data.driftUnit)) decl.driftUnit = data.driftUnit;
+  // ⚠️ `enforce` — MANQUAIT ICI pendant 24 h (05→06/08/2026). Cette `declFor`
+  //    RECOPIE clé par clé : tout ce qui n'est pas nommé est perdu EN SILENCE.
+  // ⚠️ Repris TEL QUEL, `false` COMPRIS : c'est lui qui permet à une doc de se
+  //    DÉSINSCRIRE d'un `defaults.mcp.enforce`. Le filtrer comme une valeur
+  //    « vide » rendrait la désinscription impossible (même raison que skill.js).
+  if (typeof data.enforce === 'boolean') decl.enforce = data.enforce;
   return decl;
 }
 

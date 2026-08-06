@@ -2037,3 +2037,34 @@ aucun geste bloqué, rien de corrompu, injection rétablie et prouvée par le do
 
 **Preuves** : 1034 tests · mutation 100,00 % (0 survivant) · les 2 différentiels de parité
 verts · dependency-cruiser 0 violation · jscpd 0,55 % · doctor 14/14.
+
+## ⑤ `enforce` ARMÉ EN PROD (06/08/2026) — et il était INERTE sur MCP
+
+**Décision du mainteneur** : « active-le maintenant ». Armé sur les DEUX gestes
+Stripe irréversibles — `create_refund` et `stripe_api_write` — et **PAS** sur
+`stripe.md` global : bloquer les lectures serait du bruit, et le bruit finit
+débranché. Les lectures (`stripe_api_read`, `get_stripe_account_info`) passent.
+
+🔴 **EN L'ARMANT, DÉCOUVERT QUE LA CLÉ NE FAISAIT RIEN.** `sources/mcp.js#declFor`
+RECOPIE clé par clé et ne recopiait pas `enforce` : accepté par `validateMcp`,
+présent dans le skill, dans les 4 corpus du gate de symétrie… et **INERTE sur le
+canal MCP**, c'est-à-dire précisément là où vit l'incident FONDATEUR du framework.
+Mesuré par spawn réel : `create_refund` rendait `allow`. **Sans cette
+vérification, j'aurais annoncé « c'est armé » et livré un cran d'arrêt qui ne
+s'arrête jamais — pire que pas de cran d'arrêt, parce qu'on lui fait confiance.**
+
+**CAUSE RACINE = UN COMMENTAIRE**, pas une étourderie : « une decl ne porte QUE
+de la cadence ». Juste sur le fond (une source n'arbitre rien), il a été lu comme
+« donc ne recopie pas `enforce` ». Réécrit : **transporter ≠ décider**.
+
+**POURQUOI AUCUN GATE NE L'A VU** : le gate de symétrie du vocabulaire vérifie
+qu'une clé est ADMISE dans les 4 corpus, pas qu'elle est TRANSPORTÉE jusqu'à
+`gate.decide`. Deux invariants distincts — admettre et honorer ne sont pas la
+même chose. D'où `declfor-gate.test.js` (clés DÉRIVÉES des `xForDoc` de gate.js,
+volet anti-angle-mort, rougissement prouvé par sabotage réel).
+
+**Preuves** : create_refund DENY · stripe_api_write DENY · lectures ALLOW ·
+appel Stripe RÉEL en lecture seule OK (doc injectée, geste non bloqué) ·
+1057 tests · mutation 100,00 % · 0 violation · doctor 14/14.
+🛑 **`create_refund` n'a PAS été appelé pour « voir le blocage »** : un échec du
+garde-fou déclencherait un remboursement RÉEL. Vérifier ≠ muter, toujours.

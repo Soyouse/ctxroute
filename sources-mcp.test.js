@@ -140,3 +140,38 @@ test('declFor : driftUnit du frontmatter propagé si valide, ABSENT sinon (fallb
   expect('driftUnit' in declFor(config, 's', {})).toBe(false);
   expect('driftUnit' in declFor(config, 's', undefined)).toBe(false);
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// `enforce` — PROPAGÉ, pas filtré (défaut RÉEL corrigé le 06/08/2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔴 `enforce` (le mot qui REFUSE un geste) n'était PAS recopié par declFor :
+//    accepté par validateMcp, documenté partout, INERTE sur le canal MCP —
+//    donc là où vit l'incident FONDATEUR (le clic de paiement Stripe).
+//    `create_refund` rendait `allow`. Un cran d'arrêt qui ne s'arrête pas est
+//    PIRE que rien : on lui fait confiance.
+// ⚠️ CES CAS VIVENT ICI et pas seulement dans `declfor-gate.test.js` : Stryker
+//    ne mute QUE les suites déterministes déclarées. Le gate protège l'AVENIR
+//    (toute clé future), ces cas protègent la LIGNE — les deux, jamais l'un
+//    à la place de l'autre.
+
+describe('sources/mcp — declFor propage `enforce`', () => {
+  it('`enforce: true` est TRANSPORTÉ jusqu à la decl', () => {
+    expect(declFor({}, 'stripe', { enforce: true }).enforce).toBe(true);
+  });
+
+  it('`enforce: false` EXPLICITE survit — sinon la désinscription est impossible', () => {
+    // Sans lui, une catégorie passée en `defaults.mcp.enforce` serait
+    // INDÉSINSCRIPTIBLE : l'impasse de toute cascade.
+    expect(declFor({}, 'stripe', { enforce: false }).enforce).toBe(false);
+  });
+
+  it('valeur NON booléenne → ABSENTE (jamais prise pour un oui)', () => {
+    // Un typo ne doit pas devenir une décision de blocage.
+    expect(declFor({}, 'stripe', { enforce: 'oui' }).enforce).toBeUndefined();
+    expect(declFor({}, 'stripe', { enforce: 1 }).enforce).toBeUndefined();
+  });
+
+  it('absent du frontmatter → absent de la decl (la cascade tranchera)', () => {
+    expect('enforce' in declFor({}, 'stripe', {})).toBe(false);
+  });
+});
