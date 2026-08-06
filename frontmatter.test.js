@@ -425,11 +425,15 @@ test('note : N\'ATTEINT JAMAIS le corps injecté', () => {
 //    distinguer interdit du sain, et une garde qui interdit du sain finit
 //    débranchée. Le fix correct vit dans `parse()`, seul endroit qui voit le
 //    TEXTE (valeur `|` ET ligne suivante indentée). Inscrit au REFACTOR-PLAN.
-test('bloc YAML `|` : valeur « | » et lignes suivantes PERDUES (piège figé)', () => {
+// ✅ PIÈGE FERMÉ LE 06/08/2026 — ce test figeait la PERTE comme comportement
+//    connu ; il figera désormais la CONSERVATION. Il n'est pas supprimé : c'est
+//    le témoin de la régression, et il doit rougir si quelqu'un revient en
+//    arrière. Le fix a été posé dans `parse()` (la couche qui voit la ligne
+//    suivante), exactement là où le commentaire ci-dessus l'avait prédit.
+test('bloc YAML `|` : les lignes indentées sont CONSERVÉES (ex-piège, fermé)', () => {
   const { data } = parse('---\nmatch: x.js\nnote: |\n  perdue un\n  perdue deux\n---\ncorps\n');
-  assert.strictEqual(data.note, '|');
-  assert.strictEqual(JSON.stringify(data).includes('perdue'), false, 'les lignes SONT perdues');
-  // ⚠️ Et c'est VALIDE — c'est exactement ce qui rend le piège silencieux.
+  assert.strictEqual(data.note, 'perdue un\nperdue deux');
+  assert.strictEqual(JSON.stringify(data).includes('perdue'), true, 'plus AUCUNE ligne perdue');
   assert.deepStrictEqual(validate(data), []);
   // ⚠️ `match: "|"` DOIT rester valide : c'est ce que la garde retirée cassait.
   assert.deepStrictEqual(validate({ match: '|' }), []);
@@ -560,4 +564,107 @@ test('GATE SYMÉTRIE ① : une clé présente dans un corpus et absente d\'un au
         + `ASYMETRIES_JUSTIFIEES avec une raison MESURÉE. Le silence n'est pas une option.`);
     }
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOCS YAML — la perte silencieuse est FERMÉE (06/08/2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔴 DÉFAUT RÉEL : `note: |` rendait `"|"` et AVALAIT les lignes indentées. Comme
+//    le frontmatter est retiré du corps, elles disparaissaient des DEUX côtés,
+//    avec `validate` VERT. `note` est le champ qui invite à écrire long.
+// 🛑 AUCUNE EXCEPTION PAR CLÉ : la règle est « `|`/`>` SUIVI d'une ligne
+//    INDENTÉE », valable partout. Une exception sur `note` seule aurait laissé
+//    le piège armé sur toutes les autres clés — et la clé suivante retomberait
+//    dedans sans que personne ne comprenne pourquoi.
+
+test('BLOC | : les lignes indentées sont CONSERVÉES, pas avalées', () => {
+  const { data } = parse('---\nmatch: a.js\nnote: |\n  ligne un\n  ligne deux\n---\ncorps\n');
+  assert.strictEqual(data.note, 'ligne un\nligne deux');
+  assert.strictEqual(data.match, 'a.js', 'le bloc ne mange pas les clés voisines');
+});
+
+test('BLOC > : les lignes sont REPLIÉES par une espace (sémantique YAML)', () => {
+  const { data } = parse('---\nnote: >\n  ligne un\n  ligne deux\n---\ncorps\n');
+  assert.strictEqual(data.note, 'ligne un ligne deux');
+});
+
+test('BLOC : une ligne VIDE interne est gardée, la finale est coupée', () => {
+  // Sans la garde « vide + suivante indentée », un paragraphe séparé par un
+  // blanc serait tronqué à sa première moitié — perte silencieuse à nouveau.
+  const { data } = parse('---\nnote: |\n  para un\n\n  para deux\n---\ncorps\n');
+  assert.strictEqual(data.note, 'para un\n\npara deux');
+});
+
+test('BLOC : désindentation sur la PLUS PETITE indentation, pas un nombre fixe', () => {
+  const { data } = parse('---\nnote: |\n    profond\n    aussi\n---\ncorps\n');
+  assert.strictEqual(data.note, 'profond\naussi', 'un slice(2) codé en dur mangerait un caractère');
+});
+
+test('CAS FONDATEUR : `match: |` SANS ligne indentée reste la CHAÎNE "|"', () => {
+  // 🛑 NE JAMAIS SUPPRIMER CE TEST. C'est lui qui a tué la garde du 05/08/2026,
+  //    posée dans `validate()` : elle rejetait toute valeur `|`, alors que
+  //    `match: "|"` est un pattern LÉGITIME (la CI l'a mise en rouge en minutes
+  //    via le property round-trip du migrateur). La bonne couche est `parse`,
+  //    parce qu'elle SEULE voit la ligne suivante et lève l'ambiguïté.
+  const { data } = parse('---\nmatch: |\nmode: dumb\n---\ncorps\n');
+  assert.strictEqual(data.match, '|');
+  assert.strictEqual(data.mode, 'dumb', 'la clé suivante est intacte');
+});
+
+test('BLOC en DERNIÈRE ligne du frontmatter → aucun crash (totalité)', () => {
+  // `lignes[i + 2]` vaut alors `undefined` : sans la garde de type dans
+  // `estIndentee`, le parser jetterait — donc PLUS AUCUNE doc injectée nulle
+  // part, pour tout le parc. La totalité de `parse` n'est pas négociable.
+  assert.doesNotThrow(() => parse('---\nnote: |\n  seule\n---\ncorps\n'));
+  assert.strictEqual(parse('---\nnote: |\n  seule\n---\ncorps\n').data.note, 'seule');
+});
+
+test('BLOC : le corps de la doc reste INTACT (le bloc ne déborde pas du frontmatter)', () => {
+  const { body } = parse('---\nnote: |\n  interne\n---\n# Titre\ntexte\n');
+  assert.strictEqual(body, '# Titre\ntexte\n');
+});
+
+test('BLOC : indentations INÉGALES → désindente sur la PLUS PETITE, jamais la plus grande', () => {
+  // ⚠️ Tue le mutant `Math.min` → `Math.max` : avec max, la ligne la moins
+  //    indentée serait TRONQUÉE dans son texte. L'indentation relative d'un
+  //    sous-niveau (liste, code) doit être PRÉSERVÉE, c'est du YAML.
+  const { data } = parse('---\nnote: |\n  base\n      profond\n---\ncorps\n');
+  assert.strictEqual(data.note, 'base\n    profond');
+});
+
+test('BLOC : une ligne d ESPACES SEULS ne fausse pas l indentation de référence', () => {
+  // ⚠️ Tue le mutant `l.trim() !== ''` → `l !== ''` : une ligne de 2 espaces
+  //    serait comptée comme indentation 2 et écraserait le minimum réel (4),
+  //    laissant tout le bloc décalé.
+  const { data } = parse('---\nnote: |\n    un\n  \n    deux\n---\ncorps\n');
+  assert.strictEqual(data.note, 'un\n\ndeux');
+});
+
+test('BLOC > : chaque ligne est TRIMÉE avant le repli (pas d espaces parasites)', () => {
+  // ⚠️ Tue le mutant `nues.map(l => l.trim())` → `nues.map(l => l)` : sans trim,
+  //    une indentation relative laisserait des espaces au milieu du texte replié.
+  const { data } = parse('---\nnote: >\n  un\n      deux\n---\ncorps\n');
+  assert.strictEqual(data.note, 'un deux');
+});
+
+test('BLOC : la ligne vide FINALE est coupée (chomping « clip » de YAML)', () => {
+  // ⚠️ Tue le mutant qui retire `.trimEnd()` : sans lui, le saut de ligne qui
+  //    précède le `---` de fermeture entrerait dans la valeur.
+  const { data } = parse('---\nnote: |\n  seule\n\nmode: dumb\n---\ncorps\n');
+  assert.strictEqual(data.note, 'seule', 'aucun \n résiduel en fin de valeur');
+});
+
+test('BLOC : les espaces en FIN de valeur sont coupés', () => {
+  // ⚠️ Tue le mutant qui retire `.trimEnd()`. Cas réel et invisible à l'œil :
+  //    un éditeur laisse des espaces en fin de ligne, la valeur les emporterait.
+  const { data } = parse('---\nnote: |\n  texte   \n---\ncorps\n');
+  assert.strictEqual(data.note, 'texte');
+});
+
+test('BLOC : `|` suivi d ESPACES reste un bloc (le marqueur est trimé)', () => {
+  // ⚠️ Tue le mutant `raw.trim()` → `raw` : sans le trim, une espace invisible
+  //    après le `|` ferait retomber la doc dans le PIÈGE d'origine (valeur "|",
+  //    lignes avalées) — une régression indétectable à la relecture.
+  const { data } = parse('---\nnote: |   \n  contenu\n---\ncorps\n');
+  assert.strictEqual(data.note, 'contenu');
 });

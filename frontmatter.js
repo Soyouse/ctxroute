@@ -40,6 +40,54 @@ function parseScalar(raw) {
   return m ? m[2] : v;
 }
 
+/**
+ * Une ligne appartient-elle au corps d'un bloc YAML ?
+ * ⚠️ TOTALE : `undefined` (fin de frontmatter) rend `false` — sans cette garde,
+ *    un bloc en DERNIÈRE ligne ferait planter le parser, donc TOUTE l'injection
+ *    du parc (`parse` ne doit JAMAIS throw, cf en-tête du module).
+ */
+function estIndentee(ligne) {
+  // ⚠️ PAS de garde `typeof === 'string'` : `RegExp.test` COERCE son argument
+  //    (`test(undefined)` lit "undefined", ne jette pas) et "undefined" ne
+  //    commence par aucune espace ⇒ `false`, le résultat voulu. La garde serait
+  //    donc INOBSERVABLE = un mutant ÉQUIVALENT, survivant éternel. Doctrine du
+  //    parc : on ÉLIMINE l'équivalence par construction, on ne la teste pas.
+  return /^[ \t]+\S/.test(ligne);
+}
+
+/**
+ * Ligne VIDE au sens YAML (rien, ou uniquement des blancs).
+ * ⚠️ Même coercion volontaire que `estIndentee` : `undefined` donne "undefined",
+ *    qui ne matche pas `^[ \t]*$` ⇒ `false`. Fin de frontmatter gérée sans garde.
+ */
+function estVide(ligne) {
+  return /^[ \t]*$/.test(ligne);
+}
+
+/**
+ * Corps d'un bloc YAML → valeur.
+ * ⚠️ DÉSINDENTATION SUR LA PLUS PETITE INDENTATION NON VIDE, jamais un nombre
+ *    d'espaces codé en dur : l'auteur indente comme il veut, et un `slice(2)`
+ *    fixe mangerait le premier caractère d'un bloc indenté de 1.
+ * ⚠️ `|` = LITTÉRAL (retours à la ligne gardés) · `>` = REPLIÉ (lignes jointes
+ *    par une espace) — sémantique YAML standard, pas une invention maison.
+ * ⚠️ On `trimEnd()` le résultat (chomping « clip » de YAML) : sans ça, la ligne
+ *    vide qui précède le `---` de fermeture entrerait dans la valeur.
+ */
+function assemblerBloc(corps, marqueur) {
+  // ⚠️ `trim() !== ''` et non `l !== ''` : une ligne d'ESPACES SEULS est vide au
+  //    sens YAML. La compter donnerait une indentation parasite qui écraserait
+  //    le minimum réel et laisserait tout le bloc indenté.
+  const indents = corps.filter((l) => l.trim() !== '').map((l) => /^[ \t]*/.exec(l)[0].length);
+  // ⚠️ PAS de garde `indents.length === 0` : on n'entre dans un bloc QUE si la
+  //    ligne suivante est indentée ET non vide (`estIndentee`), donc `indents`
+  //    porte TOUJOURS au moins un élément. La garde serait inatteignable = un
+  //    mutant ÉQUIVALENT de plus. L'invariant est garanti par l'APPELANT.
+  const base = Math.min(...indents);
+  const nues = corps.map((l) => l.slice(base));
+  return (marqueur === '>' ? nues.map((l) => l.trim()).join(' ') : nues.join('\n')).trimEnd();
+}
+
 function parseList(inner) {
   // `[a, b]` — liste inline uniquement (le format des scope/exclude existants).
   return inner
@@ -63,7 +111,15 @@ function parse(text) {
   if (!m) return { data: {}, body: text, hasFrontmatter: false };
 
   const data = {};
-  for (const line of m[1].split(/\r?\n/)) {
+  // ⚠️ FILE CONSOMMÉE (`shift`) et non un index : le BLOC YAML (`cle: |`) doit
+  //    AVALER les lignes suivantes — c'est la SEULE couche qui les voit encore.
+  //    Le `for (let i…; i < n; i++)` d'origine laissait vivre le mutant
+  //    `i <= n` : l'itération surnuméraire lit `undefined`, qui ne matche aucune
+  //    clé, donc INOBSERVABLE = survivant éternel. Consommer supprime la
+  //    comparaison d'indice et les accès `lignes[i+1]`/`[i+2]` d'un seul geste.
+  const restantes = m[1].split(/\r?\n/);
+  while (restantes.length > 0) {
+    const line = restantes.shift();
     // ⚠️ PAS de garde « ignorer commentaires/lignes vides » : elle serait REDONDANTE.
     //    La regex ci-dessous exige `[A-Za-z0-9_-]+` en tête — un `#` ou une ligne vide
     //    ne matchent JAMAIS, donc sont déjà ignorés. Ajouter la garde = 3 mutants
@@ -77,6 +133,41 @@ function parse(text) {
     //    sur ses virgules internes. JSON.parse est TOTAL ici (try/catch) — un JSON
     //    cassé laisse la valeur BRUTE (string) → `validate` la met en ROUGE, jamais un throw.
     //    JSON ≠ mini-langage maison : c'est le format d'ORIGINE des règles migrées.
+    // ── BLOC YAML (`cle: |` / `cle: >`) — CORRIGE UNE PERTE SILENCIEUSE ────────
+    // 🔴 DÉFAUT RÉEL (trouvé par simulation adversariale, corrigé le 06/08/2026) :
+    //    `note: |` rendait la valeur `"|"` et les lignes indentées suivantes
+    //    étaient AVALÉES — la regex de clé les rejette (elles ne commencent pas
+    //    par un identifiant), donc `continue`. Et comme le frontmatter entier est
+    //    retiré du corps, elles disparaissaient AUSSI de la doc injectée :
+    //    perdues des DEUX côtés, `validate` VERT. `note` est précisément le champ
+    //    qui invite à écrire long — le piège était armé pour son premier usage.
+    // 🛑 LA GARDE APPARTIENT À CETTE COUCHE, ET NULLE PART AILLEURS. Une version
+    //    posée dans `validate()` (05/08/2026) a été retirée le jour même : elle
+    //    rejetait toute valeur `|`, or `match: "|"` est un pattern LÉGITIME, et
+    //    la CI l'a mise en rouge en minutes (property round-trip du migrateur).
+    //    Ici on dispose du CONTEXTE qui lève l'ambiguïté : un bloc, c'est `|`
+    //    SUIVI d'une ligne INDENTÉE. Sans ligne indentée, `|` reste la chaîne.
+    // ⚠️ ON SUPPORTE au lieu de REJETER : c'est du YAML standard, et l'auteur qui
+    //    l'écrit a raison. Rejeter laisserait le besoin (écrire long) sans issue.
+    const bloc = /^([|>])[-+]?$/.exec(raw.trim());
+    if (bloc && estIndentee(restantes[0])) {
+      const corps = [];
+      // ⚠️ Une ligne VIDE appartient au bloc — sinon un paragraphe séparé par un
+      //    blanc serait tronqué à sa moitié (perte silencieuse, encore).
+      // ⚠️ PAS de « … ET une ligne indentée suit » : cette garde a existé, et
+      //    elle était INOBSERVABLE — les lignes vides FINALES ainsi absorbées
+      //    sont de toute façon retirées par le `trimEnd()` d'`assemblerBloc`.
+      //    Elle ne produisait donc qu'un mutant équivalent de plus. La règle
+      //    utile est plus simple : indentée ou vide ⇒ dans le bloc.
+      // ⚠️ AUCUNE garde de longueur : `estIndentee`/`estVide` coercent, donc
+      //    `restantes[0] === undefined` rend `false` sans jeter. Une garde
+      //    `restantes.length > 0` serait ici INOBSERVABLE = mutant équivalent.
+      while (estIndentee(restantes[0]) || estVide(restantes[0])) {
+        corps.push(restantes.shift());
+      }
+      data[key] = assemblerBloc(corps, bloc[1]);
+      continue;
+    }
     if (key === 'rules') {
       try {
         data[key] = JSON.parse(raw);
