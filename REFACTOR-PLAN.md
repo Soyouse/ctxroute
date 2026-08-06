@@ -222,6 +222,39 @@ sa réserve** : observé, jamais une dépendance.
 ⇒ **Rend ⑬ (file de reliquat) FACULTATIF** : la file resterait un confort (livrer en direct plutôt
 qu'en fichier), plus une nécessité.
 
+### ⑲ ✅ LIVRÉ 06/08/2026 — LE TABLEAU CAPACITÉS × COUCHES (le vrai squelette)
+**LA QUESTION POSÉE PAR LE MAINTENEUR** : « ce dépôt est écrit par des AGENTS et relu par PERSONNE.
+Un projet de qualité standard est-il seulement possible, ou c est du gambling ? »
+**RÉPONSE : ce n était pas du gambling, c était INCOMPLET.** Nos gates attrapaient la RÉCIDIVE, pas
+la PREMIÈRE occurrence — donc la 1re fois dépendait d un regard, donc de la chance.
+**LE RENVERSEMENT** : on n écrit plus un gate PAR FAUTE DÉCOUVERTE (réactif, sans fin). On DÉCLARE
+ce que chaque couche a le DROIT de faire. Et ce qu un programme peut faire est une liste FINIE
+(tuer le processus · écrire la sortie · lire l environnement · lire les arguments…) — exactement
+le raisonnement de la base booléenne OU/ET/NON du matching : une base FERMÉE, pas une liste ouverte.
+⇒ **il n y a plus de « classe de bug d architecture » à découvrir, il n y a que des CASES.**
+**PREUVE, PAS PROMESSE** : les 3 défauts de la semaine (⑯ transport, ⑯bis process.exit, guard-core
+console.log) sont 3 CASES de ce tableau. Aucun n était vu par 1011 tests ni par la mutation à 100 %.
+Avec le tableau ils auraient été ROUGES au premier push, sans que personne regarde.
+**LIVRÉ** : `couches.json` (manifeste) + `couches-gate.test.js` (5 volets). Noyau pur DÉRIVÉ de
+`stryker.conf.json` → `mutate` (source unique, jamais recopiée).
+⚠️ **LE PIÈGE FERMÉ D AVANCE — pour le SUCCESSEUR** : un agent futur voit rouge et « corrige » en
+ÉLARGISSANT le tableau au lieu du code ⇒ garde-fou auto-désarmé, en silence, invisible à jamais.
+D où : justification ÉCRITE obligatoire + volet INVERSE qui tue une justification périmée + le
+message d erreur qui dit littéralement « élargir le tableau est presque toujours la mauvaise réponse ».
+⚠️ **DOC-FIRST APPLIQUÉ (rappel du mainteneur)** : outils comparés AVANT de coder.
+`eslint-plugin-boundaries` et `Sheriff` = frontières de MODULES, donc rien de plus que
+dependency-cruiser (déjà là), au prix d ESLint en dépendance neuve ⇒ **ÉCARTÉS**. Retenu :
+`ast-grep` (doctrine du parc : AST, JAMAIS regex) — `files`/`ignores` + `severity` confirmés sur la
+doc officielle. ⚠️ `ast-grep.github.io` REDIRIGE en 301 vers `astgrep.com`.
+⚠️ **PARTAGE DES RÔLES, à ne jamais brouiller** : IMPORTS = dependency-cruiser · GLOBALS = ce gate.
+Deux outils pour un même invariant divergent — c est le couplage implicite qu on combat.
+**CE QU IL RESTE DE ⑲** : la déclaration PAR HARNAIS (budget/trames/dialecte en un seul endroit).
+Le tableau ferme les couches ; l unification du contrat de harnais reste à faire.
+
+### ⑳ 🟠 BACKLOG — auditer TOUS les negative-checks
+⚠️ **NUANCE APPORTÉE PAR LE MAINTENEUR (06/08/2026)** : l audit par sous-agent COÛTE et n est pas
+fiable — « je te garantis que personne ne l aurait trouvé ». Ne PAS en faire un pilier. Le tableau
+des couches tourne en CI à coût ZÉRO ; l audit reste un bonus, jamais une garantie.
 ### ⑯bis ✅ LIVRÉ 06/08/2026 — LE CYCLE DE VIE APPARTIENT À LA COQUILLE
 **MÊME FAMILLE QUE ⑯, AUTRE AXE.** Le transport était un choix d'appelant ; la MORT DU PROCESSUS
 était une décision de cœur : `porte-core.js` appelait `process.exit(0)` 4× et `guard-core.js` 2×.
@@ -269,15 +302,7 @@ Tous nos filets répondent à « est-ce cassé ? » ou « est-ce vivant ? ». Au
 **« livre-t-on à la bonne vitesse ? »**. Un système qui livre à 1/11 de son débit est
 parfaitement « fonctionnel » et parfaitement vert. ⇒ témoin de DÉBIT, à concevoir.
 
-### ⑲ 🟠 BACKLOG — UNE DÉCLARATION PAR HARNAIS (le squelette, suite de ⑯)
-Le contrat avec chaque harnais est ÉPARPILLÉ : budget dans le code, trames dans `settings.json`,
-limite dans `requirements.toml`, dialecte dans la coquille. **Personne ne possède l'ensemble** —
-3 bugs en 3 jours, même cause. CIBLE : une déclaration par harnais, lue par sa coquille, comparée
-au câblage réel par un gate. Brancher Gemini deviendrait **une ligne**.
 
-### ⑳ 🟠 BACKLOG — AUDITER TOUS LES NEGATIVE-CHECKS
-On a déjà découvert des gates INCAPABLES de rougir (`*-must-stay-pure`, 03/08). Vérifier que
-CHACUN peut, par sabotage. Un gate non saboté est un gate présumé mort.
 
 ### ㉑ 🟢 BACKLOG — `tsc --checkJs` (décision mainteneur 05/08/2026)
 TypeScript **le vérificateur, jamais la syntaxe** : JSDoc + `tsc --noEmit`, zéro build, zéro

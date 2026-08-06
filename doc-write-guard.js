@@ -30,8 +30,12 @@ const { readStdinJson } = require('./stdin-json');
 readStdinJson(
   (data) => {
     const filePath = (data.tool_input || {}).file_path;
-    run(typeof filePath === 'string' ? [filePath] : []);
-    // ⚠️ La sortie appartient à la COQUILLE (06/08/2026, cf guard-core).
+    // ⚠️ LA SORTIE APPARTIENT À LA COQUILLE (06/08/2026, cf guard-core) : le
+    //    cœur REND un verdict (`null` = rien à signaler), il n'écrit ni sur
+    //    stdout ni sur le processus. Fuite de couche fermée — 3ᵉ instance de
+    //    la même famille, trouvée par le scan de capacités, pas à l'œil.
+    const verdict = run(typeof filePath === 'string' ? [filePath] : []);
+    if (verdict) console.log(JSON.stringify(verdict));
     process.exit(0);
   },
   () => process.exit(0)

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════
-// GATES DE COUCHE — ce qui appartient au CŒUR, et ce qui appartient à la COQUILLE
+// GATE — TOUT ÉMETTEUR DE CONTEXTE TRAVERSE LA COUCHE D'ÉMISSION
 // ═══════════════════════════════════════════════════════════════════════
 //
 // ⚠️ POURQUOI CE GATE EXISTE (05/08/2026, REFACTOR-PLAN ⑯). Le transport
@@ -169,50 +169,11 @@ test('NEGATIVE : un émetteur privé de la couche est DÉTECTÉ (gate non inerte
   );
 });
 
-// ═══════════════════════════════════════════════════════════════════════
-// GATE — UN CŒUR PARTAGÉ NE DÉCIDE PAS DU CYCLE DE VIE DU PROCESSUS
-// ═══════════════════════════════════════════════════════════════════════
-//
-// ⚠️ MÊME FAMILLE QUE ⑯, AUTRE AXE (06/08/2026). Le transport était un choix
-//    d'appelant ; la MORT DU PROCESSUS était une décision de cœur. Les deux sont
-//    des fuites de couche : `porte-core.js` appelait `process.exit(0)` à
-//    4 endroits, alors que sortir est le rôle de la COQUILLE — celle qui connaît
-//    le harnais et son contrat de sortie. Effet concret : `run()` était
-//    inappelable depuis un test ou un autre contexte sans tuer l'appelant.
-// ⚠️ DÉRIVÉ, jamais une liste : tout fichier `*-core.js` est un cœur partagé.
-//    Un cœur FUTUR est donc couvert le jour où il est écrit.
-
-const COEURS = () =>
-  fs.readdirSync(repo).filter((f) => /-core.js$/.test(f) && !f.includes('.test.'));
-
-// Retire commentaires de ligne et de bloc : un `process.exit` CITÉ dans une
-// explication n'est pas un appel. Compter le texte brut ferait rougir sur de la
-// doc — et un gate qui crie sur du sain finit débranché.
-function codeNu(src) {
-  const sansBlocs = src.replace(/\/\*[\s\S]*?\*\//g, '');
-  return sansBlocs.replace(/^\s*\/\/.*$/gm, '');
-}
-
-test('GATE : aucun cœur partagé n appelle process.exit (la coquille décide)', () => {
-  const fautifs = COEURS().filter((f) =>
-    /process\.exit/.test(codeNu(fs.readFileSync(path.join(repo, f), 'utf8'))));
-  assert.deepStrictEqual(
-    fautifs,
-    [],
-    'Ces cœurs PARTAGÉS tuent le processus : ' + fautifs.join(', ')
-      + ' ⇒ le cycle de vie appartient à la COQUILLE. Un cœur RETOURNE, il ne meurt pas'
-      + ' (sinon il devient intestable et inappelable depuis un autre contexte).');
-});
-
-test('GATE (existence) : le scan voit bien des cœurs', () => {
-  // Un gate qui n'analyse RIEN passe au vert : le pire des deux mondes.
-  assert.ok(COEURS().length >= 2, 'scan suspect : ' + COEURS().length + ' cœur(s)');
-});
-
-// ⚠️ NEGATIVE-CHECK — sabotage EN MÉMOIRE, jamais un fichier réel.
-test('NEGATIVE : un cœur qui appelle process.exit est DÉTECTÉ', () => {
-  assert.strictEqual(/process.exit/.test(codeNu('// process.exit(0) en commentaire')), false,
-    'témoin : une MENTION en commentaire ne rougit pas');
-  assert.strictEqual(/process.exit/.test(codeNu('if (rien) process.exit(0);')), true,
-    'SABOTAGE NON DÉTECTÉ : un appel réel passerait au vert.');
-});
+// ⚠️ LE VOLET « UN CŒUR N APPELLE PAS process.exit » A DÉMÉNAGÉ (06/08/2026).
+//    Il vivait ici, écrit à la REGEX avec une dé-commentarisation maison — ce
+//    que la doctrine du parc interdit explicitement (AST, jamais regex : un
+//    `process.exit` cité dans un commentaire est un faux positif). Il est
+//    désormais UNE CASE du tableau capacités × couches : `couches-gate.test.js`
+//    + `couches.json`, parsing par ast-grep. NE PAS le réintroduire ici : deux
+//    outils pour un même invariant divergent — c est le couplage implicite que
+//    tout ce dépôt combat.

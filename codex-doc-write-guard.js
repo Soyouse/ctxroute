@@ -28,8 +28,12 @@ const { readStdinJson } = require('./stdin-json');
 
 readStdinJson(
   (data) => {
-    // ⚠️ La sortie appartient à la COQUILLE (06/08/2026, cf guard-core).
-    run(extractFilePaths(data.tool_name || '', data.tool_input || {}));
+    // ⚠️ LA SORTIE APPARTIENT À LA COQUILLE (06/08/2026, cf guard-core) : le
+    //    cœur REND un verdict (`null` = rien à signaler). Le JSON est composé
+    //    par le cœur (`sortieBlock`) car le dialecte `decision: block` est
+    //    MESURÉ identique sur les 2 harnais — mais il est ÉMIS ici.
+    const verdict = run(extractFilePaths(data.tool_name || '', data.tool_input || {}));
+    if (verdict) console.log(JSON.stringify(verdict));
     process.exit(0);
   },
   () => process.exit(0)

@@ -1,0 +1,53 @@
+{
+  "_pourquoi": "MANIFESTE DES COUCHES — le tableau CAPACITÉS × COUCHES (06/08/2026). Trois défauts en trois jours étaient trois cases de ce tableau : le transport orchestré dans un seul émetteur (⑯), `process.exit` dans deux cœurs partagés (⑯bis), `console.log` dans guard-core (3e instance, trouvée par le scan AST et non à l'oeil). Ce ne sont pas trois découvertes : ce sont trois cases jamais remplies. Une fois le tableau écrit, il n'y a plus de classe de bug d'architecture à découvrir — il n'y a que des cases.",
+
+  "_lire_avant_de_modifier": "🛑 ÉLARGIR CE TABLEAU EST PRESQUE TOUJOURS LA MAUVAISE RÉPONSE. Un gate rouge veut dire que le FICHIER est dans la mauvaise couche, ou qu'il fait un travail qui ne lui appartient pas. Ajouter une capacité pour faire taire le rouge désarme le garde-fou en silence — et personne ne le verra jamais. Si tu crois vraiment devoir élargir : la justification est OBLIGATOIRE (`justifications`), et le volet inverse du gate rougit dès qu'elle devient périmée.",
+
+  "_ce_que_ce_manifeste_ne_couvre_pas": "Les IMPORTS (fs, path, child_process, modules de harnais) ne sont PAS ici : c'est le travail de dependency-cruiser, déjà en place (`lib-pure-must-stay-pure`, `sources-must-not-know-the-harness`). Ne JAMAIS dupliquer ces règles ici — deux outils pour un même invariant divergent. Ici : uniquement ce qu'un graphe de dépendances NE PEUT PAS voir, c'est-à-dire les GLOBALS et la syntaxe.",
+
+  "capacites": {
+    "exit": {
+      "pattern": "process.exit($$$)",
+      "libelle": "tuer le processus",
+      "pourquoi": "Le cycle de vie appartient à la COQUILLE — seule à connaître le harnais et son contrat de sortie. Un coeur qui meurt est intestable et inappelable depuis un autre contexte."
+    },
+    "stdout": {
+      "pattern": "console.log($$$)",
+      "libelle": "écrire la sortie",
+      "pourquoi": "Sérialiser la réponse appartient à la COQUILLE (motif des frameworks web : un handler ne sérialise jamais). Un coeur REND un verdict."
+    },
+    "env": {
+      "pattern": "process.env",
+      "libelle": "lire l'environnement",
+      "pourquoi": "Un module PUR doit rendre le même résultat pour les mêmes entrées. Lire l'environnement le rend non-déterministe, donc non mutable proprement par Stryker."
+    },
+    "argv": {
+      "pattern": "process.argv",
+      "libelle": "lire les arguments",
+      "pourquoi": "Les arguments sont le CÂBLAGE, donc du dialecte d'appelant. Un coeur les reçoit en paramètre, il ne les lit jamais."
+    }
+  },
+
+  "couches": [
+    {
+      "nom": "noyau-pur",
+      "quoi": "Décide, ne fait rien. Muté par Stryker — d'où l'exigence de déterminisme total.",
+      "source": "DÉRIVÉE de `stryker.conf.json` → `mutate` (source unique : ce fichier déclare déjà «TOUS les modules PURS»). Ne PAS recopier la liste ici.",
+      "autorise": []
+    },
+    {
+      "nom": "coeur-partage",
+      "quoi": "Orchestre, partagé par tous les harnais. I/O autorisée, mais aucun dialecte ni cycle de vie.",
+      "fichiers": ["*-core.js"],
+      "autorise": []
+    },
+    {
+      "nom": "coquille",
+      "quoi": "Parle le dialecte d'UN harnais, ou est un outil en ligne de commande. C'est ici — et NULLE PART ailleurs — que vivent la sortie et la mort du processus.",
+      "fichiers": ["*"],
+      "autorise": ["exit", "stdout", "env", "argv"]
+    }
+  ],
+
+  "justifications": {}
+}

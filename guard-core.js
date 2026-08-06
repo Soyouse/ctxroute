@@ -38,8 +38,25 @@ function docKind(filePath) {
   return null;
 }
 
-// Valide chaque chemin candidat ; au PREMIER cassé, émet le block et exit.
-// Aucune doc du parc touchée / tout est sain → exit 0 muet.
+// Valide chaque chemin candidat et REND UN VERDICT au PREMIER cassé.
+// Rien de cassé (ou rien du parc touché) → rend `null`, la coquille se tait.
+//
+// ⚠️ LE CŒUR N'ÉCRIT NI SUR STDOUT NI SUR LE PROCESSUS (06/08/2026). Il
+//    appelait `console.log` + `process.exit` : deux fuites de couche de la
+//    MÊME famille que ⑯ — écrire la sortie et décider de mourir appartiennent
+//    à la COQUILLE, seule à connaître le dialecte du harnais. Trouvé par le
+//    scan de capacités (ast-grep), pas à l'œil : c'était la 3ᵉ instance.
+// ⚠️ Le JSON `decision: block` reste un dialecte COMMUN mesuré aux 2 harnais :
+//    il est composé ici (`sortieBlock`) mais ÉMIS par la coquille. Le jour où
+//    un harnais diverge, il compose le sien — jamais un `if` de harnais ici.
+function sortieBlock(errs, filePath) {
+  return {
+    decision: 'block',
+    reason: '[ctxroute] La doc que tu viens d\'écrire est INVALIDE — elle serait morte/faussée en silence. Corrige MAINTENANT :\n- '
+      + errs.join('\n- ') + '\nFichier : ' + filePath,
+  };
+}
+
 function run(filePaths) {
   try {
     for (const filePath of filePaths) {
@@ -55,23 +72,18 @@ function run(filePaths) {
       }
       if (errs.length === 0) continue;
 
-      console.log(JSON.stringify({
-        decision: 'block',
-        reason: '[ctxroute] La doc que tu viens d\'écrire est INVALIDE — elle serait morte/faussée en silence. Corrige MAINTENANT :\n- '
-          + errs.join('\n- ') + '\nFichier : ' + filePath,
-      }));
-      // ⚠️ Le cœur RETOURNE, il ne tue pas : la sortie appartient à la
-      //    COQUILLE (06/08/2026). `return` et non `break` — un blocage émis,
-      //    on n'examine PAS les fichiers suivants (une seule sortie par hook).
-      return;
+      // ⚠️ On REND au premier cassé — `return` et non `break` : un seul verdict
+      //    par hook, les chemins suivants ne sont pas examinés.
+      return sortieBlock(errs, filePath);
     }
   } catch {
     /* fail-open */
   }
-  // ⚠️ NE PAS remettre `process.exit(0)` ici : le cycle de vie du processus
-  //    est une décision de COQUILLE, jamais d'un cœur partagé (scellé par
+  // ⚠️ `null` = rien à signaler. NE PAS remettre `console.log` ni
+  //    `process.exit(0)` ici : écrire la sortie et décider de mourir sont des
+  //    décisions de COQUILLE, jamais d'un cœur partagé (scellé par
   //    `emission-core-gate.test.js`). Ce cœur avait le même défaut que
   //    porte-core — trouvé par le gate DÉRIVÉ, pas à l'œil.
 }
 
-module.exports = { run, docKind };
+module.exports = { run, docKind, sortieBlock };

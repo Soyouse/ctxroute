@@ -9,6 +9,7 @@
     "@stryker-mutator/vitest-runner": "runner Stryker (outillage de gate).",
     "fast-check": "property-based testing (outillage de gate).",
     "dependency-cruiser": "détection de couplage et gates de pureté (outillage de gate).",
-    "jscpd": "détection de duplication. Sa dérive peut bouger le POURCENTAGE donc le cliquet — mais un cliquet franchi est ROUGE, donc visible."
+    "jscpd": "détection de duplication. Sa dérive peut bouger le POURCENTAGE donc le cliquet — mais un cliquet franchi est ROUGE, donc visible.",
+    "@ast-grep/cli": "parseur AST du gate des couches (`couches-gate.test.js`). Outillage de gate : il ne produit AUCUN fichier livré, il ne fait que CHERCHER dans le code. Une dérive de sa part ferait rougir ou taire un gate — bruyant dans le premier cas, et le volet ANTI-DORMANCE du gate couvre le second. Choisi plutôt qu'une regex parce que la doctrine du parc l'exige (un `process.exit` cité en commentaire est un faux positif), et plutôt qu'ESLint parce qu'il n'ajoute pas un 2e outil pour un travail que dependency-cruiser fait déjà sur les imports."
   }
 }
