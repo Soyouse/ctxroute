@@ -15,7 +15,7 @@
 
 import { test, expect } from 'vitest';
 import fc from 'fast-check';
-import { planifier, planifierPaquets, morceler, DEFAUT_BUDGET, tailleEnveloppe } from './budget.js';
+import { planifier, planifierPaquets, morceler, ordonner, baseId, DEFAUT_BUDGET, tailleEnveloppe } from './budget.js';
 
 // Coût approx. du séparateur inter-segments, pour calibrer les tirages.
 const SEPARATEUR_APPROX = 8;
@@ -456,4 +456,72 @@ test('SCANNER ④ NEGATIVE-CHECK : les propriétés SAVENT tomber (sinon elles c
   const recolle = sabote([{ id: 'a', label: 'A', text: t }], cap)
     .map((m) => m.text.replace(/^⟦[^⟧]*⟧\n/, '')).join('');
   expect(recolle.replace(/\n/g, '')).not.toBe(t);
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ⑨ ORDONNER — file d'abord, frais ensuite, rien ne disparaît
+// ═══════════════════════════════════════════════════════════════════════
+// ⚠️ AJOUTÉ le 06/08/2026 par /stack-audit : `ordonner` est une fonction PURE
+//    à INVARIANT FORT (conservation + ordre + dédup) et n'avait QUE des cas
+//    déterministes. La doctrine du parc impose le property-based dans ce cas —
+//    c'était un MANQUE réel, trouvé par l'audit et corrigé avant de clore.
+// ⚠️ Les cas DÉTERMINISTES de budget.test.js RESTENT : Stryker n'exécute pas
+//    les property-tests, une garde prouvée seulement ici laisserait survivre
+//    ses mutants et le score MENTIRAIT. Les deux, jamais l'un à la place.
+
+const segGen = fc.record({
+  id: fc.constantFrom('a', 'b', 'c', 'a#1', 'a#2', 'b#1', 'd#7'),
+  text: fc.string({ minLength: 1, maxLength: 20 }),
+});
+
+test('PROPERTY ⑨a : la FILE sort intégralement, en TÊTE et dans l ORDRE', () => {
+  // RFC 6455 : un document fragmenté n'est JAMAIS entrelacé. Si la file
+  // n'arrivait pas en tête et dans l'ordre, le récepteur ne pourrait plus
+  // recoller ses `MORCEAU j/m` — la garantie de livraison s'effondre.
+  fc.assert(fc.property(fc.array(segGen, { maxLength: 8 }), fc.array(segGen, { maxLength: 8 }),
+    (file, frais) => {
+      const out = ordonner(file, frais);
+      expect(out.slice(0, file.length)).toEqual(file);
+    }));
+});
+
+test('PROPERTY ⑨b : AUCUN document déjà en file n est ré-empilé', () => {
+  // Le cas FONDATEUR : une doc `dumb` est re-décidée à chaque geste. Sans la
+  // dédup elle serait ré-empilée ENTIÈRE derrière ses propres morceaux.
+  fc.assert(fc.property(fc.array(segGen, { maxLength: 8 }), fc.array(segGen, { maxLength: 8 }),
+    (file, frais) => {
+      const enFile = new Set(file.map((s) => baseId(s.id)));
+      const ajoutes = ordonner(file, frais).slice(file.length);
+      expect(ajoutes.every((s) => !enFile.has(baseId(s.id)))).toBe(true);
+    }));
+});
+
+test('PROPERTY ⑨c : CONSERVATION — tout frais non-dupliqué survit, dans l ordre', () => {
+  // Rien ne doit s'évaporer : c'est l'invariant central du module.
+  fc.assert(fc.property(fc.array(segGen, { maxLength: 8 }), fc.array(segGen, { maxLength: 8 }),
+    (file, frais) => {
+      const enFile = new Set(file.map((s) => baseId(s.id)));
+      const attendus = frais.filter((s) => !enFile.has(baseId(s.id)));
+      expect(ordonner(file, frais).slice(file.length)).toEqual(attendus);
+    }));
+});
+
+test('PROPERTY ⑨d : TOTALE — jamais de jet, quelle que soit l entrée', () => {
+  // Une entrée absente/invalide DÉGRADE, elle ne casse pas : ce module est sur
+  // un chemin fail-open, un throw priverait l'agent de TOUT son contexte.
+  fc.assert(fc.property(fc.oneof(fc.array(segGen, { maxLength: 4 }), fc.constant(undefined), fc.constant(null)),
+    fc.oneof(fc.array(segGen, { maxLength: 4 }), fc.constant(undefined), fc.constant(null)),
+    (file, frais) => {
+      expect(Array.isArray(ordonner(file, frais))).toBe(true);
+    }));
+});
+
+test('PROPERTY ⑨e : IDEMPOTENCE — re-ordonner un résultat ne l enrichit plus', () => {
+  // Rejouer converge : condition pour qu'un geste interrompu puisse reprendre
+  // sans doublon (doctrine « toute opération multi-étapes est reprenable »).
+  fc.assert(fc.property(fc.array(segGen, { maxLength: 8 }), fc.array(segGen, { maxLength: 8 }),
+    (file, frais) => {
+      const une = ordonner(file, frais);
+      expect(ordonner(une, frais)).toEqual(une);
+    }));
 });
