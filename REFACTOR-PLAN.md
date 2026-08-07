@@ -59,12 +59,23 @@ par simple grep serait donc **INERTE SUR LE CAS QUI L'A MOTIVÉ** — la défini
 décoratif que ce repo traque. ⇒ il DOIT être **TRANSITIF**, sur le modèle exact de
 `emission-core-gate` (traversée des require, pas un scan de littéraux).
 
-**CIBLE** : gate dérivé — « tout composant qui ATTEINT (transitivement) un store purgé par le reset
-DOIT déclarer sa tolérance à la purge », + negative-check par sabotage en mémoire. 🛑 Ne PAS le
-poser à la va-vite en fin de session : un gate bâclé sur cette classe donnerait la fausse
-impression qu'elle est couverte, ce qui est pire que de la savoir ouverte.
-**FILET INTÉRIMAIRE, ASSUMÉ PLUS FAIBLE** : test « APRÈS COMPACTION » (`canari-check.test.js`) —
-il scelle le CAS, pas la CLASSE.
+✅ **MOITIÉ DÉCIDABLE LIVRÉE le 07/08/2026 — `store-purge-gate.test.js`.** « Tout store déclaré est
+CONNU du reset », dérivé des DEUX côtés (boucle de purge ⇄ déclarations), + volet inverse (purge
+morte) + negative-check. Il **convertit en machine** la consigne en prose que `reset.md` portait
+depuis des semaines (« tout nouveau store DOIT être ajouté ici dans le MÊME geste ») — un invariant
+qui dépendait de la vigilance, et dont l'échec est SILENCIEUX.
+⚠️ **IL A LEVÉ UN FAUX POSITIF AU PREMIER RUN, et c'est la leçon la plus utile** : il accusait
+`sources/skill.js`, qui déclare `PREFIX = 'skill/'` — un préfixe d'IDENTIFIANT de doc, pas un
+store. Mon commentaire prétendait viser « la déclaration d'un store », le code capturait TOUTE
+constante `PREFIX`. ⇒ 2ᵉ condition ajoutée (le fichier doit utiliser `session-store`). 🛑 **Un gate
+se juge sur ce qu'il matche RÉELLEMENT, jamais sur ce que son commentaire prétend** — et ça ne se
+voit qu'en le lançant sur le repo réel AVANT de le déclarer fini.
+
+🔴 **CE QUI RESTE OUVERT, ET NE SE FERMERA PAS PAR UN GATE** : « ce lecteur TOLÈRE-t-il la purge ? »
+est **sémantique** — « ce composant a-t-il besoin de continuité ? » ne se lit pas dans le code.
+C'est exactement la régression du 07/08 (le canari a perdu son dénominateur en PreCompact).
+**Filet actuel, assumé plus faible** : test « APRÈS COMPACTION » (`canari-check.test.js`) — il
+scelle le CAS, pas la CLASSE. 🛑 Ne pas croire la classe fermée parce qu'un gate porte son nom.
 
 ## ㉒ LANGUE DU CODE — DÉCLASSÉE par décision du mainteneur (07/08/2026)
 L'API interne reste en **français**, le DSL en anglais. **Ce n'est pas une dette à résorber

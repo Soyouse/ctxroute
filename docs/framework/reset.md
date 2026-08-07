@@ -1,8 +1,9 @@
 ---
-match: ctxroute-reset.js
+match: [ctxroute-reset.js, store-purge-gate.test.js]
 mode: dumb
 ---
 # ctxroute-reset.js — PreCompact : le SEUL vrai vidage de contexte
+✅ **LA CONSIGNE CI-DESSOUS EST DÉSORMAIS MÉCANIQUE (07/08/2026)** : `store-purge-gate.test.js` exige que tout store déclaré (`…PREFIX` dans un fichier qui utilise `session-store`) soit dans la boucle de purge — **dérivé des DEUX côtés**, plus un volet inverse (purge morte) et un negative-check. ⚠️ Il a levé un FAUX POSITIF au 1er run (`sources/skill.js`, préfixe d'IDENTIFIANT et non de store) : d'où la 2ᵉ condition. 🛑 **CE QU'IL NE PROUVE PAS** : qu'un lecteur TOLÈRE la purge — c'est sémantique, donc indécidable. Régression réelle du 07/08 (le canari a perdu son compteur en PreCompact) ⇒ couverte par un test de CAS, pas par ce gate. Ne pas le vendre au-delà.
 ⚠️ **LA LISTE DES PRÉFIXES EST EXHAUSTIVE OU ELLE EST FAUSSE.** 5 stores à purger : `doc-seen-` (dédup par doc) · `ctxroute-seen-` (relique legacy) · `turn-count-` (compteur de tours) · `plan-` (plan mémoïsé par invocation) · `reliquat-` (file d'émission). **En oublier un ne casse rien de visible** : ça produit des docs jamais réinjectées après compaction, ou un fragment orphelin — un défaut SILENCIEUX, découvert des sessions plus tard. Tout nouveau store DOIT être ajouté ici dans le MÊME geste.
 ⚠️ **PURGER LA FILE EST CORRECT, pas une perte** : la compaction vide le contexte réel, donc ce qui attendait d'y arriver n'a plus de destination et les docs seront redécidées à neuf par la cadence. Garder la file livrerait la FIN d'un document dont le DÉBUT a disparu — un fragment illisible.
 ⚠️ **`plan-` se balaie TOUJOURS par PRÉFIXE**, jamais par chemin exact : sa clé porte un suffixe d'invocation (`--inv-…`) qu'une suppression ciblée ne trouverait jamais.
