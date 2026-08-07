@@ -77,6 +77,29 @@ C'est exactement la régression du 07/08 (le canari a perdu son dénominateur en
 **Filet actuel, assumé plus faible** : test « APRÈS COMPACTION » (`canari-check.test.js`) — il
 scelle le CAS, pas la CLASSE. 🛑 Ne pas croire la classe fermée parce qu'un gate porte son nom.
 
+## 🛑 ㉖ PISTE MESURÉE PUIS FERMÉE — « gate sur les constantes citées » (07/08/2026)
+**Née d'un défaut RÉEL du jour** : le skill se contredisait à 9 lignes d'intervalle — il annonçait
+la disparition de `MARQUE_APPEL_CLAUDE` **et** expliquait comment la modifier. Trouvé par un grep
+manuel, pas par une machine. `doc-drift-gate` ne pouvait pas le voir : il vérifie que les FICHIERS
+cités existent, pas les IDENTIFIANTS.
+
+**MESURE FAITE (ne pas la refaire)** : docs injectables = **18 constantes citées, 0 introuvable**
+(les `*-reference.md` exclus — ils citent légitimement des constantes de RFC, ex. `BASE_PLPMTU`,
+seul faux positif du corpus). Skill = 4 citées, 0 introuvable. **Le taux de bruit serait donc nul.
+Le gate semblait faisable.**
+
+🛑 **IL NE L'EST PAS, ET LA RAISON EST STRUCTURELLE.** Le scan rend « 0 introuvable » sur le cas
+fondateur LUI-MÊME : `MARQUE_APPEL_CLAUDE` **existe encore dans le code**, en COMMENTAIRE, parce
+que la doctrine du repo impose de garder la trace datée d'une erreur. Le gate serait donc **inerte
+sur le défaut qui l'a motivé**. Et en dé-commentarisant (ce que fait `emission-core-gate`), on
+inverse le problème : il rougirait sur les mentions HISTORIQUES des docs — « cette ligne disait
+l'inverse, voici pourquoi » — qui sont précisément ce qu'on veut CONSERVER.
+⇒ **Distinguer « cité comme vivant » de « cité comme disparu » est SÉMANTIQUE.** Les deux sens du
+gate sont faux, quel que soit le réglage. **Piste FERMÉE, pas reportée.**
+⚠️ **Ce qui tient lieu de filet, assumé plus faible** : un grep des littéraux supprimés au moment
+où on en supprime un. C'est une habitude, pas une machine — et c'est écrit ici pour que personne
+ne rouvre cette piste en croyant qu'elle n'a pas été instruite.
+
 ## ㉒ LANGUE DU CODE — DÉCLASSÉE par décision du mainteneur (07/08/2026)
 L'API interne reste en **français**, le DSL en anglais. **Ce n'est pas une dette à résorber
 maintenant** : le coût du renommage de masse n'est pas justifié tant que le projet n'a pas
