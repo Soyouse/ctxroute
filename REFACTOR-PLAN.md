@@ -13,14 +13,17 @@ branche. Toute édition d'un fichier vivant est active pour tous les agents au g
 branche protège l'HISTORIQUE ; seul un worktree séparé isolerait le runtime — mais alors on ne
 testerait plus le vrai câblage.
 
-## Les 14 commits du jour, dans l'ordre
+## Les 15 commits du jour, dans l'ordre
 `cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
 audit des valeurs de rank · **`466a0bc` ㉘ la marque `[source:` CITÉE n'est plus comptée comme
 LIVRÉE (+ ② bis fermé par run Codex réel)** · `31c1ccd` + `e0d5ad3` la tête du backlog annonçait
 un état périmé (DEUX fois — d'où ㉚) · `b8a17c0` ㉙ la suite legacy n'écrit plus dans le `state/`
-vivant · `382436d` ㉚ le gate de décompte de la tête · `f21d17f` ④ le contrat canari ⟷ afficheur.
+vivant · `382436d` ㉚ le gate de décompte de la tête · `f21d17f` ④ le contrat canari ⟷ afficheur ·
+**`cb05f2a` le repli sans verrou DEVINAIT l'état au lieu de le lire — le doublon de morceau
+EXISTAIT, et la « réfutation » du matin était la vraie erreur** (une reproduction RATÉE convertie
+en RÉFUTATION).
 **Preuves de clôture** : **1096 tests** (58 fichiers) · mutation `canari.js` **100 % / 0 survivant**
 · doctor **0 problème** sur les câblages réels · dependency-cruiser 0 violation (49 modules) ·
 jscpd 0,52 % · arbre **propre**. ✅ **CI VERTE sur `f21d17f`**.
@@ -48,7 +51,7 @@ d'env · fixture ambigu) — le motif EXACT que `explain.md` documente. Réflexe
 | ㉘ bis | **Marque `[source:` auto-référente — reste 4 docs du parc** citant un `.md`. Fix total = n'accepter que les étiquettes RÉELLEMENT émises (store `emission-core`) ⇒ touche le chemin chaud de TOUS les agents ⮕ **à faire quand aucun autre agent ne travaille** | 🟠 |
 | ㉙ | **`legacy-mcp-inject.test.js` est FLAKY** — son `STATE_DIR` est le dossier `state/` **VIVANT**, où les hooks en prod écrivent en permanence (12 processus par appel d'outil). Ses tests de purge listent ce dossier pendant que d'autres agents y écrivent ⇒ 3 rouges aléatoires le 07/08, **verts en 2 runs isolés consécutifs**. Fix = tmpdir jeté (test-only, zéro risque runtime) | 🟠 |
 | ㉙ | **`legacy-mcp-inject.test.js` flaky** — ✅ **FERMÉ 07/08/2026** : son état vit en tmpdir jeté (`CTXROUTE_STATE_DIR`), plus aucune lecture du `state/` vivant. 2 runs consécutifs verts (46/46). 🛑 **AUCUN gate — 3 critères mesurés, 3 fois du bruit** : « toute suite qui spawne un hook doit isoler » ⇒ **6 faux positifs** (doctor, deadline, lint-corpus, doc-write-guard, deps-purete, vendor-deadline : elles laissent au pire un fichier inerte, jamais relu, purgé) ; « aucune suite ne résout un chemin `state` » ⇒ **8 faux positifs** (elles joignent un TMPDIR à `state`). Distinguer exigerait de savoir si la BASE est la racine du repo = analyse de flot, pas du texte. Ne pas réessayer sans nouveau critère | ✅ |
-| ㉗ | **Valeurs de `rank`** — mécanisme prouvé, les 313 valeurs jamais auditées | 🟠 |
+| ㉗ | **Valeurs de `rank`** — ✅ **MESURÉ 07/08/2026 (nuit)**, décision d'action en attente. 42 654 chemins réels, VRAI moteur (`sources/file.js`) : **88 paires co-injectées**, 77 ordonnées par le rank, **11 par l'alphabet** (Infinity/Infinity), **0 conflit** (impossible par construction : tri global). 7 rangs en DOUBLON — **aucun ne co-injecte, donc inoffensifs**. 🔴 **Le vrai trou = 39 paires MIXTES** (une rankée face à une sans rank) : la rankée passe toujours devant, mécaniquement, quelle que soit l'intention. 🛑 **Relire les 313 valeurs = TOIL** : le transport à 12 trames ne préserve PAS l'ordre de LECTURE (cf `sources.md`) ⇒ auditer un « ordre voulu » auditerait un effet non observable. Seul effet survivant = priorité de LIVRAISON sous pression de capacité. ⚠️ 5ᵉ sonde fausse sur ce sujet : `tool_name`/`tool_input` au lieu de `toolName`/`toolInput` ⇒ 0 paire, faux verdict. **Témoin positif obligatoire dans toute sonde.** | 🟠 |
 | ㉕ | **Couplage par le stockage** — moitié décidable LIVRÉE (gate), moitié sémantique indécidable | 🟠 |
 | ④ | **Contrat canari ⟷ afficheur** — ✅ **FERMÉ 07/08/2026** (volet ④ de `parc-sync-gate`) : chemins absolus, export destructuré et clé `verdict` vérifiés quand un afficheur existe. 🛑 **Mon 1er motif filtrait sur `ctxroute` et aurait RATÉ son cas fondateur** (le chemin périmé citait l'ANCIEN nom `mcp-doc-hooks`) — élargi à TOUT chemin absolu après mesure : 5 chemins, 0 mort, 0 exemption. Le framework ne RÉCLAME toujours aucun afficheur (skip s'il n'y en a pas) | ✅ |
 | ⑱ | **Rien ne mesure le DÉBIT** — partiellement couvert par l'alarme de capacité | 🟠 |
