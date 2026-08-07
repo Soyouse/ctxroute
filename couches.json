@@ -27,6 +27,12 @@
       "pourquoi": "Les arguments sont le CÂBLAGE, donc du dialecte d'appelant. Un coeur les reçoit en paramètre, il ne les lit jamais.",
       "temoin": "const a = process.argv;"
     },
+    "etat-devine": {
+      "pattern": "gate.decide($$$A, {}, $$$B)",
+      "libelle": "DEVINER l'état au lieu de le lire",
+      "pourquoi": "Un littéral vide passé en ÉTAT n'est pas « pas d'effet de bord » : c'est l'AFFIRMATION « rien n'a jamais été injecté ». BUG PROD 07/08/2026 : le repli sans verrou de porte-core.js passait `{}` ⇒ un `once` déjà livré était réémis, seul, à sa trame (morceau ORPHELIN, sans compaction, file vide). Le verrou sérialise les ÉCRITURES ; la LECTURE n'en a jamais eu besoin. ⚠️ PORTÉE VOLONTAIREMENT ÉTROITE, sur MESURE (07/08/2026) : `x || {}` compte 29 occurrences hors tests, TOUTES légitimes (normaliser un paramètre absent) — syntaxe identique, sémantique inverse. Ce qui distingue les deux (« la donnée était-elle LISIBLE ? ») est du FLOT, pas de la syntaxe. 🛑 Ne PAS élargir à `|| {}` : 29 exemptions = gate mort. Ce motif ne ferme QUE l'appel dont l'état est la vérité du framework.",
+      "temoin": "const r = gate.decide(config, acc.decls, acc.matched, {}, 0, acc.owner);"
+    },
     "shell": {
       "_pourquoi_une_REGLE_et_pas_un_motif": "MESURÉ le 06/08/2026 : le motif `{ shell: true }` ne trouve QUE l'objet à UNE seule propriété. Le cas RÉEL — `{ encoding: 'utf8', shell: true, maxBuffer: N }` — n'était PAS détecté, et `$$$` ne le rattrape pas. Une règle `kind: pair` attrape les 3 formes (multi-propriétés, mono-propriété, affectation) et ignore la CHAÎNE 'shell: true'. 🛑 Ne JAMAIS revenir à un motif ici : ce serait une règle INERTE, verte en étant aveugle — exactement ce que ce gate existe pour rendre impossible.",
       "regle": [
@@ -69,6 +75,8 @@
       ]
     }
   ],
-  "justifications": {},
+  "justifications": {
+    "explain.js/etat-devine": "DÉLIBÉRÉ, et c'est la SEULE dérogation admise : `explain.js` est un outil d'introspection lancé HORS de toute session — il n'existe aucun état à lire, et son rôle est de répondre « pourquoi cette doc s'injecterait-elle ? » sur un contexte NEUF. ⚠️ CONSÉQUENCE À CONNAÎTRE, pas un détail : son verdict de CADENCE (`once` déjà consommé, compteur `smart`) peut donc différer du réel. Il dit ce qui se passerait dans une session vierge, jamais l'état de la tienne. 🛑 Si un jour il reçoit un `session_id`, cette justification devient FAUSSE et doit tomber — il devra lire l'état comme tout le monde."
+  },
   "_doc_temoin": "⚠️ `temoin` = UNE LIGNE DE CODE RÉELLE que la capacité DOIT détecter. Le gate l'écrit dans un fichier temporaire et exige qu'elle soit trouvée. C'est ce qui rend une règle INERTE impossible — le défaut le plus dangereux du dépôt (un gate vert parce qu'il ne voit rien). Mesuré le 06/08/2026 : le motif `{ shell: true }` ne trouvait PAS `{ encoding: 'utf8', shell: true, maxBuffer: N }`, la forme qui avait justement causé la CI rouge. Le témoin DOIT donc être la forme RÉELLE rencontrée, jamais un cas d'école simplifié. 🛑 Toute capacité AJOUTÉE sans témoin est refusée par le gate."
 }
