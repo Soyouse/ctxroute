@@ -61,7 +61,8 @@
 - `Desktop/ctxroute/codex-doc-inject.js` — coquille CODEX PreToolUse (19/07/2026) : porte-core + emit Codex (SANS permissionDecision, ask DÉGRADÉ en contexte préfixé — « ask » Codex parsed-not-supported).
 - `Desktop/ctxroute/codex-doc-inject.test.js` — suite spawn de la coquille Codex (dialecte seul : dégradation ask, clé sans agent_id, fail-open).
 - `Desktop/ctxroute/corpus.js` — I/O partagée shadow+porte : lecture récursive des .md du parc (ids identiques aux `doc` du JSON).
-- `Desktop/ctxroute/session-store.js` — I/O partagée des states par session (préfixes distincts : `ctxroute-seen-` serveurs / `doc-seen-` docs). Extrait par gate jscpd.
+- `Desktop/ctxroute/session-store.js` — I/O partagée des states par session (préfixes distincts : `ctxroute-seen-` serveurs / `doc-seen-` docs). Extrait par gate jscpd. Écriture ATOMIQUE (tmp + rename, reprise bornée sur EPERM Windows).
+- `Desktop/ctxroute/session-store.test.js` — atomicité de l'écriture d'état : 2 processus réels (écrivain/lecteur), zéro lecture creuse, zéro écriture perdue, zéro `.tmp` abandonné.
 - `Desktop/ctxroute/session-inject.js` — PORTE SESSION (SessionStart, câblée 17/07/2026) : injecte TOUT `docs/session/*.md` à chaque début de session ET après chaque compaction (le « CLAUDE.md géré par le framework »). Zéro état, zéro dédup, fail-open.
 - `Desktop/ctxroute/sources/session.js` — SOURCE « session » : corpus docs/session → docs ordonnées (alpha, frontmatter strippé). PURE, mutée 13/13.
 - `Desktop/ctxroute/sources/skill.js` — SOURCE « skill » (18/07/2026) : registre `config.skills` → skills déclenchés par PÉRIMÈTRE. 2 dimensions RÉUTILISÉES (fichier via matchingDocs, MCP via lib.serverName), union dédupée. L'adaptateur injecte le CORPS du skill lu en direct (paths.skillsDir(), frontmatter harnais strippé — décision mainteneur 18/07/2026), fallback pointeur si fichier illisible. PURE, mutée 100%.
