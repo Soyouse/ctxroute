@@ -39,6 +39,24 @@ const PORTE = path.join(ICI, 'doc-inject.js');
 // Fichier RÉEL du repo, choisi parce qu'il porte une doc injectable volumineuse.
 const CIBLE = path.join(ICI, 'porte-core.js');
 
+// ⚠️ CETTE SUITE DÉPEND DU PARC VIVANT — elle SKIP sur un clone vierge.
+//    🔴 PAYÉ IMMÉDIATEMENT (07/08/2026) : écrite sans cette garde, elle a rendu
+//    la CI ROUGE au premier push (3 échecs sur ubuntu-latest) alors que le
+//    local était vert. DEUX raisons, toutes deux invisibles ici :
+//    ① `ctxroute-config.json` est GITIGNORÉ (il porte les noms de projets du
+//       mainteneur) — il n'existe donc PAS sur un clone ;
+//    ② le corpus de docs vit dans `~/.claude/hooks/docs`, hors du repo.
+//    C'est le piège nommé dans `rituel-stack-audit.md` : « le local lit la
+//    config RÉELLE de la machine, la CI un clone VIERGE ».
+// 🛑 NE PAS « corriger » en fabriquant un faux corpus : ce qu'on mesure ici,
+//    c'est le dépassement de capacité sur du contenu RÉEL. Un corpus fabriqué
+//    prouverait que l'alarme sait s'afficher, pas qu'elle se déclenche quand
+//    il le faut. Mieux vaut SKIP franchement que mesurer autre chose.
+//    Même arbitrage que les volets ①② de `couverture-gate` et que
+//    `porte-differential`, qui skippent pour la même raison.
+const parcPresent = fs.existsSync(path.join(ICI, 'ctxroute-config.json'))
+  && fs.existsSync(path.join(os.homedir(), '.claude', 'hooks', 'docs'));
+
 /** Lance la porte avec un budget imposé et rend son `systemMessage`. */
 function badge({ budgetInjection, paquet, paquets, racine }) {
   const cfg = JSON.parse(fs.readFileSync(path.join(ICI, 'ctxroute-config.json'), 'utf8'));
@@ -70,7 +88,7 @@ function tmp() {
   return d;
 }
 
-test('CRIE — capacité dépassée : la DERNIÈRE trame porte l\'alarme, avec le réglage à changer', () => {
+test.skipIf(!parcPresent)('CRIE — capacité dépassée : la DERNIÈRE trame porte l\'alarme, avec le réglage à changer', () => {
   const racine = tmp();
   try {
     // Budget minuscule + 2 trames ⇒ report GARANTI, quel que soit le corpus.
@@ -85,7 +103,7 @@ test('CRIE — capacité dépassée : la DERNIÈRE trame porte l\'alarme, avec l
   } finally { fs.rmSync(racine, { recursive: true, force: true }); }
 });
 
-test('SE TAIT — une trame NON finale ne répète pas l\'alarme (12 trames = 12 cris = alarme illisible)', () => {
+test.skipIf(!parcPresent)('SE TAIT — une trame NON finale ne répète pas l\'alarme (12 trames = 12 cris = alarme illisible)', () => {
   const racine = tmp();
   try {
     const msg = badge({ budgetInjection: 900, paquet: 1, paquets: 2, racine });
@@ -94,7 +112,7 @@ test('SE TAIT — une trame NON finale ne répète pas l\'alarme (12 trames = 12
   } finally { fs.rmSync(racine, { recursive: true, force: true }); }
 });
 
-test('NEGATIVE — capacité SUFFISANTE (câblage RÉEL, 12 trames) : aucune trame ne crie', () => {
+test.skipIf(!parcPresent)('NEGATIVE — capacité SUFFISANTE (câblage RÉEL, 12 trames) : aucune trame ne crie', () => {
   // ⚠️ ON REJOUE LES 12 TRAMES, PAS UNE SEULE. L'alarme ne vit que sur la
   //    DERNIÈRE trame PORTEUSE, et les dernières trames déclarées sont souvent
   //    VIDES (charge mesurée 65 265 c ⇒ ~9 trames sur 12). Sonder un indice
