@@ -72,6 +72,11 @@ const FENETRE_OCTETS = 2 * 1024 * 1024;
 //    du budget, et le canari deviendrait aveugle aux petites injections.
 const MARQUE_INJECTION = '[source:';
 
+// ⚠️ Longueur max d'une étiquette PLAUSIBLE (un chemin de doc). Généreux à
+//    dessein : le filtre discriminant est la FORME (`.md` / `skill/`), pas la
+//    taille — celle-ci n'écarte que les faux `]` très lointains.
+const LONGUEUR_ETIQUETTE_MAX = 200;
+
 // ⚠️ IL N'Y A PLUS AUCUNE MARQUE DE HARNAIS NULLE PART — ni ici, ni dans la
 //    coquille (07/08/2026). Jusqu'à cette date, le DÉNOMINATEUR (« combien
 //    d'occasions d'injecter ? ») se comptait en cherchant `"type":"tool_use"`
@@ -160,8 +165,58 @@ function compterInjections(extrait) {
   //    chaîne ARBITRAIRE que rien ne peut observer ⇒ mutant équivalent. Ici, le
   //    zéro est une valeur de contrat, donc testable.
   if (typeof extrait !== 'string') return 0;
-  return occurrences(extrait, MARQUE_INJECTION);
+  let n = 0;
+  let k = extrait.indexOf(MARQUE_INJECTION);
+  while (k !== -1) {
+    const debut = k + MARQUE_INJECTION.length;
+    const fin = extrait.indexOf(']', debut);
+    // ⚠️ `fin === -1` = marque COUPÉE par la fenêtre de 2 Mo. Indécidable ⇒ on
+    //    ne compte pas. Ne JAMAIS compter ici « pour ne rien rater » : ce
+    //    serait rouvrir exactement le trou ㉘ sur les marques tronquées.
+    if (fin !== -1 && estEtiquetteEmise(extrait.slice(debut, fin))) n++;
+    k = extrait.indexOf(MARQUE_INJECTION, debut);
+  }
+  return n;
 }
+
+/**
+ * L'étiquette a-t-elle la forme de celles que NOTRE PORTE ÉMET ?
+ *
+ * 🛑 DÉFAUT ㉘ (07/08/2026) — LIRE AVANT DE TOUCHER À CETTE FONCTION.
+ *    Le canari comptait toute occurrence de `[source:`. Or ce littéral vit
+ *    aussi dans du TEXTE QUI EN PARLE : les commentaires de ce fichier même, et
+ *    **64 docs du parc sur 386** (MESURÉ ce jour) qui CITENT un fichier source
+ *    sous cette forme. Conséquence : un agent qui LIT une de ces docs faisait
+ *    passer le canari au VERT — c'est-à-dire que le dead-man switch se
+ *    désamorçait au moment précis où quelqu'un ENQUÊTAIT sur une injection
+ *    morte. Le seul scénario où il sert est celui où il mentait.
+ *
+ * ✅ CE QUI DISCRIMINE : une étiquette ÉMISE désigne toujours un DOCUMENT —
+ *    elle finit par `.md` (docs fichier, MCP, session) ou commence par
+ *    `skill/`. Une citation de code désigne un fichier SOURCE. Mesure du parc
+ *    sur les marqueurs EN DUR : 23 `.js`, 18 `.ts`, 7 `.tsx`, 4 `.sh`, 3 `.py`,
+ *    1 `.mjs`, 1 `.service` — et 4 seulement en `.md`.
+ *
+ * ⚠️ CE N'EST PAS LE FIX COMPLET, ne JAMAIS le présenter comme tel : les 4 docs
+ *    du parc qui citent un `.md` restent comptées à tort. Le fix TOTAL =
+ *    n'accepter que les étiquettes RÉELLEMENT ÉMISES, relues dans le store
+ *    (`emission-core`). Il n'a pas été fait ici parce qu'il exige de toucher le
+ *    module par où passe TOUT le contexte de TOUS les agents, pendant que
+ *    d'autres agents travaillaient. Chantier ㉘ bis du REFACTOR-PLAN.
+ */
+function estEtiquetteEmise(brut) {
+  const l = brut.trim();
+  // ⚠️ Borne HAUTE : une marque suivie d'un `]` très lointain (prose, JSON
+  //    échappé) n'est pas une étiquette. Sans elle, n'importe quel texte
+  //    contenant `[source:` puis un `]` finirait par valider.
+  // ⚠️ PAS de garde `l.length === 0` : elle était MORTE (mutant survivant,
+  //    07/08/2026). Une étiquette vide ne finit pas par `.md` et ne commence
+  //    pas par `skill/` ⇒ elle est DÉJÀ refusée par le test de forme. Écrire un
+  //    test pour la ressusciter aurait figé du code inutile pour toujours.
+  if (l.length > LONGUEUR_ETIQUETTE_MAX) return false;
+  return l.endsWith('.md') || l.startsWith('skill/');
+}
+
 
 // ⚠️ Comptage par `indexOf` et non par regex : les deux marques contiennent des
 //    caractères spéciaux (`[`, `"`), et une regex construite par concaténation

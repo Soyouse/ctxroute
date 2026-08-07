@@ -86,8 +86,16 @@ test('COMPTAGE : seules NOS marques comptent — le bruit du harnais est ignoré
 });
 
 test('COMPTAGE : occurrences ADJACENTES toutes vues (pas de chevauchement raté)', () => {
-  assert.equal(compterInjections(MARQUE_INJECTION + MARQUE_INJECTION), 2);
-  assert.equal(compterInjections(MARQUE_INJECTION.repeat(7)), 7);
+  // ⚠️ CONTRAT CHANGÉ le 07/08/2026 (défaut ㉘) — l'INTENTION du test est
+  //    intacte (le balayage ne doit pas rater deux occurrences collées), seule
+  //    la fixture change : une marque NUE, sans étiquette, ne prouve plus rien.
+  //    Ne PAS revenir aux marques nues « parce que c'était plus simple » : ce
+  //    sont elles qui rendaient le canari vert sur du texte qui PARLE de lui.
+  const m = MARQUE_INJECTION + ' docs/session/a.md]';
+  assert.equal(compterInjections(m + m), 2);
+  assert.equal(compterInjections(m.repeat(7)), 7);
+  // La marque NUE répétée ne prouve AUCUNE injection.
+  assert.equal(compterInjections(MARQUE_INJECTION.repeat(7)), 0);
 });
 
 test('COMPTAGE : ligne TRONQUÉE en tête ⇒ robuste (la fenêtre coupe au milieu)', () => {
@@ -120,4 +128,80 @@ test('NEGATIVE-CHECK : le canari SAIT accuser (sinon il certifie au lieu de prot
   assert.equal(verdict(SEUIL_EMISSIONS, 0), 'mort', 'il sait accuser');
   assert.notEqual(verdict(SEUIL_EMISSIONS, 1), 'mort', "…et il sait s'abstenir");
   assert.notEqual(verdict(SEUIL_EMISSIONS - 1, 0), 'mort', "…et il sait attendre d'en savoir assez");
+});
+
+// ── ㉘ AUTO-RÉFÉRENCE : le marqueur CITÉ n'est pas le marqueur LIVRÉ ─────
+// ⚠️ DÉFAUT RÉEL trouvé le 07/08/2026 en fermant ② bis (run Codex réel).
+//    `compterInjections` comptait TOUTE occurrence de `[source:`. Or ce
+//    littéral apparaît dans du TEXTE QUI EN PARLE : les commentaires de
+//    `canari.js` lui-même, et 64 docs du parc sur 386 (MESURÉ ce jour) qui
+//    citent un fichier source sous cette forme.
+// 🛑 CONSÉQUENCE, et c'est ce qui la rend grave : un agent qui LIT une de ces
+//    docs — c'est-à-dire exactement le geste de quelqu'un qui ENQUÊTE sur une
+//    injection morte — faisait passer le canari au VERT. Le dead-man switch se
+//    désamorçait au moment précis où on avait besoin de lui.
+// ✅ FILTRE : seule une étiquette de forme ÉMISE compte (`.md` en suffixe, ou
+//    préfixe `skill/`). Mesure du parc : sur les marqueurs EN DUR, 23 citent un
+//    `.js`, 18 un `.ts`, 7 un `.tsx`, 4 un `.sh`, 3 un `.py` — 4 seulement un
+//    `.md`. Le filtre en élimine donc l'écrasante majorité.
+// ⚠️ CE N'EST PAS LE FIX COMPLET, et ne jamais le présenter comme tel : il
+//    reste 4 docs du parc citant un `.md`. Le fix TOTAL (n'accepter que les
+//    étiquettes RÉELLEMENT émises, lues dans le store) exige de toucher
+//    `emission-core.js`, par où passe tout le contexte de tous les agents.
+test('㉘ une étiquette qui CITE un fichier source ne prouve AUCUNE injection', () => {
+  // ⚠️ Chemins GÉNÉRIQUES : dépôt public, jamais un nom de projet/client réel
+  //    (gate `fuite-perso-gate` — il a rougi sur la 1re version de ce test).
+  assert.equal(compterInjections('voir [source: src/handlers/lifecycle.js]'), 0);
+  assert.equal(compterInjections('cf [source: packages/seo/src/rss.ts]'), 0);
+  assert.equal(compterInjections('cf [source: deploy.sh] et [source: a.py]'), 0);
+});
+
+test('㉘ le commentaire de canari.js sur sa PROPRE marque ne compte pas', () => {
+  // ⚠️ Le cas ironique : l'agent qui enquête lit `canari.js`, dont un
+  //    commentaire contient `[source: …]`. Avant le fix, ça suffisait à
+  //    déclarer le canal vivant.
+  assert.equal(compterInjections('(`[source: …]`, posé par la porte)'), 0);
+  assert.equal(compterInjections('[source: ]'), 0);
+});
+
+test('㉘ une VRAIE étiquette émise compte toujours — aucun faux négatif', () => {
+  assert.equal(compterInjections(injection()), 1);
+  assert.equal(compterInjections('[source: docs/session/outils.md]'), 1);
+  assert.equal(compterInjections('[source: docs/mcp/stripe.md]'), 1);
+  assert.equal(compterInjections('[source: skill/ctxroute]'), 1);
+  assert.equal(compterInjections(injection() + injection()), 2);
+});
+
+test('㉘ étiquette TRONQUÉE par la fenêtre : jamais comptée, jamais une erreur', () => {
+  // ⚠️ La fenêtre de 2 Mo coupe au milieu d'une ligne PAR CONSTRUCTION. Une
+  //    marque sans `]` est indécidable : on ne compte pas, on ne throw pas.
+  assert.equal(compterInjections('bla [source: .claude/hooks/docs/x.m'), 0);
+  assert.equal(compterInjections('[source:'), 0);
+});
+
+test('㉘ BORNE : un `]` très lointain ne fabrique pas une étiquette', () => {
+  // ⚠️ Sans borne, n'importe quelle prose contenant `[source:` puis, 3 000
+  //    caractères plus loin, un `]` finissant par « .md » validerait.
+  const loin = '[source: ' + 'x'.repeat(300) + '.md]';
+  assert.equal(compterInjections(loin), 0);
+  // Juste sous la borne : compté (preuve que la borne est bien la limite).
+  const court = '[source: ' + 'x'.repeat(150) + '.md]';
+  assert.equal(compterInjections(court), 1);
+});
+
+test('㉘ TRONCATURE : sans la garde `fin !== -1`, une coupure FABRIQUE une étiquette', () => {
+  // ⚠️ FIXTURE DISCRIMINANTE (mutant survivant du 07/08/2026). La fenêtre coupe
+  //    juste APRÈS un `.md` mais AVANT le `]`. Sans la garde, `slice(debut, -1)`
+  //    rogne le dernier caractère et rend « docs/a.md » — une étiquette PARFAITE
+  //    fabriquée par la coupure elle-même. La 1re fixture (« …/x.m ») ne
+  //    distinguait rien : elle échouait déjà sur la forme.
+  assert.equal(compterInjections('[source: docs/a.mdZ'), 0);
+});
+
+test('㉘ BORNE EXACTE : 200 caractères passent, 201 non', () => {
+  const etiquette200 = 'x'.repeat(197) + '.md';
+  const etiquette201 = 'x'.repeat(198) + '.md';
+  assert.equal(etiquette200.length, 200);
+  assert.equal(compterInjections('[source: ' + etiquette200 + ']'), 1);
+  assert.equal(compterInjections('[source: ' + etiquette201 + ']'), 0);
 });

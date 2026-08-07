@@ -30,7 +30,8 @@ d'env · fixture ambigu) — le motif EXACT que `explain.md` documente. Réflexe
 ## 📋 CE QUI RESTE OUVERT — liste COMPLÈTE, rien d'autre ne vit ailleurs
 | # | Chantier | État |
 |---|---|---|
-| ② bis | **Run Codex RÉEL du canari** — câblage prouvé par le doctor, mais aucun run réel. ⚠️ Consomme le quota ChatGPT du mainteneur ⇒ **demander avant** | 🔴 |
+| ㉘ bis | **Marque `[source:` auto-référente — reste 4 docs du parc** citant un `.md`. Fix total = n'accepter que les étiquettes RÉELLEMENT émises (store `emission-core`) ⇒ touche le chemin chaud de TOUS les agents ⮕ **à faire quand aucun autre agent ne travaille** | 🟠 |
+| ㉙ | **`legacy-mcp-inject.test.js` est FLAKY** — son `STATE_DIR` est le dossier `state/` **VIVANT**, où les hooks en prod écrivent en permanence (12 processus par appel d'outil). Ses tests de purge listent ce dossier pendant que d'autres agents y écrivent ⇒ 3 rouges aléatoires le 07/08, **verts en 2 runs isolés consécutifs**. Fix = tmpdir jeté (test-only, zéro risque runtime) | 🟠 |
 | ㉗ | **Valeurs de `rank`** — mécanisme prouvé, les 313 valeurs jamais auditées | 🟠 |
 | ㉕ | **Couplage par le stockage** — moitié décidable LIVRÉE (gate), moitié sémantique indécidable | 🟠 |
 | ④ | **Contrat canari ⟷ afficheur** — vient de se payer (3 jours d'aveuglement), filet = un commentaire | 🟠 |
@@ -46,6 +47,43 @@ d'env · fixture ambigu) — le motif EXACT que `explain.md` documente. Réflexe
 depuis le 17/07 et prouvé sur le terrain (341 injections atterries mesurées dans un transcript de
 46 Mo). Canari, gates et docs sont des FILETS autour — s'ils disparaissaient, les agents
 recevraient exactement les mêmes documents.
+
+## ✅ SESSION DU 07/08 (SOIR-2) — ② bis FERMÉ, ET IL A LIVRÉ UN DÉFAUT RÉEL
+
+**② bis — RUN CODEX RÉEL DU CANARI : FAIT.** Session Codex 0.146 à 2 tours (`codex exec` puis
+`codex exec resume --last`, sandbox lecture seule). Le canari a écrit `vivant, emissions:3,
+injections:12` et le rollout Codex contenait **exactement 12** occurrences de `[source:` — il lit
+donc bien le transcript Codex. Câblage confirmé EN FONCTIONNEMENT (`requirements.toml`,
+`UserPromptSubmit`), plus seulement au doctor. Coût : ~84 k tokens de quota.
+
+🔴 **ET C'EST LA MESURE QUI A TROUVÉ LE DÉFAUT ㉘, pas un test.** En lisant les étiquettes du
+rollout, une valeur détonnait : `[source: …]` — l'étiquette d'aucune doc. C'était le TEXTE QUI
+PARLE DU MARQUEUR, compté comme si le marqueur avait été livré.
+⇒ `compterInjections` comptait toute occurrence de `[source:`. Or ce littéral vit dans les
+commentaires de `canari.js` LUI-MÊME et dans **64 docs du parc sur 386** (mesuré). Un agent qui LIT
+une de ces docs faisait passer le canari au VERT — **le geste exact de quelqu'un qui enquête sur une
+injection morte**. Le dead-man switch se désamorçait pile au moment où il servait.
+
+✅ **CORRIGÉ** : seule une étiquette de forme ÉMISE compte (`.md` en suffixe ou préfixe `skill/`).
+Mesure des marqueurs EN DUR du parc : 23 `.js`, 18 `.ts`, 7 `.tsx`, 4 `.sh`, 3 `.py`, 1 `.mjs`,
+1 `.service` — et **4 seulement en `.md`**. Le filtre élimine donc l'écrasante majorité.
+⚠️ **RESTE OUVERT (㉘ bis)** : ces 4 docs. Le fix TOTAL exige `emission-core`, par où passe tout le
+contexte de tous les agents — **non fait volontairement**, d'autres agents travaillaient sur du
+sensible. Ne pas le présenter comme résolu.
+
+🛑 **POURQUOI AUCUN GATE ANTI-AUTO-RÉFÉRENCE** (mesuré avant d'écrire, pas après) : ~10 fichiers du
+repo portent légitimement un littéral `[source: ….md]` (assertions de `doc-inject.test.js`,
+`mcp-differential`, `session-inject`, `doctor.js`…). Un gate exigerait une liste d'exemptions de 10
+entrées = pur bruit. **Un gate bruyant est un gate qu'on cesse de lire.**
+
+⚠️ **MUTATION : 4 survivants, 1 ÉLIMINÉ (pas testé)** — la garde `l.length === 0` était MORTE (une
+étiquette vide échoue déjà sur la forme). Les 3 autres étaient du vrai comportement : tués par des
+fixtures DISCRIMINANTES. La plus instructive : `[source: docs/a.mdZ` — sans la garde `fin !== -1`,
+la coupure de fenêtre FABRIQUE l'étiquette `docs/a.md` en rognant le dernier caractère. La 1re
+fixture que j'avais écrite (`…/x.m`) ne distinguait RIEN : elle échouait déjà sur la forme.
+
+🔴 **LE GATE ANTI-FUITE A MORDU SUR MOI** : ma 1re fixture citait un chemin client réel. Dépôt
+PUBLIC ⇒ rouge immédiat, corrigé en chemins génériques. Le gate a fait exactement son travail.
 
 ## Ce qui a été livré dans cette session
 **② CANARI CODEX — FERMÉ, et le portage n'a coûté AUCUN fichier neuf.**
