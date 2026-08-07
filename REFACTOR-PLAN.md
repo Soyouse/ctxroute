@@ -13,16 +13,19 @@ branche. Toute édition d'un fichier vivant est active pour tous les agents au g
 branche protège l'HISTORIQUE ; seul un worktree séparé isolerait le runtime — mais alors on ne
 testerait plus le vrai câblage.
 
-## Les 11 commits du jour, dans l'ordre
+## Les 13 commits du jour, dans l'ordre
 `cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
 audit des valeurs de rank · **`466a0bc` ㉘ la marque `[source:` CITÉE n'est plus comptée comme
 LIVRÉE (+ ② bis fermé par run Codex réel)** · `31c1ccd` + `e0d5ad3` la tête du backlog annonçait
-un état périmé (DEUX fois — d'où ㉚).
-**Preuves de clôture** : **1086 tests** (58 fichiers) · mutation `canari.js` **100 % / 0 survivant**
-· doctor **74 ok / 0** sur les DEUX câblages réels · dependency-cruiser 0 violation · jscpd 0,52 %
-· arbre **propre**. ✅ **CI VERTE sur `31c1ccd`** (jobs `test` + `mutation`, clone vierge).
+un état périmé (DEUX fois — d'où ㉚) · `b8a17c0` ㉙ la suite legacy n'écrit plus dans le `state/`
+vivant · `382436d` ㉚ le gate de décompte de la tête.
+**Preuves de clôture** : **1094 tests** (58 fichiers) · mutation `canari.js` **100 % / 0 survivant**
+· doctor **0 problème** sur les câblages réels · dependency-cruiser 0 violation (49 modules) ·
+jscpd 0,52 % · arbre **propre**. ✅ **CI VERTE sur `31c1ccd`** (jobs `test` + `mutation`).
+⚠️ **Le commit qui écrit CETTE ligne ne peut pas s'y citer** — la mise à jour de la tête est
+toujours le commit N+1. Ne pas le compter comme un mensonge.
 
 ## 🔴 CE QUE CETTE SESSION A PROUVÉ, ET QUI VAUT PLUS QUE LE CODE LIVRÉ
 **Quatre défauts trouvés — AUCUN par une machine.** Tous sont sortis de questions du mainteneur
