@@ -2,16 +2,27 @@
 
 ---
 
-# 📍 ÉTAT AU 07/08/2026 (SOIR) — REPRISE DE SESSION, LIRE CECI EN PREMIER
+# 📍 ÉTAT AU 07/08/2026 (NUIT) — REPRISE DE SESSION, LIRE CECI EN PREMIER
 
-## Les 9 commits du jour, dans l'ordre
+## ⚠️ OÙ VIT LE TRAVAIL EN COURS — À LIRE AVANT TOUT `git`
+Le dernier commit `466a0bc` est sur la branche **`canari-codex-reel`**, **NI mergé sur `master`,
+NI poussé**. La branche a été créée parce que d'AUTRES agents travaillaient en parallèle sur des
+architectures sensibles.
+🛑 **UNE BRANCHE NE LES PROTÈGE PAS DU RUNTIME, et il faut le savoir** : le câblage
+(`settings.json`, `requirements.toml`) pointe les `.js` du **répertoire de travail**, pas d'une
+branche. Toute édition d'un fichier vivant est active pour tous les agents au geste suivant. La
+branche protège l'HISTORIQUE ; seul un worktree séparé isolerait le runtime — mais alors on ne
+testerait plus le vrai câblage.
+
+## Les 10 commits du jour, dans l'ordre
 `cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
-audit des valeurs de rank.
-**Preuves de clôture** : 1085 tests (58 fichiers) · mutation **100 %** · doctor **74 ok / 0** sur
-les DEUX câblages réels · dependency-cruiser 0 violation · jscpd 0,52 % · **CI verte** sur tous les
-pushes · `master` == `origin/master`, arbre propre.
+audit des valeurs de rank · **`466a0bc` ㉘ la marque `[source:` CITÉE n'est plus comptée comme
+LIVRÉE (+ ② bis fermé par run Codex réel)**.
+**Preuves de clôture** : **1086 tests** (58 fichiers) · mutation `canari.js` **100 % / 0 survivant**
+· doctor **74 ok / 0** sur les DEUX câblages réels · dependency-cruiser 0 violation · jscpd 0,52 %
+· arbre **propre**. ⚠️ **CI NON LANCÉE sur `466a0bc`** (rien de poussé) — ne pas la croire verte.
 
 ## 🔴 CE QUE CETTE SESSION A PROUVÉ, ET QUI VAUT PLUS QUE LE CODE LIVRÉ
 **Quatre défauts trouvés — AUCUN par une machine.** Tous sont sortis de questions du mainteneur
