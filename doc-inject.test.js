@@ -569,3 +569,73 @@ test('BADGE : le badge FICHIER ignore showNotification — y compris MORCELÉ (p
   //    protect-files) — pas l'absence d'alarme, qui a sa propre suite.
   assert.match(out.systemMessage, /^📄 doc: gros \(morceau 1\/\d+\)( · ⚠️ \d+ doc\(s\) REPORTÉE\(S\).*)?$/, 'badge fichier INCHANGÉ par showNotification (parité)');
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🔴 REPLI SANS VERROU — L'ÉTAT SE LIT, IL NE SE DEVINE PAS (07/08/2026)
+// ═══════════════════════════════════════════════════════════════════════
+// BUG RÉEL, observé en production AVANT d'être compris : un morceau de skill
+// isolé réapparaissait plusieurs minutes après une livraison COMPLÈTE, même
+// marqueur, sans compaction, file VIDE. Signature relevée dans le transcript :
+//   21:25  paquets 1..9 → morceaux 1/9 … 9/9   ###FIN:be66cd9b###
+//   21:30  paquet 2     → morceau  2/9 SEUL    ###FIN:be66cd9b###
+//
+// CAUSE : le repli « lock indisponible » décidait avec un état VIDE (`{}`).
+// Or l'état porte le « déjà vu ». Un `once` déjà livré était donc jugé JAMAIS
+// livré et réémis — et comme ce processus ne lit pas non plus le plan mémoïsé,
+// il recalculait seul le MÊME découpage (déterministe ⇒ marqueur identique) et
+// n'émettait que SA trame. D'où le morceau orphelin.
+//
+// 🛑 L'ERREUR DE FOND EST UNE INFÉRENCE : le processus savait UNIQUEMENT
+//    « je n'ai pas eu le verrou » et en déduisait « donc rien n'a été injecté ».
+//    Le verrou protège l'ÉCRITURE ; la LECTURE n'a jamais eu besoin de lui.
+//    L'état est un fichier sur le disque : il suffisait de le lire. Interroger
+//    ce qui SAIT, jamais un indice.
+//
+// 🛑 POURQUOI 1096 TESTS NE L'ONT PAS VU : aucune suite ne faisait ÉCHOUER le
+//    verrou. La branche de repli n'était exercée qu'avec un état déjà vide,
+//    c'est-à-dire dans le seul cas où l'inférence tombe juste. Un chemin de
+//    dégradation non testé AVEC de l'état est un chemin non testé.
+//
+// ⚠️ Le repli reste FAIL-OPEN et n'écrit toujours RIEN (ni état, ni file) :
+//    on lit, on décide, on livre. Un état légèrement périmé fait au pire une
+//    réinjection JUSTIFIÉE ; un état vide en fabriquait une FANTÔME, à chaque
+//    contention. Ne JAMAIS « simplifier » ce loadState en `{}`.
+test('REPLI SANS VERROU : un `once` déjà livré ne se réinjecte PAS quand le lock est pris', async () => {
+  writeDoc('once.md', '---\nmatch: server.js\nmode: once\n---\n# Savoir\ncorps\n');
+  const payload = { tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'lockfb' };
+
+  const premier = parseOut((await run(payload)).stdout);
+  assert.ok(premier && premier.hookSpecificOutput.additionalContext.includes('corps'), '1re livraison attendue');
+
+  // Le verrou est PRIS par un « autre processus » : mkdirSync échouera en EEXIST.
+  // ⚠️ mtime frais obligatoire — au-delà de STALE_MS (5 s) lock.js le force et
+  //    le repli ne serait jamais emprunté (le test se mentirait à lui-même).
+  const lockDir = path.join(STATE, '.lock-doc-lockfb');
+  fs.mkdirSync(lockDir, { recursive: true });
+  try {
+    const { code, stdout } = await run(payload, { env: { CTXROUTE_LOCK_TIMEOUT_MS: '50' } });
+    assert.strictEqual(code, 0, 'le repli reste fail-open');
+    assert.strictEqual(stdout.trim(), '', 'AUCUNE réinjection fantôme : le `once` est déjà vu');
+  } finally {
+    fs.rmSync(lockDir, { recursive: true, force: true });
+  }
+});
+
+// CONTRE-ÉPREUVE — sans elle, le test ci-dessus passerait aussi si le repli
+// devenait MUET par accident (ex. `return` prématuré), ce qui serait une panne
+// et non un correctif. Une doc JAMAIS vue doit toujours être livrée sans verrou.
+test('REPLI SANS VERROU : une doc JAMAIS vue est quand même livrée (fail-open intact)', async () => {
+  writeDoc('neuve.md', '---\nmatch: server.js\nmode: once\n---\n# Neuve\ninedit\n');
+  const lockDir = path.join(STATE, '.lock-doc-lockfb2');
+  fs.mkdirSync(lockDir, { recursive: true });
+  try {
+    const { stdout } = await run(
+      { tool_name: 'Read', tool_input: { file_path: 'C:/proj/server.js' }, session_id: 'lockfb2' },
+      { env: { CTXROUTE_LOCK_TIMEOUT_MS: '50' } },
+    );
+    const out = parseOut(stdout);
+    assert.ok(out && out.hookSpecificOutput.additionalContext.includes('inedit'), 'sans verrou on livre quand même');
+  } finally {
+    fs.rmSync(lockDir, { recursive: true, force: true });
+  }
+});

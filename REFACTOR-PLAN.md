@@ -2429,24 +2429,47 @@ garde-fou déclencherait un remboursement RÉEL. Vérifier ≠ muter, toujours.
 > **MESURES** : 1 trame 7 661 c · 12 trames **91 932 c** · charge réelle au pire **65 265 c
 > (71 %)**, dont **53 830 c pour le seul skill**.
 >
-> 🛑 **LE DOUBLON N'EXISTAIT PAS — RÉFUTÉ LE 07/08/2026, MESURE À L'APPUI.** Cette section a
-> annoncé « un morceau livré deux fois » comme un défaut avéré. **C'était un FAUX DIAGNOSTIC**, et
-> c'est lui qui a servi d'argument principal au retrait des 12 trames.
-> **CE QUE DIT LE TRANSCRIPT** : le morceau 7/8 du skill apparaît à 05:42:37 (sceau `2bc5f3df`)
-> puis à 06:26:19 (`03d7e9f2`) — et **entre les deux, un hook `PreCompact` à 06:24:24**. La
-> compaction PURGE les états ⇒ une doc `once` redevient à livrer et se réinjecte ENTIÈRE. C'est le
-> comportement **CONÇU** : sans lui, l'agent repartirait sans son skill après chaque compaction.
-> Troisième livraison à 16:39:57 — même schéma, un contexte de plus.
-> **REPRODUCTION TENTÉE** (07/08, sonde dédiée) : 12 processus RÉELLEMENT parallèles, 2 gestes,
-> dépassement massif (105 puis 92 segments en file) ⇒ **0 doublon inter-geste, 0 intra-geste**, la
-> file draine proprement `#12/23` → `#13/23`. Il n'y avait rien à reproduire.
-> ⚠️ **LA LEÇON DE MÉTHODE, elle, est le vrai livrable de cet épisode** : deux occurrences d'un
-> même identifiant NE SONT PAS un doublon tant qu'on n'a pas regardé **ce qu'il y a ENTRE LES
-> DEUX**. Le fait décisif était à trois lignes dans le transcript. L'observation, reprise d'un
-> RÉSUMÉ de session et jamais revérifiée, s'est durcie en certitude à force d'être recopiée — dans
-> le code, dans quatre docs, dans ce backlog. **Un défaut se REPRODUIT avant d'être gravé.**
-> ⚠️ Le mainteneur a demandé « comment tu l'as su ? » — c'est cette question qui a tout défait.
-> Elle doit être posée à toute affirmation héritée d'un contexte qu'on ne peut plus consulter.
+> 🔴 **LE DOUBLON EXISTE — ET LA « RÉFUTATION » CI-DESSOUS ÉTAIT LA VRAIE ERREUR (07/08/2026, nuit).**
+> Cette section a d'abord annoncé un doublon, puis l'a déclaré **RÉFUTÉ**. Les deux textes ont eu
+> tort chacun à leur tour, et c'est le SECOND qui coûte le plus cher : il a converti une
+> **reproduction ratée** en **réfutation**, en gras, avec un 🛑, dans le code, quatre docs et ce
+> backlog — fermant le sujet pour tout agent suivant.
+> ⚠️ **RÈGLE, DANS LES DEUX SENS** : un défaut se grave sur REPRODUCTION ; son ABSENCE ne se grave
+> JAMAIS. Le seul statut honnête d'un phénomène non reproduit est **« non reproduit à ce jour »**,
+> qui laisse la porte ouverte. « Réfuté » exige de démontrer l'impossibilité, pas d'échouer à voir.
+>
+> **CE QUI RESTE VRAI DE L'ANALYSE DU MATIN** (à ne pas jeter) : le morceau 7/8 des 05:42/06:26
+> était bien séparé par un `PreCompact` — comportement CONÇU ; une doc `dumb` relivrée n'est pas
+> un doublon ; et 12 processus parallèles sur 105 segments n'en ont produit aucun. Tout cela est
+> exact. **Rien de tout cela ne généralisait**, et la sonde ne pouvait PAS voir la vraie cause :
+> elle ne mettait jamais le verrou en échec.
+>
+> **CAUSE RÉELLE, TROUVÉE PAR LECTURE DU CODE APRÈS UNE 2ᵉ OBSERVATION DU MAINTENEUR** :
+> le repli « lock indisponible » de `porte-core.js` décidait avec un état **VIDE** (`{}`). Or
+> l'état porte le « déjà vu » ⇒ un `once` DÉJÀ livré était jugé jamais livré et **réémis**. Ce
+> chemin ne lit pas non plus le plan mémoïsé : il recalculait seul le MÊME découpage (déterministe
+> ⇒ **marqueur identique**) et n'émettait que **SA** trame.
+> **SIGNATURE** = un **morceau ORPHELIN** après une livraison COMPLÈTE, sans compaction, file VIDE.
+> Relevé dans le transcript : `21:25:03-05` paquets 1..9 → morceaux 1/9…9/9 `###FIN:be66cd9b###`,
+> puis `21:30:19` paquet 2 → **morceau 2/9 SEUL**, même marqueur. Quatre traits, quatre coïncidences.
+>
+> 🛑 **LA FAUTE DE FOND EST UNE INFÉRENCE, la même classe que [[feedback-interroger-ce-qui-sait]]** :
+> le processus savait UNIQUEMENT « je n'ai pas eu le verrou » et en déduisait « donc rien n'a été
+> injecté ». Le verrou sérialise les **ÉCRITURES** ; la **LECTURE** n'en a jamais eu besoin —
+> l'état est un fichier, il suffisait de le lire. **Interroger ce qui SAIT, jamais un indice.**
+> ⚠️ Conséquence systémique : le comportement dépendait de **qui gagnait la course**, donc
+> irreproductible, donc « pas reproduit », donc « réfuté ». **La fausse conclusion était fille de
+> l'inférence.** Corrigé : le repli LIT l'état (`store.loadState`) et n'écrit toujours RIEN (ni
+> état, ni plan, ni file) — fail-open intact, déterminisme retrouvé. 🛑 NE JAMAIS y remettre `{}`.
+>
+> ⚠️ **POURQUOI 1096 TESTS, MUTATION 100 % ET DOCTOR VERT NE L'ONT PAS VU** : aucune suite ne
+> faisait **ÉCHOUER** le verrou. La branche de repli n'était exercée qu'avec un état déjà vide,
+> c'est-à-dire dans le seul cas où l'inférence tombe juste. **Un chemin de DÉGRADATION testé
+> uniquement avec de l'état vide n'est pas testé.** Scellé par « REPLI SANS VERROU » dans
+> `doc-inject.test.js` : volet ROUGE (le `once` déjà vu ne doit PAS ressortir) + contre-épreuve
+> (une doc jamais vue est quand même livrée — sinon un `return` prématuré passerait pour un fix).
+> ⚠️ **GÉNÉRALISATION À CHERCHER** (non fait) : tout autre chemin de dégradation du parc qui
+> SUPPOSE un état au lieu de le lire. C'est une CLASSE, pas un cas.
 
 **DÉCLENCHEUR : le mainteneur, à l'œil nu.** Il voit les badges arriver dans le désordre
 (`morceau 1/8`, puis `5/8`, puis `2/8`…) et demande « pourquoi ça affiche pas dans l'ordre ? ».
