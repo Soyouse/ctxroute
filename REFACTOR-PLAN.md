@@ -13,7 +13,7 @@ branche. Toute édition d'un fichier vivant est active pour tous les agents au g
 branche protège l'HISTORIQUE ; seul un worktree séparé isolerait le runtime — mais alors on ne
 testerait plus le vrai câblage.
 
-## Les 15 commits du jour, dans l'ordre
+## Les 18 commits du jour, dans l'ordre
 `cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
@@ -24,6 +24,9 @@ vivant · `382436d` ㉚ le gate de décompte de la tête · `f21d17f` ④ le con
 **`cb05f2a` le repli sans verrou DEVINAIT l'état au lieu de le lire — le doublon de morceau
 EXISTAIT, et la « réfutation » du matin était la vraie erreur** (une reproduction RATÉE convertie
 en RÉFUTATION).
+`1444f70` dégraissage (le récit va au backlog, pas au chemin chaud) · `1cf7557` gate
+`etat-devine` au tableau des couches · **`f874e16` écriture ATOMIQUE du store — le lecteur
+sans verrou voyait du JSON TRONQUÉ** (4 779 lectures creuses sur 16 656 mesurées).
 **Preuves de clôture** : **1096 tests** (58 fichiers) · mutation `canari.js` **100 % / 0 survivant**
 · doctor **0 problème** sur les câblages réels · dependency-cruiser 0 violation (49 modules) ·
 jscpd 0,52 % · arbre **propre**. ✅ **CI VERTE sur `f21d17f`**.
