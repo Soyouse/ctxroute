@@ -2087,7 +2087,49 @@ garde-fou déclencherait un remboursement RÉEL. Vérifier ≠ muter, toujours.
 
 ---
 
-## ㉔ UN SEUL PROCESSUS — les 12 paquets étaient un ANTIPATTERN (06/08/2026, LIVRÉ)
+## ㉔ ✅ LA BANDE PASSANTE EST UN RÉGLAGE — 12 trames, `paquets` (06→07/08/2026)
+
+> 🔴 **CETTE SECTION S'INTITULAIT « UN SEUL PROCESSUS — les 12 paquets étaient un ANTIPATTERN ».
+> LE JUGEMENT EST RENVERSÉ, ET LE TITRE RÉÉCRIT (07/08/2026).** Le passage à UNE déclaration a
+> vécu 24 h et a été ANNULÉ. Les mesures ci-dessous restent exactes ; **la conclusion qu'on en
+> avait tirée était fausse.**
+>
+> **CE QUI A ÉTÉ MAL CADRÉ** : j'ai pris l'ORDRE D'AFFICHAGE pour l'exigence. L'exigence du
+> mainteneur, répétée toute la journée, est **« le contexte doit être COMPLET avant le prochain
+> appel d'outil »**. À 1 trame la capacité tombe à 7 661 c ⇒ un skill de 53 830 c s'étale sur
+> **8 gestes** ⇒ l'agent agit **7 fois avec un savoir partiel**. Un désordre se recolle (`k/N`,
+> c'est tout l'objet des RFC citées plus haut) ; un savoir absent au moment d'agir, non.
+>
+> 🔴 **ET LA MESURE QUI A SERVI À JUSTIFIER LE RETRAIT ÉTAIT BIAISÉE** — c'est la leçon de
+> méthode la plus importante de la journée. « Les 12 trames n'ont saturé qu'1 fois sur 74 »
+> comptait les trames UTILISÉES. Le bon observable était le **compteur de docs différées, qui ne
+> redescendait jamais à zéro** : un corpus `dumb` est redécidé à CHAQUE geste, donc
+> sous-dimensionner N met la file en **rotation perpétuelle** — invariant DÉJÀ écrit dans
+> `porte.md`, que je n'ai pas relié à ce que j'avais sous les yeux. **Mesurer la mauvaise
+> grandeur produit un chiffre juste et une conclusion fausse.**
+>
+> ⚠️ **L'ORDRE N'EST GARANTI PAR AUCUN HARNAIS, et c'est DOCUMENTÉ** (doc officielle relue le
+> 06/08) : *« All matching hooks run in parallel »*, ordre d'agrégation **non spécifié**, plafond
+> de 10 000 c sur les **5 types de handler** (`command`/`http`/`mcp_tool`/`prompt`/`agent`), aucun
+> réglage pour le lever. ⇒ **ordre garanti ⟺ sortie UNIQUE ⟺ contenu ≤ une trame.** Les trois
+> exigences « zéro geste en plus » + « tout avant d'agir » + « dans l'ordre » sont donc
+> **incompatibles** — ce n'est pas un manque d'astuce, c'est structurel.
+> 🛑 **NE JAMAIS coder de chaîne de précédence entre processus pour forcer l'ordre** (tentée puis
+> abandonnée le 07/08) : elle reposerait sur « le harnais ordonne par fin de processus », qui
+> n'est écrit NULLE PART. C'est l'interdit permanent de `budget.md` — si le harnais changeait
+> demain, ce code changerait. La réponse doit être NON.
+>
+> **CE QUI A ÉTÉ LIVRÉ LE 07/08** : `paquets` au schéma + à la config (défaut 12) · 4 checks
+> `doctor --settings` (même `--paquets` partout · autant de déclarations que de trames · indices
+> 1..N sans trou ni doublon · **égalité avec la config**) · **alarme de capacité** dans le badge
+> (`alarme-capacite.test.js`, 3 volets par spawn réel) · **badge multi-docs** corrigé
+> (`injected[0]` ne nommait qu'UNE doc sur N — c'est ce qui a fait croire à une panne).
+> **MESURES** : 1 trame 7 661 c · 12 trames **91 932 c** · charge réelle au pire **65 265 c
+> (71 %)**, dont **53 830 c pour le seul skill**.
+>
+> ⚠️ **CE QUI RESTE OUVERT, et ne doit pas être oublié** : le **doublon** (ci-dessous) est un vrai
+> bug, toujours présent — les N processus se partagent la file. Il se RÉPARE (étendre le plan
+> mémoïsé à la file) ; le contourner en réduisant N était précisément l'erreur.
 
 **DÉCLENCHEUR : le mainteneur, à l'œil nu.** Il voit les badges arriver dans le désordre
 (`morceau 1/8`, puis `5/8`, puis `2/8`…) et demande « pourquoi ça affiche pas dans l'ordre ? ».

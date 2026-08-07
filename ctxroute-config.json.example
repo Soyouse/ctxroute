@@ -4,6 +4,7 @@
   "showNotification": true,
   "mode": "smart",
   "defaultThreshold": 4,
+  "paquets": 12,
   "filterMode": "none",
   "filterList": [],
   "servers": {},

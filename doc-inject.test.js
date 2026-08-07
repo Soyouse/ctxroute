@@ -527,7 +527,12 @@ test('BADGE : une doc MORCELÉE annonce sa position — jamais N badges identiqu
   );
   assert.strictEqual(code, 0);
   const out = parseOut(stdout);
-  assert.match(out.systemMessage, /^📄 doc: gros \(morceau 1\/\d+\)$/, 'le badge porte la position du morceau');
+  // ⚠️ L'ANCRE TOLÈRE L'ALARME DE CAPACITÉ, ET RIEN D'AUTRE (07/08/2026). Ce
+  //    cas morcelle avec un budget étroit, donc il REPORTE — et un report est
+  //    désormais annoncé à l'humain. Le groupe optionnel est NOMMÉ exprès :
+  //    remplacer l'ancre par un simple `includes` laisserait passer n'importe
+  //    quel suffixe futur, c'est-à-dire renoncer à vérifier le format du badge.
+  assert.match(out.systemMessage, /^📄 doc: gros \(morceau 1\/\d+\)( · ⚠️ \d+ doc\(s\) REPORTÉE\(S\).*)?$/, 'le badge porte la position du morceau');
   assert.ok(out.hookSpecificOutput.additionalContext.includes('MORCEAU 1/'), 'et le contenu est bien un morceau');
 });
 
@@ -559,5 +564,8 @@ test('BADGE : le badge FICHIER ignore showNotification — y compris MORCELÉ (p
   );
   const out = parseOut(stdout);
   assert.ok(out.hookSpecificOutput.additionalContext.includes('MORCEAU 1/'), 'la LIVRAISON continue');
-  assert.match(out.systemMessage, /^📄 doc: gros \(morceau 1\/\d+\)$/, 'badge fichier INCHANGÉ par showNotification (parité)');
+  // ⚠️ Même tolérance nommée qu'au cas précédent : ce qui est scellé ici, c'est
+  //    que `showNotification: false` ne change PAS le badge fichier (parité
+  //    protect-files) — pas l'absence d'alarme, qui a sa propre suite.
+  assert.match(out.systemMessage, /^📄 doc: gros \(morceau 1\/\d+\)( · ⚠️ \d+ doc\(s\) REPORTÉE\(S\).*)?$/, 'badge fichier INCHANGÉ par showNotification (parité)');
 });

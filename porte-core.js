@@ -295,7 +295,52 @@ function run(data, emit, options) {
     //    que pas de badge — et `showNotification: false` doit rester un silence
     //    TOTAL, jamais un silence partiel qui laisse fuiter un fragment.
     const badge = msgs.join(' · ');
-    emit(res.decision, fullDoc, badge === '' ? '' : badge + budget.suffixeMorceaux(plan.emis));
+
+    // ⚠️ ALARME DE CAPACITÉ — le SEUL canal qui parle à l'HUMAIN (07/08/2026).
+    //
+    // 🔴 POURQUOI ELLE EXISTE : un reliquat n'est PAS anodin. Rien n'est perdu
+    //    (la file draine au geste suivant), mais l'agent AGIT avant d'avoir
+    //    tout reçu. C'est précisément ce que le mainteneur exige d'éviter :
+    //    « le contexte doit être complet avant le prochain appel d'outil ».
+    //    Sans ce message, le passage « tout arrive d'un coup » → « ça déborde »
+    //    est parfaitement SILENCIEUX : aucune erreur, aucun rouge, juste un
+    //    agent qui recommence à décider sur un savoir partiel. C'est le trou
+    //    « rien ne mesure le DÉBIT » du backlog (⑱), fermé ici.
+    //
+    // ⚠️ ELLE PART DANS `systemMessage`, JAMAIS dans `additionalContext` : doc
+    //    officielle, `systemMessage` = « Warning message shown to the user »,
+    //    et c'est le SEUL canal vers l'humain. L'annonce technique destinée à
+    //    l'AGENT existe déjà par ailleurs (budget.annonce) — ne pas confondre
+    //    les deux publics, ni dupliquer l'un dans l'autre.
+    //
+    // ⚠️ UNE SEULE FOIS PAR GESTE, par construction : `planifierPaquets` ne
+    //    pose `differes` que sur le DERNIER paquet. Ne JAMAIS remplacer cette
+    //    condition par un test sur l'indice — 12 trames crieraient 12 fois, et
+    //    une alarme répétée est une alarme qu'on cesse de lire.
+    //
+    // ⚠️ ON COMPTE DES DOCUMENTS, PAS DES MORCEAUX (même piège que
+    //    `budget.annonce`, mesuré le 05/08/2026 : une doc morcelée produisait
+    //    56 entrées). `baseId` ramène `doc#3/7` à `doc`.
+    //
+    // 🛑 LE MESSAGE DIT D'AUGMENTER `paquets`, ET C'EST VOULU : `budget.md`
+    //    l'INTERDISAIT jusqu'au 07/08/2026, au motif qu'un report est un
+    //    phénomène normal de transport. Cadrage corrigé par le mainteneur — le
+    //    report dégrade la DÉCISION de l'agent, et seul un humain peut arbitrer
+    //    ce réglage puisque l'augmenter coûte ~330 ms de process par trame ET
+    //    par appel d'outil. Ce n'est donc pas du toil : c'est un arbitrage.
+    const reportes = Array.isArray(plan.differes) ? plan.differes : [];
+    let alarme = '';
+    if (reportes.length > 0) {
+      const docs = new Set(reportes.map((s) => budget.baseId(s.id)));
+      alarme = ` · ⚠️ ${docs.size} doc(s) REPORTÉE(S) au geste suivant — capacité dépassée `
+        + `(${nbPaquets} trame(s)). Augmente "paquets" dans ctxroute-config.json.`;
+    }
+
+    // ⚠️ Badge vide ⇒ suffixe ET alarme supprimés : `showNotification: false`
+    //    doit rester un silence TOTAL, jamais un silence partiel qui laisse
+    //    fuiter un fragment. Un « (morceau 3/7) » orphelin inquiète plus qu'un
+    //    silence — et une alarme sans savoir de QUOI elle parle encore plus.
+    emit(res.decision, fullDoc, badge === '' ? '' : badge + budget.suffixeMorceaux(plan.emis) + alarme);
   } catch {
     // fail-open : on RÉPOND « rien à injecter », on ne tue pas le processus.
   }

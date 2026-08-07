@@ -395,44 +395,88 @@ function checkWiring(settingsPath) {
   check('la PORTE (doc-inject.js) est câblée — sinon plus AUCUNE doc injectée', porte.length >= 1,
     'doc-inject.js absent de settings.json : depuis la fusion, c\'est LUI qui injecte TOUTES les docs. Mort silencieux.');
 
-  // ── UNE SEULE DÉCLARATION DE PORTE (06/08/2026) — ANTI-RETOUR AUX N PROCESSUS.
+  // ── COHÉRENCE DU MULTI-TRAMES (06/08/2026) — LE CÂBLAGE DOIT ÊTRE COMPLET.
   //
-  // 🔴 POURQUOI CE CHECK EXISTE : déclarer la porte N fois lance N processus
-  //    PARALLÈLES qui se partagent la file d'émission. Ils écrivent tous le
-  //    même état, chacun sur une photo différente du monde ⇒ un morceau peut
-  //    être ÉMIS et malgré tout laissé en file, donc RELIVRÉ au geste suivant.
-  //    Défaut MESURÉ le 06/08/2026 dans un transcript réel : le morceau 7/8 du
-  //    skill `ctxroute` livré DEUX FOIS. Repéré à l'œil nu par le mainteneur —
-  //    aucun des 1000+ tests ne regardait cet invariant.
+  // 🛑 JUGEMENT RENVERSÉ LE JOUR MÊME, ÉCRIT ICI POUR QU'IL NE SE REFASSE PAS.
+  //    Deux checks ont vécu quelques heures à cet endroit : « la porte est
+  //    déclarée UNE SEULE FOIS » et « aucun `--paquets N>1` ». Ils sont
+  //    SUPPRIMÉS parce que leur prémisse était FAUSSE, pas parce qu'ils gênaient.
   //
-  // 🛑 ET L'ORDRE N'EST PAS RATTRAPABLE À N>1 : le harnais rend les sorties
-  //    dans l'ordre où les processus FINISSENT. Mesuré sur 74 gestes : 69
-  //    utilisaient ≥2 trames, donc 93 % arrivaient dans le désordre. Les
-  //    ordonner exigerait qu'un processus ATTENDE ses pairs — une coordination
-  //    entre PAIRS ÉGAUX, que rien ne tranche, et qui sérialiserait 12 spawns
-  //    à chaque appel d'outil.
+  // 🔴 CE QUE J'AVAIS RATÉ : l'exigence du mainteneur n'a jamais été l'ordre
+  //    d'affichage, c'est que **le contexte soit COMPLET avant le prochain
+  //    appel d'outil**. Or un processus = une sortie = un plafond de trame.
+  //    Livrer un corpus plus gros que ça AVANT le geste suivant exige donc
+  //    plusieurs trames sur le MÊME geste — c'est-à-dire N déclarations.
+  //    Retomber à 1 ne « ralentissait » pas : ça faisait travailler l'agent
+  //    avec un savoir incomplet pendant N-1 gestes.
   //
-  // ⚠️ CE N'EST PAS UNE PERTE DE CAPACITÉ. Depuis la file (05/08/2026), N ne
-  //    règle QUE le débit : ce qui ne tient pas dans la trame attend et repart
-  //    au geste suivant. À 1, tout arrive encore — en plus de gestes, jamais en
-  //    moins de contenu. Mesuré : médiane 3 trames par geste, donc 3 gestes.
+  // 🔴 ET LA MESURE QUI M'AVAIT SERVI À JUSTIFIER LE RETRAIT ÉTAIT BIAISÉE :
+  //    j'avais compté « les 12 trames n'ont saturé qu'1 fois sur 74 gestes »,
+  //    en regardant les trames UTILISÉES. Le bon observable était le compteur
+  //    de docs différées, qui ne redescendait plus à zéro : le corpus `dumb`
+  //    est redécidé à CHAQUE geste, donc sous-dimensionner N met la file en
+  //    ROTATION PERPÉTUELLE (invariant déjà écrit dans `porte.md`, que je n'ai
+  //    pas relié à ce que j'avais sous les yeux).
   //
-  // ⚠️ C'EST AUSSI LA POSITION DE L'INDUSTRIE, pas une préférence locale :
-  //    ouvrir N connexions parallèles était la ruse de HTTP/1.1 ; HTTP/2 puis
-  //    HTTP/3 l'ont abandonnée pour UNE connexion multiplexée. « Plus de
-  //    tuyaux » est la vieille méthode ; le standard est un tuyau, mieux utilisé.
+  // ⚠️ L'ORDRE D'ARRIVÉE RESTE NON GARANTI à N>1 (le harnais rend les sorties
+  //    quand les processus FINISSENT) et c'est ACCEPTÉ : chaque trame est
+  //    auto-descriptive (`PAQUET k/N` + marqueur commun, RFC 2046/6455), donc
+  //    recollable. Un désordre lisible vaut mieux qu'un savoir absent.
+  //    ⚠️ Le DOUBLON, lui, est un vrai bug (course sur la file) — il se
+  //    RÉPARE, il ne se contourne pas en supprimant la capacité.
   //
-  // 🛑 NE JAMAIS « assouplir » ce check en autorisant N>1 sous un drapeau : le
-  //    désordre et la course reviendraient avec, et un utilisateur ne peut pas
-  //    consentir à un défaut qu'il ne verra que des semaines plus tard.
-  check('la porte est déclarée UNE SEULE FOIS (N processus = doublons + désordre)',
-    porte.length === 1,
-    `doc-inject.js est déclaré ${porte.length} fois dans settings.json. Les N processus sont PARALLÈLES : ils se partagent la file d'émission, d'où des morceaux livrés DEUX FOIS (mesuré le 06/08/2026), et le harnais rend leurs sorties dans le désordre. Ne garder qu'UNE déclaration : la file livre déjà tout, sur plusieurs gestes s'il le faut.`);
+  // ⇒ CE QUI SE VÉRIFIE ICI est donc la COHÉRENCE du câblage, jamais sa
+  //    taille : un indice manquant ou dupliqué fait disparaître une trame
+  //    entière EN SILENCE, et rien d'autre ne peut le voir (le câblage vit
+  //    HORS du repo).
+  const declares = porte
+    .map((c) => /--paquets\s+(\d+)/.exec(c))
+    .map((m) => (m ? Number(m[1]) : 1));
+  const nUnique = [...new Set(declares)];
+  check('toutes les déclarations de porte annoncent le MÊME nombre de trames',
+    nUnique.length === 1,
+    `Valeurs de --paquets divergentes dans settings.json : ${nUnique.join(', ')}. Les processus découperaient le contenu différemment : les trames ne recolleraient plus.`);
 
-  const multi = porte.filter((c) => /--paquets\s+(?!1\b)\d+/.test(c));
-  check('aucune déclaration ne demande plusieurs trames (`--paquets N>1`)',
-    multi.length === 0,
-    `Déclaration(s) avec --paquets N>1 : ${multi.join(' | ')}. Ce réglage n'a plus qu'une valeur correcte (1) — il ne gagne rien (la file livre tout de toute façon) et rouvre la course entre processus.`);
+  const nAttendu = nUnique.length === 1 ? nUnique[0] : porte.length;
+  check('il y a exactement autant de déclarations que de trames annoncées',
+    porte.length === nAttendu,
+    `${porte.length} déclaration(s) de doc-inject.js pour --paquets ${nAttendu}. Chaque trame est portée par UN processus : il en manque ${nAttendu - porte.length}, donc ce contenu ne sortira JAMAIS de ce geste.`);
+
+  // ── LA BANDE PASSANTE SE DÉCLARE À UN SEUL ENDROIT (07/08/2026).
+  //
+  // 🔴 CLASSE D'ERREUR DÉJÀ PAYÉE, LE 05/08/2026 : un réglage écrit dans le
+  //    câblage d'un harnais et JAMAIS RELU par le moteur. Résultat mesuré, un
+  //    skill livré en 11 gestes au lieu d'1 — avec 995 tests verts, mutation à
+  //    100 %, doctor 27/27 et canari vivant. Un VERT QUI MENT : rien n'était
+  //    cassé, tout était dégradé. Deux endroits pour un même chiffre finissent
+  //    TOUJOURS par diverger, et cette divergence-là est silencieuse.
+  //
+  // ⇒ `ctxroute-config.json` porte l'INTENTION de l'utilisateur (`paquets`) ;
+  //    `settings.json` porte le CÂBLAGE que le harnais exécute. Le moteur ne
+  //    peut pas imposer le second (le harnais lance ce qui y est déclaré, à
+  //    froid) — donc la seule défense possible est de CONFRONTER les deux ici.
+  // ⚠️ Clé absente de la config = pas d'opinion, pas de reproche : on ne
+  //    force personne à déclarer sa bande passante (un langage n'impose pas
+  //    une politique — même doctrine que `skillsWithoutPerimeter`).
+  let paquetsVoulus = null;
+  try {
+    const cfg = require('./collect-core').loadConfig();
+    if (cfg && Number.isInteger(cfg.paquets) && cfg.paquets >= 1) paquetsVoulus = cfg.paquets;
+  } catch { /* config illisible : le gate de config le dira, pas celui-ci */ }
+  if (paquetsVoulus !== null) {
+    check(`le câblage respecte la bande passante déclarée (paquets: ${paquetsVoulus})`,
+      nAttendu === paquetsVoulus && porte.length === paquetsVoulus,
+      `ctxroute-config.json demande ${paquetsVoulus} trame(s), settings.json en câble ${porte.length} (--paquets ${nAttendu}). Le harnais obéit à settings.json : la capacité RÉELLE est ${porte.length}, pas ${paquetsVoulus}. Réaligner les deux — c'est exactement la divergence silencieuse du 05/08/2026.`);
+  }
+
+  const indices = porte
+    .map((c) => /--paquet\s+(\d+)/.exec(c))
+    .map((m) => (m ? Number(m[1]) : 0))
+    .sort((a, b) => a - b);
+  const attendus = Array.from({ length: nAttendu }, (_, i) => i + 1);
+  check('les indices de trame couvrent 1..N, sans trou ni doublon',
+    JSON.stringify(indices) === JSON.stringify(attendus),
+    `Indices --paquet déclarés : [${indices.join(', ')}] au lieu de [${attendus.join(', ')}]. Un indice manquant = une trame jamais émise ; un indice en double = un contenu livré deux fois. Les deux sont SILENCIEUX.`);
   for (const c of porte) {
     const m = /([A-Za-z]:[\\/][^"]*?|\/[^"]*?)doc-inject\.js/.exec(c);
     if (!m) continue;

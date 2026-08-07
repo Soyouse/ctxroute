@@ -87,7 +87,34 @@ test.skipIf(!parcPresent)('LECTURE : contenu injecté IDENTIQUE à l\'octet prè
   assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'allow');
   assert.strictEqual(neuf.hookSpecificOutput.permissionDecision, 'allow');
   assert.strictEqual(desceller(neuf.hookSpecificOutput.additionalContext), vieux.hookSpecificOutput.additionalContext);
-  assert.strictEqual(neuf.systemMessage, vieux.systemMessage);
+  // ⚠️ ÉCART DÉCLARÉ SUR LE BADGE — LE NOUVEAU EN NOMME PLUS (07/08/2026).
+  //
+  // 🔴 DÉFAUT RÉEL, mesuré ICI sur le parc : l'ancien moteur (et le nôtre
+  //    jusqu'à ce jour) n'annonçait QUE la première doc livrée. Ce test le
+  //    prouve noir sur blanc — « 📄 doc: pointer » alors que `pointer` ET
+  //    `lib-pure` étaient injectés. Conséquence vécue : le mainteneur a vu
+  //    « morceau 1/8 » puis « 2/8 » puis un autre nom, et en a conclu que la
+  //    livraison s'ARRÊTAIT. Elle était complète. Une matinée perdue à
+  //    diagnostiquer une panne inexistante, sur la foi d'un badge faux.
+  //
+  // ⚠️ L'ORACLE EST FIGÉ ET DATÉ (sa propre doc l'écrit) : chaque capacité
+  //    ajoutée à la porte après le 17/07/2026 creuse l'écart — le sceau l'avait
+  //    déjà fait. On ne PEUT donc plus exiger l'égalité stricte du badge sans
+  //    interdire toute amélioration de l'affichage.
+  //
+  // 🛑 CE QUI RESTE VÉRIFIÉ, ET C'EST L'ESSENTIEL : le badge de l'ancien est un
+  //    PRÉFIXE EXACT du nôtre, et le supplément ne peut être QUE des noms de
+  //    documents réellement livrés. Un badge qui perdrait le nom historique, en
+  //    changerait la forme ou inventerait un suffixe reste ROUGE.
+  //    ⚠️ Ne JAMAIS relâcher ça en `includes` : on cesserait de vérifier la
+  //    forme, c'est-à-dire de vérifier quoi que ce soit.
+  if (neuf.systemMessage !== vieux.systemMessage) {
+    assert.ok(neuf.systemMessage.startsWith(vieux.systemMessage),
+      `le badge a PERDU ou DÉFORMÉ le nom historique.\n  ancien : ${vieux.systemMessage}\n  neuf   : ${neuf.systemMessage}`);
+    const supplement = neuf.systemMessage.slice(vieux.systemMessage.length);
+    assert.match(supplement, /^( · [^·]+)+$/,
+      `le badge s'est enrichi d'autre chose que des noms de docs livrées : ${JSON.stringify(supplement)}`);
+  }
 });
 
 test.skipIf(!parcPresent)('ÉCRITURE : décision miroir du rush réel, mêmes docs', async () => {

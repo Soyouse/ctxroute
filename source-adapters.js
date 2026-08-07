@@ -35,6 +35,11 @@ const fs = require('fs');
 const path = require('path');
 const lib = require('./lib-pure');
 const gate = require('./gate');
+// ⚠️ UNIQUEMENT pour `baseId` (ramener `doc#3/7` à `doc`) — l'identité d'un
+//    document est une règle du TRANSPORT, source unique dans budget.js. La
+//    recopier ici en ferait une 2ᵉ vérité qui divergerait au premier changement
+//    de format de morceau.
+const budget = require('./budget');
 const { parse, validate } = require('./frontmatter');
 const { readCorpus } = require('./corpus');
 const { rulesFromCorpus } = require('./loader');
@@ -93,11 +98,43 @@ const fileAdapter = {
  * 🛑 NE JAMAIS inverser l'ordre : lire `acc.labels` d'abord changerait le badge
  *    du cas nominal et casserait les différentiels de parité.
  */
-function labelDoc(injected, ctx) {
-  const parTag = gate.docLabel(ctx.fullDoc);
-  if (parTag) return parTag;
-  const brut = ctx.acc.labels[injected[0]];
+// ⚠️ NOMBRE MAX DE NOMS CITÉS. Au-delà, « +N » : un badge est une LIGNE DE
+//    STATUT, pas un sommaire — 12 noms le rendraient illisible, donc ignoré.
+const MAX_NOMS = 3;
+
+function nomCourt(id, ctx) {
+  const brut = ctx.acc.labels[id];
   return brut ? String(brut).split(/[\\/]/).pop().replace(/\.md$/, '') : '';
+}
+
+function labelDoc(injected, ctx) {
+  // ⚠️ DÉDUP PAR DOCUMENT (07/08/2026) : `injected` porte des SEGMENTS, donc
+  //    `doc#2/7` et `doc#3/7` de la MÊME doc. Sans `baseId` on citerait deux
+  //    fois le même nom — le piège déjà payé sur `budget.annonce` le 05/08.
+  const bases = [...new Set(injected.map((i) => budget.baseId(i)))];
+
+  // ⚠️ CAS NOMINAL INTOUCHÉ — UNE SEULE DOC : chemin historique à l'OCTET
+  //    (tag `[source:]` d'abord, `acc.labels` en repli). C'est la parité
+  //    protect-files, scellée par `porte-differential`. Toucher ce chemin
+  //    ferait rougir le différentiel sans qu'aucun moteur ait changé.
+  if (bases.length <= 1) {
+    const parTag = gate.docLabel(ctx.fullDoc);
+    if (parTag) return parTag;
+    return nomCourt(bases[0] !== undefined ? bases[0] : injected[0], ctx);
+  }
+
+  // 🔴 PLUSIEURS DOCS DANS LA MÊME TRAME — LE DÉFAUT CORRIGÉ ICI (07/08/2026).
+  //    Le code lisait `injected[0]` : quatre documents livrés, UN SEUL nommé.
+  //    Conséquence RÉELLE, pas cosmétique : le mainteneur a vu « morceau 1/8 »,
+  //    « morceau 2/8 », puis un autre nom — et en a conclu que la livraison
+  //    s'était ARRÊTÉE à 2/8. Elle était complète. Une matinée passée à
+  //    diagnostiquer une panne inexistante, sur la foi d'un compteur faux.
+  // ⚠️ LEÇON À GARDER : un transport correct mais ILLISIBLE se fait prendre
+  //    pour une panne. L'affichage fait partie du contrat, pas de la déco.
+  const noms = bases.map((b) => nomCourt(b, ctx)).filter(Boolean);
+  if (noms.length === 0) return '';
+  const cites = noms.slice(0, MAX_NOMS).join(' · ');
+  return noms.length > MAX_NOMS ? cites + ' +' + (noms.length - MAX_NOMS) : cites;
 }
 
 // ── SOURCE « MCP » : docs/mcp/ du repo, sélection pure sources/mcp.js ──
