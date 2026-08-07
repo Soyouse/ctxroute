@@ -52,11 +52,29 @@ const { readStdinJson } = require('./stdin-json');
 //    NOTRE donnée, identique sur tous les harnais. Ce qu'on cherche encore dans
 //    le transcript, c'est UNIQUEMENT notre propre marque `[source:` — une
 //    sous-chaîne, jamais un champ de schéma.
-// ⚠️ Ce qui rend le partage LÉGITIME, et il faut le vérifier avant tout nouveau
-//    harnais : les deux payloads exposent `transcript_path` et `session_id`
-//    sous CES noms, et les deux contrats de sortie admettent le silence total.
-//    Un harnais qui différerait sur l'un des trois exigerait une coquille — pas
-//    un `if` ici.
+// ⚠️ CE QUI REND LE PARTAGE LÉGITIME — VÉRIFIÉ DANS LES DEUX DOCS OFFICIELLES,
+//    pas déduit (07/08/2026). Claude Code (`code.claude.com/docs/en/hooks`) ET
+//    Codex (`learn.chatgpt.com/docs/hooks`) documentent tous deux, en champs
+//    d'entrée COMMUNS : `transcript_path` (« Path to conversation JSON ») et
+//    `session_id`. Et côté Claude le contrat de sortie admet explicitement le
+//    silence : « Exit 0 means success […] For most events, stdout is written to
+//    the debug log but not shown ». Un harnais qui différerait sur l'un de ces
+//    trois points exigerait une coquille — jamais un `if` ici.
+//
+// ⚠️ FAIT DÉCOUVERT EN VÉRIFIANT, ET IL COMPTE : le transcript est écrit de
+//    façon ASYNCHRONE. Doc Claude, verbatim : « The transcript file is written
+//    asynchronously and may lag the in-memory conversation, so it may not yet
+//    include the current turn's most recent messages when a hook fires ».
+//    ⇒ une injection qui vient d'atterrir peut ne PAS encore être dans le
+//    fichier. C'est INOFFENSIF ICI, et il faut comprendre pourquoi avant de
+//    toucher au seuil : le retard porte sur les DERNIERS messages d'un tour,
+//    alors qu'on exige 25 ÉMISSIONS et qu'on lit 2 Mo d'historique. Le décalage
+//    est absorbé par l'échantillon.
+// 🛑 CE FAIT INTERDIT UNE « AMÉLIORATION » QUI SEMBLERAIT ÉVIDENTE : baisser le
+//    seuil à 1 ou 2, ou ne regarder que le tour courant. On lirait alors un
+//    transcript en retard et on crierait à la mort d'un canal parfaitement
+//    vivant. Le seuil n'est pas de la prudence, c'est ce qui rend la lecture
+//    d'un fichier asynchrone DÉCIDABLE.
 
 // ⚠️ Chemin STABLE et unique : la statusline le lit sans rien savoir du
 //    framework. Le poser ailleurs qu'ici dupliquerait une vérité de chemin.
