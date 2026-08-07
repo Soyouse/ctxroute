@@ -18,7 +18,8 @@ testerait plus le vrai câblage.
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
 audit des valeurs de rank · **`466a0bc` ㉘ la marque `[source:` CITÉE n'est plus comptée comme
-LIVRÉE (+ ② bis fermé par run Codex réel)** · `31c1ccd` la tête du backlog annonçait un état périmé.
+LIVRÉE (+ ② bis fermé par run Codex réel)** · `31c1ccd` + `e0d5ad3` la tête du backlog annonçait
+un état périmé (DEUX fois — d'où ㉚).
 **Preuves de clôture** : **1086 tests** (58 fichiers) · mutation `canari.js` **100 % / 0 survivant**
 · doctor **74 ok / 0** sur les DEUX câblages réels · dependency-cruiser 0 violation · jscpd 0,52 %
 · arbre **propre**. ✅ **CI VERTE sur `31c1ccd`** (jobs `test` + `mutation`, clone vierge).
@@ -40,8 +41,10 @@ d'env · fixture ambigu) — le motif EXACT que `explain.md` documente. Réflexe
 ## 📋 CE QUI RESTE OUVERT — liste COMPLÈTE, rien d'autre ne vit ailleurs
 | # | Chantier | État |
 |---|---|---|
+| ㉚ | **Fraîcheur de la tête du backlog** — ✅ **FERMÉ 07/08/2026** (volet ② de `backlog-coherence-gate`). 🛑 Portée réduite ASSUMÉE : vérifier que les empreintes EXISTENT est impossible en CI (`fetch-depth: 1`) ⇒ cohérence INTERNE du décompte seulement | ✅ |
 | ㉘ bis | **Marque `[source:` auto-référente — reste 4 docs du parc** citant un `.md`. Fix total = n'accepter que les étiquettes RÉELLEMENT émises (store `emission-core`) ⇒ touche le chemin chaud de TOUS les agents ⮕ **à faire quand aucun autre agent ne travaille** | 🟠 |
 | ㉙ | **`legacy-mcp-inject.test.js` est FLAKY** — son `STATE_DIR` est le dossier `state/` **VIVANT**, où les hooks en prod écrivent en permanence (12 processus par appel d'outil). Ses tests de purge listent ce dossier pendant que d'autres agents y écrivent ⇒ 3 rouges aléatoires le 07/08, **verts en 2 runs isolés consécutifs**. Fix = tmpdir jeté (test-only, zéro risque runtime) | 🟠 |
+| ㉙ | **`legacy-mcp-inject.test.js` flaky** — ✅ **FERMÉ 07/08/2026** : son état vit en tmpdir jeté (`CTXROUTE_STATE_DIR`), plus aucune lecture du `state/` vivant. 2 runs consécutifs verts (46/46). 🛑 **AUCUN gate — 3 critères mesurés, 3 fois du bruit** : « toute suite qui spawne un hook doit isoler » ⇒ **6 faux positifs** (doctor, deadline, lint-corpus, doc-write-guard, deps-purete, vendor-deadline : elles laissent au pire un fichier inerte, jamais relu, purgé) ; « aucune suite ne résout un chemin `state` » ⇒ **8 faux positifs** (elles joignent un TMPDIR à `state`). Distinguer exigerait de savoir si la BASE est la racine du repo = analyse de flot, pas du texte. Ne pas réessayer sans nouveau critère | ✅ |
 | ㉗ | **Valeurs de `rank`** — mécanisme prouvé, les 313 valeurs jamais auditées | 🟠 |
 | ㉕ | **Couplage par le stockage** — moitié décidable LIVRÉE (gate), moitié sémantique indécidable | 🟠 |
 | ④ | **Contrat canari ⟷ afficheur** — vient de se payer (3 jours d'aveuglement), filet = un commentaire | 🟠 |

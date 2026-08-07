@@ -73,6 +73,79 @@ test('aucun en-tête de REFACTOR-PLAN n\'annonce ouvert ce qui est entièrement 
     'En-tête(s) qui mentent — réécris-les (ne PAS les empiler) :\n  ' + faux.join('\n  '));
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// VOLET ② — LA LISTE DE COMMITS DE LA TÊTE DOIT SE COMPTER JUSTE (㉚, 07/08/2026)
+// ═══════════════════════════════════════════════════════════════════════
+//
+// 🔴 DEUXIÈME CLASSE, MÊME FICHIER, MÊME CAUSE : la tête a menti DEUX fois
+//    en deux heures le 07/08/2026 (branche annoncée vivante alors qu'elle
+//    était supprimée et mergée · « CI NON LANCÉE » alors qu'elle était verte
+//    · « Les 10 commits » sous une liste de NEUF). Le volet ① ne voit rien de
+//    tout ça : il ne regarde que les titres de section.
+//
+// 🛑 CE QU'IL EST HONNÊTEMENT POSSIBLE DE PROUVER ICI, ET RIEN DE PLUS.
+//    J'ai voulu vérifier que chaque empreinte citée EXISTE dans l'historique
+//    (`git rev-parse`) et que la branche annoncée est vivante. **MESURÉ ET
+//    ÉCARTÉ** : `actions/checkout@v5` clone en `fetch-depth: 1` dans les deux
+//    workflows du repo ⇒ AUCUN commit ancien n'existe en CI, et les branches
+//    locales non plus. Le gate serait rouge sur un clone vierge — soit on
+//    passe à `fetch-depth: 0` (clone lourd à chaque push, pour du confort de
+//    backlog), soit on le rend conditionnel, c'est-à-dire INERTE là où il
+//    compte. Les deux sont pires que la portée réduite retenue ici.
+//    ⇒ Ce volet prouve la COHÉRENCE INTERNE du décompte, JAMAIS la vérité
+//    historique. Même honnêteté que le volet ① et que `doc-drift-gate`.
+//
+// ⚠️ INVARIANT DÉRIVÉ, PAS UNE CONVENTION DE PLUS : toute empreinte citée
+//    DANS la section de recensement doit être l'un des commits recensés.
+//    C'est ce qui rend le décompte vérifiable — une empreinte de preuve
+//    (« CI verte sur X ») cite forcément un commit de la liste, sinon elle
+//    parle d'un état que la tête ne décrit pas.
+
+/** Le corps de la section `## Les N commits …`, jusqu'au prochain `## `. */
+function sectionCommits(texte) {
+  const lignes = texte.split(/\r?\n/);
+  const debut = lignes.findIndex((l) => /^##\s+Les\s+\d+\s+commits/.test(l));
+  if (debut === -1) return null;
+  const reste = lignes.slice(debut + 1);
+  const fin = reste.findIndex((l) => /^##\s/.test(l));
+  return { titre: lignes[debut], corps: (fin === -1 ? reste : reste.slice(0, fin)).join('\n') };
+}
+
+/** `null` si tout va bien, sinon le message d'incohérence. */
+function decompteFaux(texte) {
+  const s = sectionCommits(texte);
+  if (s === null) return null; // section absente = hors périmètre (jamais du bruit)
+  const annonce = Number(s.titre.match(/Les\s+(\d+)\s+commits/)[1]);
+  // ⚠️ 7 à 40 hexa entre backticks : la forme sous laquelle le backlog cite
+  //    une empreinte. Un `Set` car la même peut servir de preuve plus bas.
+  const citees = new Set((s.corps.match(/`[0-9a-f]{7,40}`/g) || []));
+  if (citees.size !== annonce) {
+    return `la tête annonce ${annonce} commits mais en cite ${citees.size} : ` +
+      [...citees].join(' ');
+  }
+  return null;
+}
+
+test('㉚ — le décompte de commits de la tête du backlog est cohérent', () => {
+  const texte = fs.readFileSync(path.join(ICI, 'REFACTOR-PLAN.md'), 'utf8');
+  const faux = decompteFaux(texte);
+  assert.strictEqual(faux, null,
+    'Tête incohérente — recompte AVANT de committer :\n  ' + faux);
+});
+
+test('㉚ NEGATIVE — le décompte rougit vraiment (sabotage EN MÉMOIRE)', () => {
+  // Le cas RÉEL du 07/08/2026 : titre à 10, liste à 9.
+  const faux = ['## Les 10 commits du jour', '`aaaaaaa` un · `bbbbbbb` deux'].join('\n');
+  assert.ok(decompteFaux(faux) !== null, 'le gate ne voit pas un décompte faux : il est INERTE');
+
+  // Contre-épreuve ① : décompte juste ⇒ silence, empreinte répétée en preuve comprise.
+  const sain = ['## Les 2 commits du jour', '`aaaaaaa` un · `bbbbbbb` deux', 'CI verte sur `bbbbbbb`.'].join('\n');
+  assert.strictEqual(decompteFaux(sain), null, 'faux positif : une empreinte citée deux fois gonfle le compte');
+
+  // Contre-épreuve ② : pas de section de recensement ⇒ hors périmètre.
+  assert.strictEqual(decompteFaux('## Autre chose'), null, 'une tête sans recensement ne doit rien déclencher');
+});
+
 test('NEGATIVE — le gate rougit vraiment (sabotage EN MÉMOIRE, jamais le vrai fichier)', () => {
   // ⚠️ EN MÉMOIRE, PAS SUR DISQUE : un sabotage sur fichier réel avait fait
   //    tomber 38 tests d'autres suites qui lisaient en parallèle (31/07/2026).
