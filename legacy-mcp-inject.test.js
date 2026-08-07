@@ -22,7 +22,21 @@ import os from 'node:os';
 
 const HOOK = path.join(import.meta.dirname, 'legacy-mcp-inject.js');
 const RESET_HOOK = path.join(import.meta.dirname, 'ctxroute-reset.js');
-const STATE_DIR = path.join(import.meta.dirname, 'state');
+// ⚠️ ㉙ (07/08/2026) — TMPDIR JETABLE, JAMAIS le `state/` DU REPO. Cette suite
+//    pointait `<repo>/state`, c'est-à-dire le dossier VIVANT où les hooks en
+//    production écrivent en permanence (12 processus par appel d'outil, tous
+//    les agents de la machine). Ses tests de PURGE listent ce dossier et
+//    comptent ce qu'il reste : pendant qu'un autre agent y écrit, le compte
+//    change sous les pieds du test ⇒ 3 rouges ALÉATOIRES le 07/08/2026, verts
+//    en deux runs isolés consécutifs.
+// 🛑 Une suite qui rougit au hasard est une suite qu'on cesse de lire — et le
+//    jour où elle a raison, personne ne la croit. Même raison que le tmpdir de
+//    `CONFIG_PATH` juste en dessous : un test n'écrit ni ne lit JAMAIS l'état
+//    réel du framework.
+// ⚠️ `CTXROUTE_STATE_DIR` est lu par `paths.stateDir()` — passé à CHAQUE spawn
+//    (cf `run()`), sinon les hooks écriraient encore dans le repo et le test
+//    lirait un dossier vide.
+const STATE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxroute-state-'));
 // ⚠️ NE JAMAIS repointer CONFIG_PATH vers le ctxroute-config.json du repo.
 // Les tests écrivaient leurs fixtures dans le VRAI fichier puis restauraient
 // "l'original" — lequel était déjà une config de test committée : le framework
@@ -36,16 +50,15 @@ const CONFIG_PATH = path.join(
 );
 const DOCS_DIR = path.join(import.meta.dirname, 'docs', 'mcp');
 
-const sessions = new Set();
-
 function run(hook, payload, env = {}) {
-  if (payload.session_id) sessions.add(payload.session_id);
   const r = spawnSync('node', [hook], {
     input: JSON.stringify(payload),
     encoding: 'utf8',
     // ⚠️ CTXROUTE_CONFIG_PATH sur TOUT spawn : sans lui le hook relirait le
     // vrai config du repo et les tests dépendraient de l'environnement local.
-    env: { ...process.env, CTXROUTE_CONFIG_PATH: CONFIG_PATH, ...env },
+    // ⚠️ CTXROUTE_STATE_DIR sur TOUT spawn (㉙) : sans lui le hook écrirait
+    // dans le `state/` VIVANT du repo et le test lirait un tmpdir vide.
+    env: { ...process.env, CTXROUTE_CONFIG_PATH: CONFIG_PATH, CTXROUTE_STATE_DIR: STATE_DIR, ...env },
   });
   return { stdout: (r.stdout || '').trim(), status: r.status };
 }
@@ -411,7 +424,6 @@ function setConfig(obj) {
 
   ok('fichier state périmé (60j > TTL 30j) → supprimé par la purge', !fs.existsSync(oldFile));
   ok('fichier state récent → conservé par la purge', fs.existsSync(path.join(STATE_DIR, `ctxroute-seen-${keep}.json`)));
-  sessions.add('test-gc-trigger-17');
 }
 
 // ── Test 18 — CONCURRENCE RÉELLE : N invocations PARALLÈLES du hook sur la
@@ -419,7 +431,9 @@ function setConfig(obj) {
 // cross-process de lock.js, pas juste une lecture de code). ──
 function callMcpAsync(sessionId, server, tool = 'do_thing') {
   return new Promise((resolve) => {
-    const p = spawn('node', [HOOK], { env: { ...process.env, CTXROUTE_CONFIG_PATH: CONFIG_PATH } });
+    const p = spawn('node', [HOOK], {
+      env: { ...process.env, CTXROUTE_CONFIG_PATH: CONFIG_PATH, CTXROUTE_STATE_DIR: STATE_DIR },
+    });
     let out = '';
     p.stdout.on('data', (c) => (out += c));
     p.stdin.write(JSON.stringify({
@@ -452,7 +466,6 @@ test(`concurrence : ${N_CALLS} appels parallèles sur ${N_SERVERS} serveurs → 
   //    2 s expirent légitimement (fail-open voulu) = faux rouge d'atomicité.
   process.env.CTXROUTE_LOCK_TIMEOUT_MS = '20000';
   const s = 'test-concurrency-18';
-  sessions.add(s);
   const dirs = [];
   for (let i = 0; i < N_SERVERS; i++) {
     const d = path.join(DOCS_DIR, `concserver${i}`);
@@ -481,11 +494,9 @@ test(`concurrence : ${N_CALLS} appels parallèles sur ${N_SERVERS} serveurs → 
 afterAll(() => {
   // Config de test = tmpdir jetable : rien à restaurer dans le repo.
   try { fs.rmSync(path.dirname(CONFIG_PATH), { recursive: true, force: true }); } catch {}
-  for (const s of sessions) {
-    const safe = String(s).replace(/[^a-zA-Z0-9_-]/g, '');
-    const f = path.join(STATE_DIR, `ctxroute-seen-${safe}.json`);
-    try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch {}
-    const lockDir = path.join(STATE_DIR, `.lock-${safe}`);
-    try { if (fs.existsSync(lockDir)) fs.rmdirSync(lockDir); } catch {}
-  }
+  // ⚠️ ㉙ — l'état vit désormais dans un tmpdir À NOUS : on jette le dossier
+  //    ENTIER. L'ancienne version énumérait les sessions vues pour ne supprimer QUE
+  //    ses propres fichiers, précisément parce qu'elle partageait le `state/`
+  //    de la prod — une énumération qui rate un fichier laissait une scorie.
+  try { fs.rmSync(STATE_DIR, { recursive: true, force: true }); } catch {}
 });
