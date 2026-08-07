@@ -77,6 +77,25 @@ C'est exactement la régression du 07/08 (le canari a perdu son dénominateur en
 **Filet actuel, assumé plus faible** : test « APRÈS COMPACTION » (`canari-check.test.js`) — il
 scelle le CAS, pas la CLASSE. 🛑 Ne pas croire la classe fermée parce qu'un gate porte son nom.
 
+## 🟠 ㉗ AUDITER LES VALEURS DE `rank` — le MÉCANISME est prouvé, les VALEURS non (07/08/2026)
+✅ **LE MÉCANISME MARCHE — mesuré, et de façon DISCRIMINANTE.** Parc de test à 2 docs, rangs
+INVERSÉS par rapport à l'alphabet (`aaa.md` rang 90 · `zzz.md` rang 10) ⇒ livré **`zzz` AVANT
+`aaa`**. `rank` bat donc l'ordre alphabétique ; il est lu par `loader.js` (tri l.92), atteint depuis
+le chemin vivant via `source-adapters.js`.
+⚠️ **CE PREMIER TEST ÉTAIT AMBIGU et il a fallu le refaire** : avec `aaa`=10 et `zzz`=90, l'ordre
+obtenu satisfaisait le rank ET l'alphabet — il ne prouvait RIEN. **Un fixture non discriminant
+donne un vert qui ne mesure pas ce qu'on croit.** (3 sondes fausses avant celle-là : harnais maison
+vide, puis `CTXROUTE_HOOKS_DIR` au lieu de `CTXROUTE_FILEDOCS_DIR` — le motif exact que
+`explain.md` documente.)
+🔴 **CE QUI RESTE OUVERT : les 313 VALEURS elles-mêmes.** Personne n'a jamais audité si elles
+disent ce qu'on croit — un rank posé au jugé, deux docs qui devraient s'ordonner et ne le font pas,
+un rank oublié (⇒ `Infinity`, la doc passe APRÈS toutes les rankées). Le moteur applique
+fidèlement des nombres que personne n'a relus.
+**CIBLE** : dérouler les paires de docs qui matchent une MÊME cible et vérifier que l'ordre livré
+est celui voulu. ⚠️ Mesure de 2026-07-16 à re-faire (39 paires, 0 conflit) — elle date d'avant
+`rules` par-entrée et d'avant 100 docs. 🛑 **Test discriminant OBLIGATOIRE** : toute paire dont
+l'ordre alphabétique coïncide avec l'ordre des rangs ne prouve rien.
+
 ## 🛑 ㉖ PISTE MESURÉE PUIS FERMÉE — « gate sur les constantes citées » (07/08/2026)
 **Née d'un défaut RÉEL du jour** : le skill se contredisait à 9 lignes d'intervalle — il annonçait
 la disparition de `MARQUE_APPEL_CLAUDE` **et** expliquait comment la modifier. Trouvé par un grep
