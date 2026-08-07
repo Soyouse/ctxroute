@@ -1,5 +1,5 @@
 ---
-rules: [{"pattern":"emission-core.js","scope":["ctxroute"]},{"pattern":"emission-core-gate.test.js","scope":["ctxroute"]}]
+rules: [{"pattern":"emission-core.js","scope":["ctxroute"]},{"pattern":"emission-core.test.js","scope":["ctxroute"]},{"pattern":"emission-core-gate.test.js","scope":["ctxroute"]}]
 mode: dumb
 ---
 # emission-core.js — LA COUCHE QUE TOUT ÉMETTEUR TRAVERSE (05/08/2026)
