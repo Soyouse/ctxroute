@@ -2127,9 +2127,24 @@ garde-fou déclencherait un remboursement RÉEL. Vérifier ≠ muter, toujours.
 > **MESURES** : 1 trame 7 661 c · 12 trames **91 932 c** · charge réelle au pire **65 265 c
 > (71 %)**, dont **53 830 c pour le seul skill**.
 >
-> ⚠️ **CE QUI RESTE OUVERT, et ne doit pas être oublié** : le **doublon** (ci-dessous) est un vrai
-> bug, toujours présent — les N processus se partagent la file. Il se RÉPARE (étendre le plan
-> mémoïsé à la file) ; le contourner en réduisant N était précisément l'erreur.
+> 🛑 **LE DOUBLON N'EXISTAIT PAS — RÉFUTÉ LE 07/08/2026, MESURE À L'APPUI.** Cette section a
+> annoncé « un morceau livré deux fois » comme un défaut avéré. **C'était un FAUX DIAGNOSTIC**, et
+> c'est lui qui a servi d'argument principal au retrait des 12 trames.
+> **CE QUE DIT LE TRANSCRIPT** : le morceau 7/8 du skill apparaît à 05:42:37 (sceau `2bc5f3df`)
+> puis à 06:26:19 (`03d7e9f2`) — et **entre les deux, un hook `PreCompact` à 06:24:24**. La
+> compaction PURGE les états ⇒ une doc `once` redevient à livrer et se réinjecte ENTIÈRE. C'est le
+> comportement **CONÇU** : sans lui, l'agent repartirait sans son skill après chaque compaction.
+> Troisième livraison à 16:39:57 — même schéma, un contexte de plus.
+> **REPRODUCTION TENTÉE** (07/08, sonde dédiée) : 12 processus RÉELLEMENT parallèles, 2 gestes,
+> dépassement massif (105 puis 92 segments en file) ⇒ **0 doublon inter-geste, 0 intra-geste**, la
+> file draine proprement `#12/23` → `#13/23`. Il n'y avait rien à reproduire.
+> ⚠️ **LA LEÇON DE MÉTHODE, elle, est le vrai livrable de cet épisode** : deux occurrences d'un
+> même identifiant NE SONT PAS un doublon tant qu'on n'a pas regardé **ce qu'il y a ENTRE LES
+> DEUX**. Le fait décisif était à trois lignes dans le transcript. L'observation, reprise d'un
+> RÉSUMÉ de session et jamais revérifiée, s'est durcie en certitude à force d'être recopiée — dans
+> le code, dans quatre docs, dans ce backlog. **Un défaut se REPRODUIT avant d'être gravé.**
+> ⚠️ Le mainteneur a demandé « comment tu l'as su ? » — c'est cette question qui a tout défait.
+> Elle doit être posée à toute affirmation héritée d'un contexte qu'on ne peut plus consulter.
 
 **DÉCLENCHEUR : le mainteneur, à l'œil nu.** Il voit les badges arriver dans le désordre
 (`morceau 1/8`, puis `5/8`, puis `2/8`…) et demande « pourquoi ça affiche pas dans l'ordre ? ».

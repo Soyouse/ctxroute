@@ -2,12 +2,35 @@
 // ZÉRO DOUBLON — un segment ÉMIS ne doit JAMAIS rester en file (06/08/2026)
 // ═══════════════════════════════════════════════════════════════════════
 //
-// 🔴 DÉFAUT RÉEL, OBSERVÉ EN PRODUCTION, PAS UNE CRAINTE THÉORIQUE. Mesuré
-//    dans le transcript du 06/08/2026 : le morceau 7/8 du skill `ctxroute` a
-//    été livré DEUX FOIS, à deux gestes distincts (marqueurs `2bc5f3df` puis
-//    `03d7e9f2`), alors que les 7 autres ne l'ont été qu'une seule fois. C'est
-//    le MAINTENEUR qui l'a vu à l'œil nu — aucun des 1000+ tests ne regardait
-//    cet invariant.
+// 🛑 ATTENTION — LE DÉFAUT FONDATEUR DE CE FICHIER N'A JAMAIS EXISTÉ.
+//    RÉFUTÉ PAR LA MESURE LE 07/08/2026, et c'est écrit ici pour que personne
+//    ne reparte de la fausse piste.
+//
+//    Ce fichier est né d'une observation du 06/08 : le morceau 7/8 du skill vu
+//    DEUX FOIS dans le transcript (sceaux `2bc5f3df` puis `03d7e9f2`), d'où
+//    l'hypothèse d'une course entre les N processus sur la file. **FAUX.** Le
+//    transcript montre un hook **`PreCompact` entre les deux** (06:24:24) : la
+//    compaction PURGE les états, donc une doc `once` redevient à livrer et se
+//    réinjecte ENTIÈRE. C'est le comportement CONÇU — sans lui, l'agent
+//    repartirait sans son skill après chaque compaction. Une 3ᵉ livraison à
+//    16:39:57 suit le même schéma : un contexte de plus, pas un doublon.
+//    Reproduction dédiée (12 processus RÉELLEMENT parallèles, 2 gestes, 105
+//    puis 92 segments en file) : **0 doublon**, drainage propre `#12/23` →
+//    `#13/23`. Il n'y avait rien à reproduire.
+//
+// ⚠️ POURQUOI CE FICHIER RESTE MALGRÉ TOUT. L'invariant qu'il énonce est SAIN
+//    et n'était couvert par rien : `budget.property` prouve la CONSERVATION et
+//    est structurellement aveugle à la duplication. Un test juste, né d'une
+//    cause fausse, reste un test juste — on corrige son RÉCIT, on ne jette pas
+//    sa garantie. 🛑 Mais ne JAMAIS le citer comme la preuve d'un bug passé.
+//
+// ⚠️ LEÇON DE MÉTHODE, le vrai legs de l'épisode : deux occurrences d'un même
+//    identifiant NE SONT PAS un doublon tant qu'on n'a pas regardé CE QU'IL Y A
+//    ENTRE LES DEUX. Le fait décisif était à trois lignes dans le transcript.
+//    L'observation, héritée d'un RÉSUMÉ de session et jamais revérifiée, s'est
+//    durcie en certitude à force d'être recopiée — dans le code, quatre docs et
+//    le backlog — et a servi d'argument principal pour supprimer une capacité
+//    qui fonctionnait. **Un défaut se REPRODUIT avant d'être gravé.**
 //
 // ⚠️ L'INVARIANT, ÉNONCÉ EXACTEMENT : à l'issue d'un geste, l'ensemble des
 //    segments ÉMIS et l'ensemble des segments PERSISTÉS EN FILE doivent être
@@ -22,15 +45,18 @@
 //    conservation, parfaitement conservé. Conservation ET unicité — les deux,
 //    jamais l'une pour l'autre.
 //
-// ⚠️ POURQUOI LE VOLET ③ (deux `emettre` dans le MÊME geste) : les N processus
-//    de `--paquets N` sont PARALLÈLES. Le plan mémoïsé doit faire qu'un seul
-//    appelle `emettre`, mais il est ÉCRIT APRÈS l'appel — il existe donc une
-//    fenêtre où deux processus le manquent tous les deux. Le second lit une
-//    file DÉJÀ réécrite par le premier : il ne voit plus le même monde, donc
-//    ne décide plus le même découpage. C'est la définition d'une course, et
-//    c'est la cause racine mesurée. 🛑 LE LOCK NE PROTÈGE PAS DE ÇA : il
-//    sérialise les ÉCRITURES, il n'empêche pas une SECONDE DÉCISION d'être
-//    prise sur un état modifié.
+// 🛑 CE QUI SUIVAIT ICI DÉCRIVAIT UNE « COURSE ENTRE PROCESSUS » COMME LA CAUSE
+//    RACINE MESURÉE. C'ÉTAIT UNE HYPOTHÈSE, JAMAIS UNE MESURE — et elle est
+//    RÉFUTÉE (cf en-tête : la compaction explique tout, et 12 processus
+//    réellement parallèles sur 2 gestes ne produisent AUCUN doublon).
+//    Le texte disait : « le plan mémoïsé est écrit APRÈS l'appel, il existe donc
+//    une fenêtre où deux processus le manquent ». Cette fenêtre n'a jamais été
+//    observée ; l'appel et l'écriture du plan sont dans la MÊME section
+//    critique du lock.
+// ⚠️ IL EST CONSERVÉ SOUS CETTE FORME, BARRÉ ET DATÉ, plutôt que supprimé :
+//    une hypothèse effacée revient, une hypothèse RÉFUTÉE PAR ÉCRIT ne revient
+//    pas. C'est la même règle que pour le backlog — un jugement renversé se
+//    réécrit, il ne s'empile pas et ne s'efface pas non plus.
 
 import { test } from 'vitest';
 import assert from 'node:assert';
@@ -90,25 +116,28 @@ test('② aucun segment n\'est émis deux fois dans un même geste', () => {
   });
 });
 
-// ⚠️ IL Y A EU UN VOLET ③ « COURSE », ET IL ÉTAIT ROUGE (06/08/2026). Il
-//    appelait `emettre` DEUX FOIS pour le même geste — ce que faisaient les 12
-//    processus de `--paquets 12` quand ils manquaient tous le plan mémoïsé — et
-//    il rendait exactement le défaut observé en prod : les 5 morceaux déjà
-//    sortis repartaient une seconde fois.
+// 🛑 CE BLOC A JUSTIFIÉ, PENDANT 24 H, LE RETRAIT D'UN VOLET « COURSE » PAR DES
+//    RAISONS AUJOURD'HUI PÉRIMÉES OU FAUSSES. Réécrit le 07/08/2026.
 //
-// 🛑 IL A ÉTÉ RETIRÉ PARCE QUE SA CAUSE N'EXISTE PLUS, PAS PARCE QU'IL GÊNAIT.
-//    Le câblage est passé à UNE seule déclaration : il n'y a plus qu'un
-//    processus par geste, donc plus qu'un `emettre`. La course est éliminée
-//    PAR CONSTRUCTION — c'est la doctrine du repo (éliminer, jamais tester du
-//    code qu'on aurait pu supprimer). Écrire un test pour rendre sûre une
-//    concurrence qu'on peut simplement ne pas avoir, c'est figer le problème.
+//    ① Il affirmait « le câblage est passé à UNE seule déclaration, donc plus
+//       qu'un `emettre` par geste ». **PÉRIMÉ** : le câblage est revenu à
+//       **12 déclarations** (bande passante, cf `paquet-unique.md`).
+//    ② Il affirmait que le volet ③ rouge « rendait exactement le défaut observé
+//       en prod ». **FAUX** : ce volet appelait `emettre` DEUX FOIS À LA MAIN,
+//       ce que le code réel ne fait jamais — le plan mémoïsé et l'écriture de
+//       la file sont dans la MÊME section critique du lock. Il reproduisait un
+//       scénario FABRIQUÉ, pas le comportement du système. Et le « défaut
+//       observé en prod » n'existait pas non plus (cf en-tête : compaction).
+//    ③ Il affirmait que `doctor --settings` « exige UNE déclaration et REFUSE
+//       `--paquets N>1` ». **PÉRIMÉ** : ces deux checks ont été remplacés par
+//       des checks de COHÉRENCE (même N partout, autant de déclarations que de
+//       trames, indices 1..N sans trou ni doublon, égalité avec la config).
 //
-// ⚠️ CE QUI GARDE LA PORTE FERMÉE EST DONC AILLEURS, et c'est volontaire :
-//    `doctor.js --settings` exige UNE déclaration et REFUSE `--paquets N>1`.
-//    Le câblage vit HORS du repo (aucun test d'ici ne peut le voir) — c'est
-//    la même raison qui fait que le check `--settings` est la seule couverture
-//    du câblage depuis le début. Ne PAS réintroduire ici un test de course :
-//    il redeviendrait rouge sans qu'aucun défaut n'existe.
+// ⚠️ CE QU'IL FAUT EN RETENIR — un test qui prouve un scénario que le code ne
+//    peut pas produire ne prouve RIEN sur le code. Il rassure ou il effraie,
+//    au hasard. Avant d'écrire un test « de course », vérifier que la course
+//    est ATTEIGNABLE : ici, 12 processus réellement parallèles sur 2 gestes
+//    n'ont produit aucun doublon (sonde du 07/08).
 
 test('③ plusieurs gestes successifs ne réémettent jamais un morceau déjà sorti', () => {
   isole(() => {
