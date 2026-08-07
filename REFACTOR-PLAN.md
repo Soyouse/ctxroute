@@ -2,7 +2,50 @@
 
 ---
 
-# 📍 ÉTAT AU 07/08/2026 (SOIR) — LE CANARI EST MULTI-HARNAIS, ② FERMÉ
+# 📍 ÉTAT AU 07/08/2026 (SOIR) — REPRISE DE SESSION, LIRE CECI EN PREMIER
+
+## Les 9 commits du jour, dans l'ordre
+`cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
+d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
+le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
+audit des valeurs de rank.
+**Preuves de clôture** : 1085 tests (58 fichiers) · mutation **100 %** · doctor **74 ok / 0** sur
+les DEUX câblages réels · dependency-cruiser 0 violation · jscpd 0,52 % · **CI verte** sur tous les
+pushes · `master` == `origin/master`, arbre propre.
+
+## 🔴 CE QUE CETTE SESSION A PROUVÉ, ET QUI VAUT PLUS QUE LE CODE LIVRÉ
+**Quatre défauts trouvés — AUCUN par une machine.** Tous sont sortis de questions du mainteneur
+(« c'est vraiment solide ? », « les docs disent-elles vrai ? », « le rank, ça marche ? ») :
+① une régression introduite le matin même, invisible sous **1081 tests verts + mutation 100 %** ;
+② l'afficheur du canari MORT depuis 3 jours (chemin périmé, hors repo, aucun gate ne peut le voir) ;
+③ le skill se **contredisait lui-même** à 9 lignes d'intervalle ; ④ une suite sans doc injectable.
+⚠️ **Et 2 des 3 gates écrits ce jour avaient un défaut AU PREMIER RUN sur le repo réel** (faux
+positif `sources/skill.js`, fixture non discriminant sur `rank`). **Un gate se juge sur ce qu'il
+matche RÉELLEMENT, jamais sur ce que son commentaire prétend** — et ça ne se voit qu'en le lançant
+pour de vrai AVANT de le déclarer fini.
+🛑 **3 SONDES FAUSSES en cherchant si `rank` marchait** (harnais maison vide · mauvaise variable
+d'env · fixture ambigu) — le motif EXACT que `explain.md` documente. Réflexe à garder :
+`node explain.js`, jamais un harnais maison ; parc de test via **`CTXROUTE_FILEDOCS_DIR`**.
+
+## 📋 CE QUI RESTE OUVERT — liste COMPLÈTE, rien d'autre ne vit ailleurs
+| # | Chantier | État |
+|---|---|---|
+| ② bis | **Run Codex RÉEL du canari** — câblage prouvé par le doctor, mais aucun run réel. ⚠️ Consomme le quota ChatGPT du mainteneur ⇒ **demander avant** | 🔴 |
+| ㉗ | **Valeurs de `rank`** — mécanisme prouvé, les 313 valeurs jamais auditées | 🟠 |
+| ㉕ | **Couplage par le stockage** — moitié décidable LIVRÉE (gate), moitié sémantique indécidable | 🟠 |
+| ④ | **Contrat canari ⟷ afficheur** — vient de se payer (3 jours d'aveuglement), filet = un commentaire | 🟠 |
+| ⑱ | **Rien ne mesure le DÉBIT** — partiellement couvert par l'alarme de capacité | 🟠 |
+| — | **DOC-FIRST** — récidive du 04/08, et encore ce jour (affirmation scellée non vérifiée) | 🔴 |
+| ⑳ | Audit des negative-checks (bonus, jamais un pilier — coûteux et peu fiable) | 🟠 |
+| ㉑ | `tsc --checkJs` | 🟢 |
+| ㉒ | Langue du code | 🧊 **GELÉ** — réveil : quand le projet aura de la popularité |
+| ㉖ | Gate sur les constantes citées | 🛑 **FERMÉ** sur mesure, ne pas rouvrir |
+| — | Worktree orphelin `mcp-doc-hooks-paquets` (105 Mo) | scorie, marche à suivre écrite |
+
+⚠️ **AUCUN de ces trous ne dégrade ce qui est LIVRÉ à l'agent.** Le moteur d'injection est en prod
+depuis le 17/07 et prouvé sur le terrain (341 injections atterries mesurées dans un transcript de
+46 Mo). Canari, gates et docs sont des FILETS autour — s'ils disparaissaient, les agents
+recevraient exactement les mêmes documents.
 
 ## Ce qui a été livré dans cette session
 **② CANARI CODEX — FERMÉ, et le portage n'a coûté AUCUN fichier neuf.**
