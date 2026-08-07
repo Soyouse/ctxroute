@@ -25,6 +25,23 @@ poussé sur GitHub**, donc **aucune CI n'a validé** ce travail — c'est le pre
 ⇒ **RÈGLE : un défaut se REPRODUIT avant d'être gravé**, et tout fait hérité d'un RÉSUMÉ de
 session est NON VÉRIFIÉ tant qu'on n'a pas retrouvé la trace d'origine.
 
+## 🟠 GATE « UN DÉFAUT SE REPRODUIT AVANT D'ÊTRE GRAVÉ » — ÉCARTÉ, avec sa raison
+La doctrine dit : une consigne en prose qui n'a pas tenu doit devenir un GATE. La leçon du jour
+(un faux défaut gravé dans le code, 4 docs et ce backlog) devrait donc être mécanisée.
+🛑 **DÉCISION : NON, et ce n'est pas un report.** Le seul gate imaginable serait « une doc qui
+AFFIRME un défaut doit citer une date de reproduction » — il faudrait donc **comprendre de la
+prose** pour distinguer « ce défaut existe » de « ce défaut a existé » ou « ne pas réintroduire ce
+défaut ». Sur 385 docs, ça produirait des faux positifs en masse, et **un gate bruyant finit
+débranché** (leçon du rush mode, déjà payée). Un gate qui certifie au lieu de protéger est pire
+que pas de gate.
+⚠️ **CE QUI TIENT LIEU DE FILET, ASSUMÉ COMME PLUS FAIBLE** : la leçon est écrite en doc
+injectable (`paquet-unique.md`, réinjectée à chaque accès au transport) ET en mémoire globale
+(`feedback-reproduire-avant-de-graver-un-defaut`). C'est de la prévention par CONTEXTE, pas un
+fail-closed. **Le vrai filet reste l'opérateur** : la question « comment tu l'as su ? » est ce qui
+a défait le faux diagnostic — aucune machine du repo ne l'aurait posée.
+⇒ Rouvrir seulement si la classe RÉCIDIVE : trois occurrences justifieraient un gate même
+imparfait. Deux ne le justifient pas.
+
 ## ⚠️ SCORIE MESURÉE, VOLONTAIREMENT NON TRAITÉE (07/08/2026)
 Worktree `~/Desktop/mcp-doc-hooks-paquets` (branche `chantier-paquets`, **105 Mo**) : son dépôt
 parent (`mcp-doc-hooks/.git`) N'EXISTE PLUS — le repo a été renommé `ctxroute`, donc le worktree
