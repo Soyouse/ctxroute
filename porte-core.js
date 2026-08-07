@@ -242,26 +242,11 @@ function run(data, emit, options) {
     //    comportement, jamais une corruption. La file reste intacte et repart au
     //    geste suivant.
     if (!res) {
-      // ⚠️ L'ÉTAT SE LIT, IL NE SE DEVINE PAS (07/08/2026 — bug RÉEL en prod).
-      //    Ce repli passait `{}`. Or l'état porte le « déjà vu » : un `once`
-      //    déjà livré était donc jugé JAMAIS livré et RÉÉMIS. Comme ce chemin
-      //    ne lit pas non plus le plan mémoïsé, il recalculait seul le MÊME
-      //    découpage (déterministe ⇒ marqueur identique) et n'émettait que SA
-      //    trame — d'où un MORCEAU ORPHELIN réapparaissant après une livraison
-      //    complète, sans compaction, file vide. Signature relevée :
-      //      21:25 paquets 1..9 → morceaux 1/9…9/9  ###FIN:be66cd9b###
-      //      21:30 paquet 2     → morceau  2/9 SEUL ###FIN:be66cd9b###
-      // 🛑 LA FAUTE ÉTAIT UNE INFÉRENCE : ce processus savait UNIQUEMENT « je
-      //    n'ai pas eu le verrou » et en déduisait « donc rien n'a été
-      //    injecté ». Le verrou sérialise les ÉCRITURES ; la LECTURE n'en a
-      //    jamais eu besoin — l'état est un fichier, il suffit de le lire.
-      //    Interroger ce qui SAIT, jamais un indice.
-      // ⚠️ NE JAMAIS remettre `{}` « pour rester sans effet de bord » : lire
-      //    n'a AUCUN effet de bord. Un état légèrement périmé fait au pire une
-      //    réinjection JUSTIFIÉE ; un état vide en fabrique une FANTÔME à
-      //    CHAQUE contention, donc un système non déterministe.
-      // ⚠️ CE QUI NE CHANGE PAS : on n'écrit RIEN (ni état, ni plan, ni file)
-      //    et on reste fail-open. Seule la CONNAISSANCE s'améliore.
+      // 🛑 L'ÉTAT SE LIT, IL NE SE DEVINE PAS. NE JAMAIS remettre `{}` ici :
+      //    un `once` déjà livré serait réémis à CHAQUE contention (morceau
+      //    orphelin en prod, 07/08/2026). Le verrou sérialise les ÉCRITURES —
+      //    lire n'en a jamais eu besoin et n'a aucun effet de bord.
+      //    On lit, on décide, on n'écrit RIEN. Détail : `porte.md`.
       const etatConnu = store.loadState(STORE_PREFIX, sessionId);
       const r = gate.decide(config, decls, matched, etatConnu, turnCount, acc.owner);
       const segments = segmentsPour(r.inject);
