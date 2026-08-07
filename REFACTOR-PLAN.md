@@ -2,7 +2,42 @@
 
 ---
 
-# 📍 ÉTAT AU 05/08/2026 — À LIRE EN PREMIER (reprise de session)
+# 📍 ÉTAT AU 07/08/2026 — À LIRE EN PREMIER (reprise de session)
+
+## Ce qui tourne MAINTENANT
+`settings.json` câble la porte en **12 déclarations** (`--paquet k --paquets 12`).
+**Capacité d'un geste = 91 932 c** (1 trame = 7 661 c) · **charge réelle au pire = 65 265 c (71 %)**,
+dont **53 830 c pour le seul skill**. Réglage utilisateur : **`paquets`** dans `ctxroute-config.json`.
+**Preuves du jour** : 1072 tests verts (56 fichiers) · doctor **57 ok / 0 problème** sur le câblage
+réel · différentiels porte + mcp verts · dependency-cruiser **0 violation** (49 modules) · jscpd
+**0,53 %** · mutation NON relancée et c'est justifié (aucun fichier `mutate` touché : seuls
+`doctor.js`, `porte-core.js`, `source-adapters.js` — de l'I/O — ont changé).
+Commits : `ddc7146` (retour aux 12 trames) · `388773b` (réfutation du faux doublon). **Rien n'est
+poussé sur GitHub**, donc **aucune CI n'a validé** ce travail — c'est le premier geste à faire.
+
+## 🛑 LES DEUX ERREURS DE MÉTHODE DU JOUR — les lire avant de décider quoi que ce soit
+1. **Un faux diagnostic a servi à casser une capacité qui marchait.** « Le morceau 7/8 livré 2× »
+   n'a JAMAIS été un doublon : un `PreCompact` séparait les deux occurrences (compaction ⇒ purge
+   ⇒ une doc `once` se réinjecte entière, comportement CONÇU). Non reproduit, jamais revérifié,
+   il s'est propagé dans le code, 4 docs et ce backlog. Détail complet : section ㉔.
+2. **La mesure qui justifiait le retrait mesurait la mauvaise grandeur** (trames UTILISÉES au lieu
+   du compteur de docs différées). **Un chiffre juste peut porter une conclusion fausse.**
+⇒ **RÈGLE : un défaut se REPRODUIT avant d'être gravé**, et tout fait hérité d'un RÉSUMÉ de
+session est NON VÉRIFIÉ tant qu'on n'a pas retrouvé la trace d'origine.
+
+## ⚠️ SCORIE MESURÉE, VOLONTAIREMENT NON TRAITÉE (07/08/2026)
+Worktree `~/Desktop/mcp-doc-hooks-paquets` (branche `chantier-paquets`, **105 Mo**) : son dépôt
+parent (`mcp-doc-hooks/.git`) N'EXISTE PLUS — le repo a été renommé `ctxroute`, donc le worktree
+est ORPHELIN et `git -C` y échoue. **`git log master..chantier-paquets` = 10 commits**, dont les
+MESSAGES sont identiques à des commits présents dans `master` sous d'autres SHA (`cd565a6` ici ⇄
+`f1481ef` là) ⇒ le travail a très probablement été rejoué. 🛑 **NON SUPPRIMÉ : « très
+probablement » ne suffit pas pour effacer 105 Mo d'historique.** Pour trancher : comparer les
+ARBRES (`git diff --stat master chantier-paquets` montre 8 871 suppressions = la branche est en
+RETARD, pas en avance) puis `git worktree prune` avant tout `rm`.
+
+---
+
+# 📍 ÉTAT AU 05/08/2026 (historique — conservé pour ses mesures)
 
 ## Bilan des 2 jours (04 → 05/08/2026)
 
