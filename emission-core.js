@@ -73,8 +73,44 @@ function chargerFile(scopeId) {
 //    VIDE la file quand tout est enfin livré. La rendre conditionnelle au
 //    non-vide ferait boucler la dernière livraison à chaque geste, pour
 //    toujours.
-function enregistrerFile(scopeId, differes) {
-  store.saveState(RELIQUAT_PREFIX, scopeId, { segments: differes });
+function enregistrerFile(scopeId, differes, emissions) {
+  store.saveState(RELIQUAT_PREFIX, scopeId, { segments: differes, emissions });
+}
+
+/**
+ * COMPTEUR D'ÉMISSIONS — combien de fois cette couche a réellement fait SORTIR
+ * du contexte, pour ce scope d'agent, depuis la dernière compaction.
+ *
+ * ⚠️ RAISON D'ÊTRE (07/08/2026, portage du canari sur Codex). Le canari doit
+ *    répondre à « on a émis, est-ce ARRIVÉ ? ». Il lui faut donc un
+ *    DÉNOMINATEUR : sans lui, « zéro injection constatée » est indécidable
+ *    (peut-être n'a-t-on simplement rien émis). Côté Claude Code ce
+ *    dénominateur était compté en cherchant `"type":"tool_use"` dans le
+ *    transcript — c'est-à-dire en lisant le DIALECTE du harnais.
+ * 🛑 CETTE VOIE EST FERMÉE POUR CODEX, ET C'EST DOCUMENTÉ NOIR SUR BLANC.
+ *    Doc officielle des hooks Codex (learn.chatgpt.com/docs/hooks, relue le
+ *    07/08/2026) : « the transcript format isn't a stable interface for hooks
+ *    and may change over time ». Compter des appels d'outils en devinant un
+ *    marqueur dans ce fichier serait bâtir sur un format que l'éditeur se
+ *    réserve explicitement le droit de casser. NE JAMAIS le faire.
+ * ✅ Le dénominateur est donc une donnée à NOUS, produite par notre propre
+ *    couche d'émission : indépendante de tout harnais, vraie partout, et
+ *    gratuite (elle voyage dans une écriture de store qui existait déjà).
+ *
+ * ⚠️ INCRÉMENTÉ SEULEMENT QUAND DU CONTENU PART VRAIMENT (`segments` non vide).
+ *    Compter les passages à vide gonflerait le dénominateur sans jamais
+ *    produire de trace attendue en face — le canari accuserait une panne
+ *    inexistante, et une alarme qui crie sur du sain cesse d'être lue.
+ * ⚠️ Purgé par `ctxroute-reset.js` avec le reste du préfixe `reliquat-` : après
+ *    une compaction l'échantillon RECOMMENCE, ce qui est correct — le contexte
+ *    a été vidé, les injections d'avant ne prouvent plus rien sur maintenant.
+ */
+function compteurEmissions(scopeId) {
+  const f = store.loadState(RELIQUAT_PREFIX, scopeId);
+  // ⚠️ Store écrit AVANT le 07/08/2026 : la clé n'existe pas. Absente = 0,
+  //    jamais une erreur — c'est ce qui rend l'ajout rétro-compatible
+  //    (expand/contract : la nouvelle clé apparaît, personne ne casse).
+  return Number.isInteger(f.emissions) && f.emissions > 0 ? f.emissions : 0;
 }
 
 /**
@@ -109,8 +145,13 @@ function decouper(segments, budgetMax, nbPaquets) {
 function emettre({ frais, budgetMax, nbPaquets, indice, scopeId }) {
   const segments = budget.ordonner(chargerFile(scopeId), frais);
   const paquets = decouper(segments, budgetMax, nbPaquets);
-  enregistrerFile(scopeId, paquets[paquets.length - 1].differes);
+  // ⚠️ LE COMPTEUR VOYAGE DANS L'ÉCRITURE QUI EXISTAIT DÉJÀ — zéro I/O de plus,
+  //    zéro lock de plus. C'est ce qui rend le dénominateur du canari GRATUIT ;
+  //    un store dédié aurait ajouté une écriture par geste sur le chemin chaud.
+  //    Le passage à vide ne compte pas (cf `compteurEmissions`).
+  const emissions = compteurEmissions(scopeId) + (segments.length > 0 ? 1 : 0);
+  enregistrerFile(scopeId, paquets[paquets.length - 1].differes, emissions);
   return { segments, paquets, plan: paquets[indice - 1] };
 }
 
-module.exports = { emettre, decouper, chargerFile, RELIQUAT_PREFIX };
+module.exports = { emettre, decouper, chargerFile, compteurEmissions, RELIQUAT_PREFIX };

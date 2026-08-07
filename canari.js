@@ -34,18 +34,18 @@
 
 'use strict';
 
-// Nombre d'appels d'outils à partir duquel « zéro injection » cesse d'être une
-// coïncidence et devient une PREUVE.
+// Nombre d'ÉMISSIONS à partir duquel « zéro injection atterrie » cesse d'être
+// une coïncidence et devient une PREUVE.
 // ⚠️ Ce n'est pas un délai, c'est une TAILLE D'ÉCHANTILLON — la règle du parc
 //    « le temps se déclare » ne s'y applique pas : on n'attend rien, on exige
 //    d'avoir assez observé avant de conclure. Justification chiffrée : le parc
 //    compte des centaines de docs injectables ET des docs de session livrées à
 //    chaque démarrage ; sur une session vivante, la fenêtre mesurée le
 //    03/08/2026 portait 109 appels pour 174 injections. Zéro injection sur 25
-//    appels consécutifs n'arrive pas quand le canal fonctionne.
+//    émissions consécutives n'arrive pas quand le canal fonctionne.
 // ⚠️ Le baisser fabriquerait des fausses alertes — et un avertissement récurrent
 //    sur du sain, c'est un canal qu'on cesse de lire (leçon du rush mode).
-const SEUIL_APPELS = 25;
+const SEUIL_EMISSIONS = 25;
 
 // Fenêtre de lecture du transcript, en octets, lue depuis la FIN.
 // ⚠️ BORNE OBLIGATOIRE : un transcript réel du parc pesait **104 Mo** le
@@ -63,19 +63,34 @@ const FENETRE_OCTETS = 2 * 1024 * 1024;
 //    du budget, et le canari deviendrait aveugle aux petites injections.
 const MARQUE_INJECTION = '[source:';
 
-// ⚠️ AUCUNE MARQUE DE HARNAIS ICI. La façon dont un harnais note un appel
-//    d'outil dans son transcript est SON dialecte (Claude Code : `"type":
-//    "tool_use"` ; un autre produit écrira autre chose). L'écrire dans ce
-//    module ferait entrer un dialecte dans le noyau — précisément ce que
-//    `sources-must-not-know-the-harness` interdit ailleurs, et ce qui casserait
-//    le portage. La COQUILLE la déclare et la passe en paramètre.
-//    ⚠️ `MARQUE_INJECTION`, elle, RESTE ici : c'est NOTRE marque, posée par
-//    notre propre porte — elle ne dépend d'aucun produit tiers.
+// ⚠️ IL N'Y A PLUS AUCUNE MARQUE DE HARNAIS NULLE PART — ni ici, ni dans la
+//    coquille (07/08/2026). Jusqu'à cette date, le DÉNOMINATEUR (« combien
+//    d'occasions d'injecter ? ») se comptait en cherchant `"type":"tool_use"`
+//    dans le transcript de Claude Code, et le portage sur un autre harnais
+//    consistait à deviner SON marqueur équivalent.
+// 🛑 CETTE APPROCHE EST MORTE, ET LA DOC OFFICIELLE LE DIT NOIR SUR BLANC.
+//    Hooks Codex (learn.chatgpt.com/docs/hooks, relue le 07/08/2026) :
+//    « the transcript format isn't a stable interface for hooks and may change
+//    over time ». Le transcript est un CONFORT de lecture, jamais un contrat.
+//    Bâtir un dénominateur sur son schéma, c'est parier sur un format que
+//    l'éditeur se réserve le droit de casser — interdit permanent du repo.
+// ✅ CE QUI LE REMPLACE : le compteur d'ÉMISSIONS de `emission-core.js`, une
+//    donnée à NOUS. Le canari demande désormais « on a émis N fois, est-ce
+//    arrivé ? » au lieu de « il s'est passé N choses chez le harnais ».
+//    C'est la MÊME question, posée à une source dont nous sommes l'auteur.
+//    Conséquence heureuse : les deux harnais partagent la MÊME coquille — le
+//    portage sur Codex n'a coûté aucun fichier, seulement une ligne de câblage.
+//
+// ⚠️ `MARQUE_INJECTION` RESTE ici, et elle seule : c'est NOTRE marque, posée par
+//    notre propre porte. La chercher dans le transcript ne dépend d'AUCUN
+//    schéma — c'est une sous-chaîne dans du texte. Si le harnais change son
+//    format de fichier, notre marque y reste ; s'il cesse d'écrire un
+//    transcript, `transcript_path` vaut `null` (documenté) et le canari se tait.
 
 /**
  * Tranche l'état du canal d'injection.
  *
- * @param {number} appels — appels d'outils observés dans la fenêtre.
+ * @param {number} emissions — fois où le framework a fait SORTIR du contexte.
  * @param {number} injections — injections ayant ATTERRI dans la fenêtre.
  * @returns {'vivant'|'mort'|'indecidable'}
  *
@@ -86,16 +101,16 @@ const MARQUE_INJECTION = '[source:';
  *    prouver que le canal vit. On ne compare JAMAIS un nombre d'injections à un
  *    nombre attendu — ce serait retomber dans l'estimation.
  */
-function verdict(appels, injections) {
+function verdict(emissions, injections) {
   // ⚠️ `Math.max(0, …)` et NON `x > 0 ? x : 0` : à x = 0 les deux branches du
   //    ternaire rendent la même chose ⇒ le comparateur est INTUABLE (mutant
   //    équivalent, donc survivant éternel). Même leçon que `parsePaquetArgs` et
   //    `capacitePaquet` — écrire la forme TESTABLE, toujours.
-  const a = Number.isInteger(appels) ? Math.max(0, appels) : 0;
+  const e = Number.isInteger(emissions) ? Math.max(0, emissions) : 0;
   const i = Number.isInteger(injections) ? Math.max(0, injections) : 0;
   if (i > 0) return 'vivant';
   // Pas assez observé pour accuser : on se TAIT plutôt que de crier au loup.
-  if (a >= SEUIL_APPELS) return 'mort';
+  if (e >= SEUIL_EMISSIONS) return 'mort';
   return 'indecidable';
 }
 
@@ -118,23 +133,25 @@ function etiquette(v) {
 }
 
 /**
- * Compte les deux témoins dans un extrait de transcript.
+ * Compte les injections ATTERRIES dans un extrait de transcript.
+ *
  * ⚠️ Tolérant aux lignes TRONQUÉES : la fenêtre coupe le fichier au milieu
  *    d'une ligne par construction. On compte des SOUS-CHAÎNES, jamais du JSON
- *    parsé — parser exigerait des lignes entières et rendrait le canari fragile
- *    au découpage, pour zéro gain.
+ *    parsé — parser exigerait des lignes entières, rendrait le canari fragile
+ *    au découpage, et surtout ferait DÉPENDRE le canari du schéma du
+ *    transcript, que la doc Codex déclare instable (cf en-tête). Compter une
+ *    sous-chaîne qu'on a soi-même écrite ne dépend d'aucun format.
+ * ⚠️ UN SEUL TÉMOIN ICI, plus deux (07/08/2026) : le dénominateur ne se lit
+ *    plus dans le transcript, il vient du compteur d'émissions. Ne JAMAIS
+ *    réintroduire un paramètre « marque d'appel » — ce serait refaire entrer un
+ *    dialecte de harnais dans le noyau.
  */
-// ⚠️ `marqueAppel` est un PARAMÈTRE, jamais une constante d'ici : c'est le
-//    dialecte du harnais (cf ci-dessus). La coquille le fournit.
-function compter(extrait, marqueAppel) {
+function compterInjections(extrait) {
   // ⚠️ Sortie ANTICIPÉE plutôt qu'un repli sur `''` : le repli introduisait une
-  //    chaîne ARBITRAIRE que rien ne peut observer (n'importe quel texte sans
-  //    les deux marques donne le même résultat) ⇒ mutant équivalent. Ici, le
+  //    chaîne ARBITRAIRE que rien ne peut observer ⇒ mutant équivalent. Ici, le
   //    zéro est une valeur de contrat, donc testable.
-  if (typeof extrait !== 'string' || typeof marqueAppel !== 'string' || marqueAppel === '') {
-    return { appels: 0, injections: 0 };
-  }
-  return { appels: occurrences(extrait, marqueAppel), injections: occurrences(extrait, MARQUE_INJECTION) };
+  if (typeof extrait !== 'string') return 0;
+  return occurrences(extrait, MARQUE_INJECTION);
 }
 
 // ⚠️ Comptage par `indexOf` et non par regex : les deux marques contiennent des
@@ -150,4 +167,4 @@ function occurrences(s, marque) {
   return n;
 }
 
-module.exports = { verdict, etiquette, compter, SEUIL_APPELS, FENETRE_OCTETS, MARQUE_INJECTION };
+module.exports = { verdict, etiquette, compterInjections, SEUIL_EMISSIONS, FENETRE_OCTETS, MARQUE_INJECTION };

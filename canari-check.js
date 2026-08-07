@@ -30,16 +30,33 @@ require('./deadline').arm();
 const fs = require('fs');
 const path = require('path');
 const canari = require('./canari');
+const emission = require('./emission-core');
+const lib = require('./lib-pure');
 const paths = require('./paths');
 const { readStdinJson } = require('./stdin-json');
 
-// ⚠️ DIALECTE DU HARNAIS — SA PLACE EST ICI, JAMAIS DANS `canari.js`.
-//    Façon dont Claude Code note un appel d'outil dans son transcript JSONL,
-//    MESURÉE le 03/08/2026 (2 734 lignes analysées, 310 entrées portantes).
-//    Un autre harnais écrira autre chose : porter le canari = changer CETTE
-//    ligne dans une coquille dédiée, et RIEN d'autre. Le noyau reste intact —
-//    même contrat que `porte-core` ⟷ `doc-inject`/`codex-doc-inject`.
-const MARQUE_APPEL_CLAUDE = '"type":"tool_use"';
+// ⚠️ CETTE COQUILLE EST COMMUNE AUX DEUX HARNAIS — il n'y a PLUS de dialecte
+//    à déclarer (07/08/2026, portage Codex). Elle portait
+//    `MARQUE_APPEL_CLAUDE = '"type":"tool_use"'`, le motif par lequel Claude
+//    Code note un appel d'outil dans son transcript, et porter le canari
+//    consistait à deviner l'équivalent chez l'autre produit.
+// 🛑 CE PLAN A ÉTÉ ABANDONNÉ SUR PREUVE DOCUMENTAIRE, pas par goût.
+//    Doc officielle des hooks Codex (learn.chatgpt.com/docs/hooks, lue le
+//    07/08/2026) : « the transcript format isn't a stable interface for hooks
+//    and may change over time ». Le backlog prévoyait de chercher
+//    `response_item`/`custom_tool_call` : c'était rétro-ingénierer un format
+//    que l'éditeur se réserve le droit de casser — donc un canari qui serait
+//    mort en silence à la première mise à jour. Un dead-man switch qui meurt
+//    sans le dire est PIRE que pas de dead-man switch.
+// ✅ Le dénominateur vient désormais de `emission-core.compteurEmissions` :
+//    NOTRE donnée, identique sur tous les harnais. Ce qu'on cherche encore dans
+//    le transcript, c'est UNIQUEMENT notre propre marque `[source:` — une
+//    sous-chaîne, jamais un champ de schéma.
+// ⚠️ Ce qui rend le partage LÉGITIME, et il faut le vérifier avant tout nouveau
+//    harnais : les deux payloads exposent `transcript_path` et `session_id`
+//    sous CES noms, et les deux contrats de sortie admettent le silence total.
+//    Un harnais qui différerait sur l'un des trois exigerait une coquille — pas
+//    un `if` ici.
 
 // ⚠️ Chemin STABLE et unique : la statusline le lit sans rien savoir du
 //    framework. Le poser ailleurs qu'ici dupliquerait une vérité de chemin.
@@ -73,15 +90,23 @@ function run(data) {
   if (!transcript) return;
 
   const extrait = lireQueue(transcript);
-  const { appels, injections } = canari.compter(extrait, MARQUE_APPEL_CLAUDE);
-  const v = canari.verdict(appels, injections);
+  const injections = canari.compterInjections(extrait);
+  // ⚠️ MÊME CLÉ DE SCOPE QUE LA PORTE (`lib.scopeId`, SOURCE UNIQUE) : le
+  //    compteur d'émissions est écrit par `emission-core` sous cette clé. La
+  //    composer autrement ici lirait un compteur qui n'existe pas — donc un
+  //    dénominateur à 0, donc un canari éternellement `indecidable` : muet, vert,
+  //    et parfaitement inutile. C'est le mode de panne le plus dangereux d'un
+  //    dead-man switch, et rien d'autre que la sonde du doctor ne le verrait.
+  const scopeId = lib.scopeId(data.session_id, data.agent_id);
+  const emissions = emission.compteurEmissions(scopeId);
+  const v = canari.verdict(emissions, injections);
 
   const dossier = paths.stateDir();
   fs.mkdirSync(dossier, { recursive: true });
   // Écriture ATOMIQUE (tmp + rename) : la statusline lit ce fichier en
   // permanence ; un JSON à moitié écrit lui ferait afficher n'importe quoi.
   const tmp = cheminSante() + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify({ verdict: v, appels, injections, horodatage: Date.now() }));
+  fs.writeFileSync(tmp, JSON.stringify({ verdict: v, emissions, injections, horodatage: Date.now() }));
   fs.renameSync(tmp, cheminSante());
 }
 

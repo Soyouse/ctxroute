@@ -302,10 +302,11 @@ function probe() {
     //    on lui en donne un. On ne touche JAMAIS le transcript vivant.
     const trans = (injecte) => {
       const f = path.join(tmp, `transcript-${injecte ? 'vivant' : 'mort'}.jsonl`);
-      // SEUIL_APPELS = 25 → il en faut au moins autant pour que le canari OSE
-      // trancher. En dessous, son verdict est 'indecidable' (échantillon trop
-      // petit) — c'est voulu, et ça ne prouverait rien ici.
       const lignes = [];
+      // ⚠️ Ces lignes ne sont plus COMPTÉES depuis le 07/08/2026 (le format d'un
+      //    transcript n'est un contrat chez AUCUN harnais — doc Codex : « isn't
+      //    a stable interface ») : elles ne sont là que comme BRUIT réaliste.
+      //    Le dénominateur vient du compteur d'émissions posé ci-dessous.
       for (let i = 0; i < 30; i++) lignes.push('{"type":"tool_use","id":"t' + i + '"}');
       if (injecte) lignes.push('{"text":"[source: .claude/hooks/docs/probe.md]"}');
       fs.writeFileSync(f, lignes.join('\n') + '\n');
@@ -314,6 +315,15 @@ function probe() {
     const passeCanari = (injecte) => {
       const sante = path.join(stateDir, 'canari.json');
       try { fs.rmSync(sante, { force: true }); } catch { /* premier passage */ }
+      // ⚠️ ON POSE LE DÉNOMINATEUR — sans lui le canari répond 'indecidable' et
+      //    la sonde ne prouverait RIEN. `SEUIL_EMISSIONS` = 25, on en met plus.
+      //    Clé et préfixe IDENTIQUES à ceux qu'écrit `emission-core` : c'est
+      //    justement cette frontière qui doit rester vraie en production.
+      fs.mkdirSync(stateDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(stateDir, 'reliquat-doctor-probe.json'),
+        JSON.stringify({ segments: [], emissions: 30 }),
+      );
       const r9 = spawnSync(process.execPath, [CANARI], {
         input: JSON.stringify({
           hook_event_name: 'UserPromptSubmit',
@@ -578,7 +588,20 @@ function checkCodexWiring(hooksPath) {
     'session-inject.js absent du câblage Codex : docs/session/ jamais injectées côté Codex.');
   check('la porte TOUR (turn-count.js, RÉUTILISÉE) est câblée en UserPromptSubmit', wired('turn-count.js'),
     'turn-count.js absent du câblage Codex : driftUnit turn mort côté Codex.');
-  for (const name of ['codex-doc-inject.js', 'codex-doc-write-guard.js', 'ctxroute-reset.js', 'session-inject.js', 'turn-count.js']) {
+  // ⚠️ 6ᵉ VOIE — LE CANARI CÔTÉ CODEX (07/08/2026, chantier ② du backlog).
+  //    Sans lui, le framework n'avait de témoin de bout en bout que sur UN
+  //    harnais : le jour où OpenAI change son contrat de hooks, l'injection
+  //    Codex meurt en SILENCE (tout est fail-open, le doctor reste vert).
+  //    Le canari est aussi, par construction, notre SEUL gate anti-dépréciation
+  //    utilisable : détecter l'ANNONCE d'un flag déprécié s'est révélé
+  //    impossible gratuitement (3 pistes mesurées et fermées le 05/08) ; lui
+  //    détecte l'EFFET, ce qui suffit et ne coûte rien.
+  // ⚠️ MÊME FICHIER que côté Claude, sans coquille : `transcript_path` et
+  //    `session_id` sont documentés sous ces noms dans les DEUX payloads.
+  check('le CANARI (canari-check.js, RÉUTILISÉ) est câblé en UserPromptSubmit', wired('canari-check.js'),
+    'canari-check.js absent du câblage Codex : plus AUCUN témoin ne verrait Codex cesser de consommer '
+    + 'nos injections. Le framework se croirait sain sur un harnais devenu muet.');
+  for (const name of ['codex-doc-inject.js', 'codex-doc-write-guard.js', 'ctxroute-reset.js', 'session-inject.js', 'turn-count.js', 'canari-check.js']) {
     if (wired(name)) {
       check(`le fichier câblé existe et est CE repo : ${name}`, expectRepo(name),
         `le câblage Codex pointe vers une copie/un fichier inexistant pour ${name} (ce repo : ${__dirname}).`);

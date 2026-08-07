@@ -2,7 +2,51 @@
 
 ---
 
-# 📍 ÉTAT AU 07/08/2026 — À LIRE EN PREMIER (reprise de session)
+# 📍 ÉTAT AU 07/08/2026 (SOIR) — LE CANARI EST MULTI-HARNAIS, ② FERMÉ
+
+## Ce qui a été livré dans cette session
+**② CANARI CODEX — FERMÉ, et le portage n'a coûté AUCUN fichier neuf.**
+🛑 **LE PLAN ÉCRIT DANS CE BACKLOG ÉTAIT MAUVAIS, et c'est le point à retenir.** Il prévoyait de
+mesurer le marqueur d'appel d'outil dans le rollout Codex (`response_item`/`custom_tool_call`).
+Doc officielle relue le 07/08 (`learn.chatgpt.com/docs/hooks`, Codex 0.146.0 installé) :
+> *« the transcript format isn't a stable interface for hooks and may change over time »*
+
+Rétro-ingénierer ce schéma aurait produit un canari **mort en silence à la première mise à jour** —
+un dead-man switch qui meurt sans le dire est pire que pas de dead-man switch du tout.
+✅ **CE QUI A ÉTÉ FAIT À LA PLACE** : le dénominateur du canari (« combien de fois a-t-on émis ? »)
+vient désormais de **notre** compteur, `emission-core.compteurEmissions`, incrémenté dans une
+écriture de store qui existait DÉJÀ (zéro I/O, zéro lock de plus). Du transcript on ne lit plus que
+**notre propre** sous-chaîne `[source:`, qui ne dépend d'aucun schéma.
+⇒ `MARQUE_APPEL_CLAUDE` supprimé : **plus aucun dialecte de harnais dans le canari**, donc **une
+seule coquille pour les deux produits** (`transcript_path` et `session_id` sont documentés sous ces
+noms des deux côtés, et les deux contrats admettent le silence total). Le portage s'est réduit à
+une ligne de câblage dans `requirements.toml` + les preuves.
+✅ **BÉNÉFICE NON PRÉVU** : sans émission de notre part, plus aucune accusation (`indecidable`).
+Avant, l'activité du HARNAIS suffisait à crier « INJECTION MORTE » — faux positif sur un
+utilisateur ne touchant aucun fichier documenté.
+✅ **⑩ FERMÉ PAR RICOCHET** : le canari étant le seul gate anti-dépréciation praticable, il couvre
+maintenant les deux harnais.
+
+## 🔴 BUG RÉEL TROUVÉ EN CHEMIN — l'afficheur du canari était MORT depuis 3 jours
+`statusline.js` lisait `Desktop/mcp-doc-hooks/state/canari.json` : le nom du repo **AVANT** son
+renommage en `ctxroute` (04/08). Dossier inexistant ⇒ le `catch` fail-open avalait tout ⇒ le canari
+écrivait son verdict **pour personne**. Le canal d'injection aurait pu mourir sans que rien ne
+s'affiche. **Corrigé + commentaire scellé.**
+⚠️ **CLASSE D'ERREUR À RETENIR** : l'afficheur vit HORS du repo, donc **aucun gate du repo ne peut
+le voir**. C'est le prix assumé du principe « le framework ne fournit aucun afficheur ». Tout
+renommage du dossier ctxroute DOIT repasser dans `statusline.js`. Trouvé en appliquant la règle
+« énumérer les consommateurs avant de déplacer une responsabilité » — pas par un test.
+
+## ㉒ LANGUE DU CODE — DÉCLASSÉE par décision du mainteneur (07/08/2026)
+L'API interne reste en **français**, le DSL en anglais. **Ce n'est pas une dette à résorber
+maintenant** : le coût du renommage de masse n'est pas justifié tant que le projet n'a pas
+d'audience externe. **Condition de réveil, explicite : quand le projet commence à avoir de la
+popularité** (premiers contributeurs extérieurs). D'ici là, ne PAS rouvrir le sujet, ne pas le
+resservir comme un manque.
+
+---
+
+# 📍 ÉTAT AU 07/08/2026 (matin)
 
 ## Ce qui tourne MAINTENANT
 `settings.json` câble la porte en **12 déclarations** (`--paquet k --paquets 12`).
@@ -87,7 +131,13 @@ framework — et la raison de ne JAMAIS remplacer un gate par une consigne en pr
 
 ---
 
-## 🔴 CHANTIERS OUVERTS — par ordre de priorité (session suivante)
+## ✅ SÉRIE CANARI / CODEX — TOUS FERMÉS (dernier : ② le 07/08/2026)
+> ⚠️ Cet en-tête disait « 🔴 CHANTIERS OUVERTS » ; la fermeture de ② l'a rendu MENSONGER et
+> `backlog-coherence-gate` l'a attrapé **au premier run**, sans que personne regarde. C'est
+> exactement ce pour quoi il a été écrit le 06/08 (3 en-têtes périmés en 2 jours).
+> **Ce qui reste ouvert vit AILLEURS dans ce fichier** : 🔴 DOC-FIRST · ⑱ débit · ⑳ audit des
+> negative-checks · ㉑ `tsc --checkJs` · ④ contrat canari ⟷ afficheur. ㉒ est GELÉ (décision
+> mainteneur). Ne pas chercher un chantier ouvert dans les sous-sections ci-dessous.
 
 ### ① CANARI SANS SONDE DOCTOR — ✅ FERMÉ (05/08/2026)
 `grep -c canari doctor.js` était à **0** : le canari tournait en PROD depuis le 03/08 sans aucune
@@ -105,9 +155,13 @@ injection atterrie. Le negative-check 3j sabote précisément ce cas.
 `doctor.test.js` **61 tests** (6 neufs) · le canari de prod était bien câblé — mais c'était une
 SUPPOSITION jusqu'à aujourd'hui, c'est maintenant vérifié à chaque session.
 
-### ② CODEX N'A AUCUN CANARI
-Filet mono-harnais. Si OpenAI change son contrat de hooks, ça meurt en SILENCE. Seule inconnue à
-MESURER : format du transcript Codex + marqueur d'appel d'outil. Détail section ②.
+### ② ✅ CANARI CODEX — FERMÉ le 07/08/2026 (voir l'état en tête de fichier)
+🛑 **L'« inconnue à mesurer » annoncée ici (« format du transcript Codex + marqueur d'appel
+d'outil ») ÉTAIT LA MAUVAISE QUESTION.** Doc officielle Codex : le format du transcript *« isn't a
+stable interface for hooks and may change over time »* ⇒ on n'y compte plus RIEN. Le dénominateur
+vient de notre propre compteur d'émissions, identique sur tous les harnais ; du transcript on ne
+lit que notre marque `[source:`. Résultat : **une seule coquille pour les deux harnais**, zéro
+fichier neuf, et un faux positif éliminé au passage.
 
 ### ③ `additionalContextLimit` — ✅ ACTIF (05/08/2026), et 2 pannes trouvées au passage
 **Codex mis à jour 0.144.6 → 0.146.0.** Re-mesure du binaire : `additionalContextLimit` passe de
@@ -322,7 +376,12 @@ trouve ce que la revue ne voit pas — c'est exactement l'argument de ⑳.
 de cette revue : le nommage est BILINGUE (API interne en français, DSL en anglais) — frein réel à
 l'adoption pour un projet qui vise le standard multi-harnais. À trancher (cf ㉒).
 
-### ㉒ 🟠 BACKLOG — LANGUE DU CODE : trancher, puis appliquer mécaniquement
+### ㉒ 🟢 GELÉ — LANGUE DU CODE (décision du mainteneur, 07/08/2026)
+**TRANCHÉ : on garde le français, et on ne traduit PAS maintenant.** Le coût d'un renommage de
+masse n'est pas justifié tant que le projet n'a pas d'audience externe. **Condition de réveil
+explicite : quand le projet commence à avoir de la popularité** (premiers contributeurs
+extérieurs). D'ici là, ne pas rouvrir, ne pas le resservir comme un manque dans un audit.
+Le constat d'origine reste valable et est conservé ci-dessous pour le jour où la condition tombe.
 API interne en français (`planifierPaquets`, `emettre`, `decouper`, `chargerFile`), DSL en anglais
 (`match`/`scope`/`exclude`/`mode`). Incohérent pour un projet OPEN SOURCE visant le standard
 industriel : un contributeur étranger lit la moitié du code. ⚠️ Renommage MÉCANIQUE de masse ⇒
@@ -1117,10 +1176,12 @@ tué le 31/07 sur `mcp:`, réapparu ailleurs.
 
 ---
 
-## 🟠 2 OUVERTS sur 4 — manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
+## 🟠 1 OUVERT sur 4 — manques trouvés par `/stack-audit` le 04/08/2026 (session canari)
 > ③ FERMÉ le 04/08/2026 (requalifié en PANNE, pas en doc inexacte). ① FERMÉ le 05/08/2026
 > (sonde canari dans le doctor — `grep -c canari doctor.js` = 20, cf le ✅ de la section ① plus bas).
-> **Restent ② et ④.** ⚠️ Cet en-tête a annoncé « 3 OUVERTS / restent ①②④ » pendant 24 h APRÈS la
+> **② FERMÉ le 07/08/2026** (canari câblé sur Codex, coquille commune — voir l'état en tête).
+> **Reste ④** (contrat de frontière canari ⟷ afficheur non scellé) — et il vient de se PAYER :
+> l'afficheur a lu un chemin périmé pendant 3 jours sans que rien ne rougisse. ⚠️ Cet en-tête a annoncé « 3 OUVERTS / restent ①②④ » pendant 24 h APRÈS la
 > fermeture de ① : un lecteur croyait un chantier grave encore ouvert. C'est exactement ce
 > qu'interdit `pilotage.md` — un jugement renversé se RÉÉCRIT, il ne s'empile pas. Corrigé le
 > 06/08/2026, après que le mainteneur a demandé un état des lieux.
@@ -1140,14 +1201,24 @@ fausse confiance**, exactement ce que `doctor.md` interdit.
 → exiger le fichier `canari.json` avec le bon verdict), + check du câblage `--settings`, + un
 negative-check dans `doctor.test.js` qui SABOTE une copie et exige le hurlement.
 
-### ② Codex n'a AUCUN canari — le trou n'est fermé QUE pour Claude Code
-**Constat mesuré** : `0` mention de `canari` dans le câblage Codex (`requirements.toml`).
-L'injection, elle, reste bien compatible Codex (coquilles + probes 7-8). Mais le filet posé le
-03/08 est mono-harnais : si OpenAI change son contrat de hooks, ça meurt en SILENCE comme avant.
-**Cible** : coquille `codex-canari-check.js` (le noyau `canari.js` ne bouge PAS — il ne connaît
-aucun dialecte depuis le 03/08). Seule inconnue à MESURER : le format du transcript Codex et le
-marqueur d'appel d'outil équivalent à `"type":"tool_use"`. ⚠️ **Mesurer sur un payload/transcript
-RÉEL, jamais sur parole** (règle du portage).
+### ② ✅ FERMÉ le 07/08/2026 — Codex a son canari, et c'est le MÊME fichier
+**Constat d'origine** : `0` mention de `canari` dans `requirements.toml` — filet mono-harnais.
+🛑 **LA CIBLE ÉCRITE ICI ÉTAIT FAUSSE, et il faut le lire avant de recommencer ailleurs.** Elle
+prévoyait une coquille `codex-canari-check.js` dont la « seule inconnue à MESURER » serait le
+marqueur d'appel d'outil du transcript Codex. **Aucune mesure n'était la bonne réponse** : la doc
+officielle dit que ce format *« isn't a stable interface for hooks and may change over time »*.
+Mesurer un format instable, c'est fabriquer une dépendance qui cassera sans préavis — et un canari
+cassé ne se plaint pas, il se tait.
+✅ **CE QUI A ÉTÉ LIVRÉ** : le dénominateur passe par `emission-core.compteurEmissions` (notre
+donnée) ; le transcript n'est plus lu que pour NOTRE marque `[source:`. Plus aucun dialecte ⇒ zéro
+coquille neuve, `canari-check.js` se câble tel quel comme reset/turn-count/session-inject.
+**Preuves** : doctor 74 ok / 0 problème sur les 2 câblages réels · `doctor.test.js` 70 tests
+(negative-check **7f** : câblage Codex sans canari ⇒ ROUGE + canari NOMMÉ) · `canari-check.test.js`
+8 tests dont un **contrat de frontière** (le canari lit ce que la couche d'émission écrit
+VRAIMENT) et un **negative** (transcript bruyant sans émission ⇒ jamais d'accusation).
+⚠️ **LEÇON GÉNÉRALISABLE, pour le prochain portage** : quand une inconnue porte sur le format
+interne d'un produit tiers, la question à poser n'est pas « comment le mesurer ? » mais
+**« ai-je le droit d'en dépendre ? »**. Ici la réponse documentée était non.
 
 ### ③ 🟡 POSÉ mais PAS ENCORE ACTIF (04/08/2026) — et le diagnostic ci-dessous était TROP DOUX
 > **Résumé en une ligne** : le réglage est écrit, scellé par un gate, et ne casse rien (prouvé en

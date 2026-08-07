@@ -269,6 +269,11 @@ process.stdin.on('end', () => {
       { command: `node ${path.join(repo, 'ctxroute-reset.js')}` },
       { command: `node ${path.join(repo, 'session-inject.js')}`, additionalContextLimit: 0 },
       { command: `node ${path.join(repo, 'turn-count.js')}` },
+      // ⚠️ 6ᵉ voie depuis le 07/08/2026 : sans le canari, un câblage Codex n'est
+      //    PAS « complet » — il est aveugle à sa propre mort. Ce fixture a
+      //    rougi au premier run après l'ajout du check, ce qui prouve que le
+      //    check mord vraiment (le contraire aurait dû inquiéter).
+      { command: `node ${path.join(repo, 'canari-check.js')}` },
     ] }] } }));
     const r2 = runDoctor(DOCTOR, ['--codex-hooks', hooksPath]);
     ok('câblage CODEX complet et propre → doctor exit 0', r2.status === 0);
@@ -302,11 +307,17 @@ process.stdin.on('end', () => {
       ...(limite === null ? [] : [`additionalContextLimit = ${limite}`]),
       '',
     ].join('\n');
+    // ⚠️ `canari-check.js` fait partie du câblage SAIN depuis le 07/08/2026
+    //    (6ᵉ voie Codex). L'omettre ici rendrait TOUS les volets 7d rouges pour
+    //    une raison étrangère à ce qu'ils testent — et on « corrigerait » alors
+    //    le mauvais bout. Son propre negative-check est le volet 7f.
+    // 🛑 NE PAS lui donner `additionalContextLimit` : il n'émet aucun contexte.
     const cablage = (limInject, limSession) => bloc('codex-doc-inject.js', limInject)
       + bloc('codex-doc-write-guard.js', null)
       + bloc('ctxroute-reset.js', null)
       + bloc('session-inject.js', limSession)
-      + bloc('turn-count.js', null);
+      + bloc('turn-count.js', null)
+      + bloc('canari-check.js', null);
 
     // 7d-1 — les DEUX émetteurs déclarent 0 → vert.
     fs.writeFileSync(toml, cablage(0, 0));
@@ -343,6 +354,27 @@ process.stdin.on('end', () => {
     fs.writeFileSync(toml, cablage(5000, 0));
     ok('additionalContextLimit = 5000 (plafond résiduel) → doctor exit ≠ 0',
       runDoctor(DOCTOR, ['--codex-hooks', toml]).status !== 0);
+
+    // ── 7f — NEGATIVE : le CANARI CODEX n'est pas câblé (07/08/2026) ─────
+    // ⚠️ CE VOLET EST LA CONDITION D'EXISTENCE DU CHECK. Sans lui on aurait
+    //    ajouté une ligne au doctor sans jamais vérifier qu'elle peut rougir —
+    //    exactement les règles de pureté INERTES du 03/08/2026, décoratives
+    //    pendant des mois tout en étant citées partout comme LA garantie.
+    // ⚠️ CE QUI SE JOUE : le canari est le seul témoin capable de voir Codex
+    //    cesser de consommer nos injections, et c'est aussi le SEUL gate
+    //    anti-dépréciation praticable (les 3 autres pistes ont été mesurées et
+    //    fermées le 05/08). Non câblé, il ne manque pas une commodité : il
+    //    rend le harnais Codex entièrement aveugle, en silence.
+    const sansCanari = bloc('codex-doc-inject.js', 0)
+      + bloc('codex-doc-write-guard.js', null)
+      + bloc('ctxroute-reset.js', null)
+      + bloc('session-inject.js', 0)
+      + bloc('turn-count.js', null);
+    fs.writeFileSync(toml, sansCanari);
+    const rSansCanari = runDoctor(DOCTOR, ['--codex-hooks', toml]);
+    ok('câblage CODEX SANS canari-check.js → doctor exit ≠ 0', rSansCanari.status !== 0);
+    ok('…et il NOMME le canari (un diagnostic muet sur la cause ne sert à rien)',
+      /canari-check\.js/.test(rSansCanari.stderr));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
