@@ -38,11 +38,20 @@
 // une coïncidence et devient une PREUVE.
 // ⚠️ Ce n'est pas un délai, c'est une TAILLE D'ÉCHANTILLON — la règle du parc
 //    « le temps se déclare » ne s'y applique pas : on n'attend rien, on exige
-//    d'avoir assez observé avant de conclure. Justification chiffrée : le parc
-//    compte des centaines de docs injectables ET des docs de session livrées à
-//    chaque démarrage ; sur une session vivante, la fenêtre mesurée le
-//    03/08/2026 portait 109 appels pour 174 injections. Zéro injection sur 25
-//    émissions consécutives n'arrive pas quand le canal fonctionne.
+//    d'avoir assez observé avant de conclure.
+// ⚠️ JUSTIFICATION RECALIBRÉE LE 07/08/2026, ET IL FALLAIT LE FAIRE. Le chiffre
+//    valait pour des APPELS D'OUTILS (mesure du 03/08 : 109 appels / 174
+//    injections). Il compte désormais des ÉMISSIONS — une AUTRE grandeur. Garder
+//    le nombre sans refaire la mesure, c'est traîner une justification périmée
+//    qui a l'air d'en être une : exactement ce que ce repo traque ailleurs.
+// ⚠️ NOUVELLE MESURE (transcript réel de 46 Mo, 13 compactions repérées par
+//    `isCompactSummary`) : entre deux compactions, **94 à 335 injections**
+//    atterries — donc bien plus de 25 émissions. Le seuil est franchi tôt dans
+//    chaque intervalle, et le compteur (purgé en PreCompact) a le temps de se
+//    reconstituer. 🛑 Cette mesure vaut pour CE parc : sur des sessions très
+//    courtes et très compactées, le canari resterait `indecidable` — dégradation
+//    SÛRE (silence), jamais une fausse alarme, scellée par le test
+//    « APRÈS COMPACTION » de `canari-check.test.js`.
 // ⚠️ Le baisser fabriquerait des fausses alertes — et un avertissement récurrent
 //    sur du sain, c'est un canal qu'on cesse de lire (leçon du rush mode).
 const SEUIL_EMISSIONS = 25;

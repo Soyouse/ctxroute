@@ -37,6 +37,35 @@ le voir**. C'est le prix assumé du principe « le framework ne fournit aucun af
 renommage du dossier ctxroute DOIT repasser dans `statusline.js`. Trouvé en appliquant la règle
 « énumérer les consommateurs avant de déplacer une responsabilité » — pas par un test.
 
+## 🔴 ㉕ NOUVEAU — COUPLAGE PAR LE STOCKAGE : la classe que RIEN ne voit (07/08/2026)
+**Née d'une régression que j'ai introduite ce jour et qu'AUCUN filet n'a vue** (1081 tests verts,
+mutation 100 %, doctor 74 ok) : `canari-check` s'est mis à dépendre du store `reliquat-`, que
+`ctxroute-reset` PURGE en PreCompact. Résultat : fenêtre d'aveuglement après chaque compaction.
+Trouvée en instruisant une question du mainteneur — **par un humain, pas par une machine.**
+
+🔴 **LA CLASSE, formulée pour être gatable** : *un composant dépend d'un état qu'un AUTRE composant
+purge.* C'est du couplage **par le STOCKAGE**, et il échappe aux deux filets existants par
+construction — `dependency-cruiser` voit les IMPORTS, `couches-gate` voit les GLOBALS. Personne ne
+voit qu'un lecteur et un purgeur partagent un préfixe.
+
+**MESURE FAITE (ne pas la refaire)** : 8 fichiers citent un préfixe de store
+(`budget`, `ctxroute-reset`, `doctor`, `emission-core`, `legacy-mcp-inject`, `porte-core`,
+`session-store`, `turn-count`) · 1 seul purge (`ctxroute-reset`, 5 préfixes en dur). Petit graphe,
+littéraux décidables : **le gate est faisable.**
+
+🛑 **LE PIÈGE, MESURÉ AVANT D'ÉCRIRE UNE LIGNE — et il est fatal au gate naïf** :
+`canari-check.js` **NE CITE AUCUN PRÉFIXE**. Il passe par `emission.compteurEmissions()`. Un gate
+par simple grep serait donc **INERTE SUR LE CAS QUI L'A MOTIVÉ** — la définition même du gate
+décoratif que ce repo traque. ⇒ il DOIT être **TRANSITIF**, sur le modèle exact de
+`emission-core-gate` (traversée des require, pas un scan de littéraux).
+
+**CIBLE** : gate dérivé — « tout composant qui ATTEINT (transitivement) un store purgé par le reset
+DOIT déclarer sa tolérance à la purge », + negative-check par sabotage en mémoire. 🛑 Ne PAS le
+poser à la va-vite en fin de session : un gate bâclé sur cette classe donnerait la fausse
+impression qu'elle est couverte, ce qui est pire que de la savoir ouverte.
+**FILET INTÉRIMAIRE, ASSUMÉ PLUS FAIBLE** : test « APRÈS COMPACTION » (`canari-check.test.js`) —
+il scelle le CAS, pas la CLASSE.
+
 ## ㉒ LANGUE DU CODE — DÉCLASSÉE par décision du mainteneur (07/08/2026)
 L'API interne reste en **français**, le DSL en anglais. **Ce n'est pas une dette à résorber
 maintenant** : le coût du renommage de masse n'est pas justifié tant que le projet n'a pas

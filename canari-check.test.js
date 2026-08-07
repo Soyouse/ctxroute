@@ -155,6 +155,50 @@ test('SPAWN RÉEL : lecture BORNÉE — un gros transcript ne coûte pas sa tail
   assert.equal(sante.verdict, 'mort', 'les vieilles injections hors fenêtre ne masquent pas la panne EN COURS');
 });
 
+test('APRÈS COMPACTION : le canari se TAIT, il n\'accuse JAMAIS à tort', () => {
+  // 🔴 CE TEST SCELLE UNE RÉGRESSION QUE J'AI INTRODUITE LE 07/08/2026, et
+  //    qu'AUCUN test n'avait vue : 1081 verts, mutation 100 %, doctor 74 ok.
+  //    Elle a été trouvée en répondant à la question « c'est vraiment solide ? ».
+  //
+  // CE QUI A CHANGÉ : le dénominateur venait du TRANSCRIPT, qui SURVIT à la
+  // compaction — le canari était donc opérationnel immédiatement après. Il vient
+  // maintenant du store `reliquat-`, que `ctxroute-reset.js` PURGE en PreCompact.
+  // ⇒ après chaque compaction le compteur repart de zéro : le canari est AVEUGLE
+  //    jusqu'à ce que `SEUIL_EMISSIONS` soit de nouveau atteint.
+  //
+  // ⚠️ L'ÉCHANGE EST ASSUMÉ, ET MESURÉ (07/08/2026, transcript réel de 46 Mo,
+  //    13 compactions) : entre deux compactions, **94 à 335 injections** — le
+  //    seuil est donc franchi très tôt dans chaque intervalle. En échange, le
+  //    canari ne dépend plus d'AUCUN format tiers. Ce qui est vrai sur ce parc
+  //    ne l'est pas partout (petites sessions très compactées), d'où ce test.
+  //
+  // 🛑 L'INVARIANT QUI COMPTE N'EST PAS « il voit tout », c'est **« il ne ment
+  //    jamais »** : la dégradation post-compaction doit être un SILENCE
+  //    (`indecidable`), jamais une accusation. Une alarme qui crie après chaque
+  //    compaction serait pire que pas d'alarme — on cesserait de la lire.
+  const d = tmp();
+  const t = path.join(d, 'transcript.jsonl');
+  // Transcript CHARGÉ (le passé reste visible) mais compteur PURGÉ : c'est
+  // exactement l'état d'un lendemain de compaction.
+  fs.writeFileSync(t, bruitHarnais().repeat(SEUIL_EMISSIONS * 10));
+  poserEmissions(d, SEUIL_EMISSIONS);
+  fs.rmSync(path.join(d, `reliquat-${SID}.json`)); // ⇐ ce que fait le reset
+
+  lancer({ transcript_path: t, session_id: SID }, d);
+  const apres = JSON.parse(fs.readFileSync(path.join(d, 'canari.json'), 'utf8'));
+  assert.equal(apres.verdict, 'indecidable', 'le canari ACCUSE après une compaction : fausse alarme garantie à chaque cycle');
+  assert.equal(etiquette(apres.verdict), '', 'et il doit rester MUET, pas seulement prudent');
+
+  // Et il REDEVIENT décidable dès que les émissions repartent — sans quoi la
+  // compaction le tuerait définitivement au lieu de le suspendre.
+  poserEmissions(d, SEUIL_EMISSIONS);
+  lancer({ transcript_path: t, session_id: SID }, d);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(d, 'canari.json'), 'utf8')).verdict, 'mort',
+    'le canari ne se réarme pas après une compaction : il serait aveugle POUR LE RESTE de la session',
+  );
+});
+
 test("CONTRAT DE FRONTIÈRE : le canari lit la clé QUE la couche d'émission écrit", () => {
   // ⚠️ CE TEST EXISTE PARCE QUE LA PANNE SERAIT INVISIBLE. `emission-core` écrit
   //    `emissions` dans le store `reliquat-`, `canari-check` l'y relit. Si l'un
