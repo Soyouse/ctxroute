@@ -109,6 +109,45 @@ function declarationDe(cheminAbs, cheminRel, reglesParDoc) {
   return decl;
 }
 
+/**
+ * Une doc porte-t-elle un tag `[source: …]` ÉCRIT EN DUR dans son corps ?
+ *
+ * ⚠️ LE MOTEUR AJOUTE CE TAG LUI-MÊME à l'émission (`porte-core.js`). En
+ *    trouver un dans le FICHIER, c'est un copier-coller d'injection — et le
+ *    dégât ne se voit nulle part : ① la doc arrive avec son tag EN DOUBLE ;
+ *    ② un agent qui LIT ce fichier dépose une étiquette de forme valide dans
+ *    le transcript, donc le CANARI la compte comme une injection ARRIVÉE et
+ *    reste VERT même si le canal est MORT (= ㉘ bis, mesuré le 08/08/2026).
+ * 🛑 C'EST LE FIX EN DONNÉES, PAS DANS LE MOTEUR. Le backlog prévoyait de
+ *    n'accepter que les étiquettes RÉELLEMENT émises, ce qui imposait un
+ *    nouvel écrit d'état dans `emission-core` — le chemin CHAUD traversé par
+ *    12 processus à CHAQUE appel d'outil de CHAQUE agent. Le contrat
+ *    d'extension du framework le dit : « un trou se règle d'abord en DONNÉES,
+ *    le moteur en DERNIER recours ». 4 docs fautives, 0 ligne de moteur.
+ * 🛑 ANCRÉ SUR UNE LIGNE ENTIÈRE — et ce n'est PAS un détail de style.
+ *    Mon premier motif cherchait le tag N'IMPORTE OÙ dans le texte : il a
+ *    accusé `canari.md` AU PREMIER RUN sur le parc réel, alors que cette doc
+ *    ne fait qu'EXPLIQUER le marqueur (« le numérateur ne compte plus
+ *    `[source:` nu… `.md` en suffixe ou préfixe `skill/` »). **Une doc qui
+ *    PARLE du mécanisme n'en porte pas un.** Le moteur, lui, émet toujours le
+ *    tag SEUL SUR SA LIGNE : c'est ça, la signature d'un copier-coller.
+ *    ⚠️ Ne JAMAIS ré-élargir ce motif « pour être sûr » — il condamnerait la
+ *    documentation du framework par elle-même, et un gate qui accuse du sain
+ *    est le plus court chemin vers un gate qu'on désarme.
+ * ⚠️ La forme du chemin est celle que le canari accepte (`.md` / `skill/`) :
+ *    hors de ces deux formes, aucun faux vert n'est possible, donc aucun
+ *    défaut à signaler.
+ */
+function porteUnTagSource(cheminAbs) {
+  let texte = '';
+  try {
+    texte = fs.readFileSync(cheminAbs, 'utf8');
+  } catch {
+    return false; // illisible : le reste du lint le dira, pas ce check-ci
+  }
+  return texte.split(/\r?\n/).some((l) => /^\[source:\s*[^\]]+(\.md|skill\/[^\]]*)\]$/.test(l.trim()));
+}
+
 // ⚠️ Les serveurs MCP branchés vivent dans PLUSIEURS fichiers (.claude.json ET
 //    .mcp.json — 16 uniques mesurés le 15/07, 8 + 14 avec recouvrement). N'en
 //    lire qu'un = sous-compter en silence, donc rater des serveurs sans doc.
@@ -164,6 +203,7 @@ function collecter() {
   const docs = surDisque.map((rel) => ({
     chemin: rel,
     declaration: declarationDe(path.join(HOOKS, rel), rel, reglesParDoc),
+    tagSourceEnDur: porteUnTagSource(path.join(HOOKS, rel)),
   }));
 
   // ⚠️ Le miroir : une règle qui vise un .md absent du disque.

@@ -114,6 +114,29 @@ function analyser(etat) {
       'une règle vise ce .md, il n\'existe pas : règle morte en silence.'));
   }
 
+  // ── ERREUR : tag `[source: …]` COLLÉ EN DUR dans une doc ─────────────
+  // ⚠️ Le moteur AJOUTE ce tag lui-même à l'émission. Le trouver DANS le
+  //    corps d'une doc, c'est un copier-coller d'injection — et ça casse
+  //    DEUX choses à la fois :
+  //      ① la doc arrive avec son tag EN DOUBLE ;
+  //      ② un agent qui LIT ce fichier dépose une étiquette de forme valide
+  //         dans le transcript ⇒ le CANARI la compte comme une injection
+  //         ARRIVÉE et passe au VERT alors que le canal peut être MORT.
+  //    Le ② est le vrai danger : c'est le geste exact de qui ENQUÊTE sur une
+  //    injection morte qui faisait mentir le dead-man switch. (= ㉘ bis)
+  // ⚠️ ERREUR et pas warn : contrairement à `mcp-sans-doc` (« pas encore
+  //    fait »), ici il n'y a AUCUN cas légitime — le tag ne s'écrit jamais
+  //    à la main. MESURÉ avant d'écrire cette règle : 4 occurrences dans
+  //    tout le parc, toutes fautives, **zéro exemption nécessaire**.
+  // 🛑 La détection vit dans la COQUILLE (elle seule lit les fichiers) ; ce
+  //    noyau ne fait que juger un booléen — cf `lint-must-stay-pure`.
+  for (const d of liste(e.docs)) {
+    if (!d || typeof d.chemin !== 'string' || !d.tagSourceEnDur) continue;
+    constats.push(constat('error', 'tag-source-en-dur', d.chemin,
+      // Stryker disable next-line StringLiteral
+      'un tag [source: …] est écrit DANS cette doc : le moteur l\'ajoute déjà, et le canari le compte comme une injection arrivée.'));
+  }
+
   // ── WARN : serveur MCP branché sans doc ──────────────────────────────
   // ⚠️ MESURÉ : 2 documentés sur 16 branchés. `ssh` (VPS prod) et `infra`
   //    (sites clients) sans aucune doc. `config-gate.test.js` est DIRECTIONNEL

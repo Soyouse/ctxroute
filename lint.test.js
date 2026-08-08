@@ -95,6 +95,12 @@ test('délégation : `inject: never` + déclencheur = contradiction remontée', 
 
 test('doc sans chemin exploitable = ignorée, jamais un crash', () => {
   assert.deepStrictEqual(analyser({ docs: [{ declaration: {} }, null, { chemin: 42 }] }), []);
+  // ⚠️ MÊME GARDE, SUR LE CHECK `tag-source-en-dur` (mutant survivant tué le
+  //    08/08/2026). Chaque boucle porte SA propre garde de totalité : un
+  //    `chemin` non-chaîne avec le drapeau levé ne doit ni crasher ni
+  //    produire un constat dont la CIBLE serait inexploitable.
+  assert.deepStrictEqual(
+    analyser({ docs: [null, { chemin: 42, tagSourceEnDur: true }, { tagSourceEnDur: true }] }), []);
 });
 
 // ── ERREUR : règle fantôme (miroir exact) ────────────────────────────
@@ -102,6 +108,36 @@ test('règle fantôme = ERREUR (0 mesurée le 15/07 — ce check maintient le 0)
   const c = analyser({ docsFantomes: ['docs/disparue.md'] });
   assert.deepStrictEqual(codes(c), ['regle-fantome']);
   assert.strictEqual(c[0].niveau, 'error');
+});
+
+// ── ERREUR : tag [source: …] collé en dur (㉘ bis, 08/08/2026) ────────
+// ⚠️ Le défaut RÉEL : 4 docs du parc portaient le tag que le moteur ajoute
+//    lui-même. Un agent qui LIT une de ces docs déposait une étiquette de
+//    forme valide dans le transcript ⇒ le CANARI la comptait comme une
+//    injection ARRIVÉE et restait VERT même canal mort. C'est le geste exact
+//    de qui ENQUÊTE sur une injection morte qui faisait mentir le témoin.
+test('tag [source:] en dur = ERREUR (le canari le compterait comme une injection arrivée)', () => {
+  const c = analyser({ docs: [{ chemin: 'docs/a.md', declaration: { match: 'x.js' }, tagSourceEnDur: true }] });
+  assert.deepStrictEqual(codes(c), ['tag-source-en-dur']);
+  assert.strictEqual(c[0].niveau, 'error');
+  assert.strictEqual(c[0].cible, 'docs/a.md');
+});
+
+test('doc SANS tag en dur = silence (le cas de 389 docs sur 393)', () => {
+  const c = analyser({ docs: [{ chemin: 'docs/a.md', declaration: { match: 'x.js' } }] });
+  assert.deepStrictEqual(codes(c), []);
+});
+
+// ⚠️ ERREUR et pas warn : contrairement à `mcp-sans-doc` (« pas encore
+//    fait »), le tag ne s'écrit JAMAIS à la main — aucun cas légitime,
+//    donc aucune exemption. Ce test scelle la GRAVITÉ, pas juste la
+//    détection : la rétrograder en warn la noierait dans le bruit.
+test('gravité : le tag en dur passe AVANT tout warn dans la sortie', () => {
+  const c = analyser({
+    docs: [{ chemin: 'docs/a.md', declaration: { match: 'x.js' }, tagSourceEnDur: true }],
+    serveursMCP: ['ssh'],
+  });
+  assert.deepStrictEqual(codes(c), ['tag-source-en-dur', 'mcp-sans-doc']);
 });
 
 // ── WARN : couverture MCP (mesuré 2/16) ──────────────────────────────
