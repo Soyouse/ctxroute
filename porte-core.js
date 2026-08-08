@@ -147,10 +147,38 @@ function run(data, emit, options) {
 
     // [source: …] — vocabulaire posé par CHAQUE source (acc.labels) :
     // fichier = '.claude/hooks/docs/…', MCP = 'docs/mcp/…'. Parité gardée.
+    // ⚠️ ORDINAL `DOC i/T` — L'ORDRE VOULU DOIT RESTER CONNAISSABLE (08/08/2026).
+    //    `rank` ordonne les docs (loader.js) et la concaténation préserve cet
+    //    ordre — mais les N trames arrivent DANS LE DÉSORDRE, donc la place
+    //    d'un document était INOBSERVABLE. `MORCEAU j/m` recolle UN document ;
+    //    ceci recolle l'ENSEMBLE. C'est le trou symétrique, et il se ferme ici.
+    // 🛑 ICI ET NULLE PART AILLEURS. L'ordinal est de l'IDENTITÉ (qui je suis,
+    //    où je me place), jamais du TRANSPORT (comment je suis découpé). Le
+    //    poser dans `budget.js` a été ESSAYÉ puis ANNULÉ le 08/08/2026 : il y
+    //    fallait DEUX fonctions d'en-tête (doc entière + morceau) donc deux
+    //    endroits qui divergent, et l'en-tête coûtait ~35 c par document
+    //    (label répété) au lieu de ~12 ici — mesuré par le test FRONTIÈRE, qui
+    //    a vu la densité d'un paquet chuter. Le tag existe déjà : on l'enrichit.
+    // ⚠️ MUET À UN SEUL DOCUMENT (T < 2) : un ordinal sur un document unique
+    //    n'apprend RIEN, et ce silence garde la parité protect-files à l'OCTET
+    //    (cas à une doc = l'oracle du différentiel). NE JAMAIS l'émettre à T=1.
+    // 🛑 L'ORDINAL SE POSE APRÈS LE CROCHET FERMANT, JAMAIS DEDANS.
+    //    `[source: <chemin>]` est un CONTRAT ENVERS L'AGENT : il y lit le
+    //    chemin EXACT pour aller METTRE LA DOC À JOUR quand il découvre
+    //    qu'elle est fausse ou incomplète. C'est la boucle qui rend le
+    //    corpus auto-réparant — la casser rendrait chaque doc non éditable.
+    // ⚠️ ESSAYÉ PUIS ANNULÉ LE 08/08/2026 : glissé À L'INTÉRIEUR, la capture
+    //    de `gate.js` (`[^\]]+` entre `source:` et `]`) rendait
+    //    "<chemin> — DOC 2/5" — un chemin INVALIDE, et le badge avec.
+    //    🔴 538 TESTS ÉTAIENT VERTS : aucun n'assertait le contenu du tag en
+    //    multi-documents. C'est le MAINTENEUR qui l'a vu, pas la machine.
+    //    ⇒ un test scelle désormais ce contrat (voir doc-inject.test.js).
+    const rang = (i, t) => (t < 2 ? '' : ' [DOC ' + (i + 1) + '/' + t + ']');
     const segmentsPour = (docs) =>
-      docs.map((doc) => ({
+      docs.map((doc, i) => ({
         id: doc,
-        text: (bodies[doc] || '').trim() + '\n[source: ' + acc.labels[doc] + ']',
+        text: (bodies[doc] || '').trim()
+          + '\n[source: ' + acc.labels[doc] + ']' + rang(i, docs.length),
         label: acc.labels[doc],
       }));
     const budgetMax = budgetPour(config, options);
