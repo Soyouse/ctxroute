@@ -218,17 +218,15 @@ function estEtiquetteEmise(brut) {
 }
 
 
-// ⚠️ Comptage par `indexOf` et non par regex : les deux marques contiennent des
-//    caractères spéciaux (`[`, `"`), et une regex construite par concaténation
-//    serait une porte ouverte à l'échappement oublié. Ici, rien à échapper.
-function occurrences(s, marque) {
-  let n = 0;
-  let k = s.indexOf(marque);
-  while (k !== -1) {
-    n++;
-    k = s.indexOf(marque, k + marque.length);
-  }
-  return n;
-}
+// ⚠️ `occurrences()` A ÉTÉ SUPPRIMÉE le 08/08/2026 — CODE MORT, pas un oubli.
+//    Elle datait du canari qui comparait REÇU vs ATTENDU (deux compteurs tirés
+//    du transcript). Depuis le 07/08 le dénominateur vient de
+//    `emission-core.compteurEmissions` et `compterInjections` fait son propre
+//    balayage : plus aucun appelant, et elle n'était pas exportée.
+// 🛑 NE PAS LA RESSUSCITER « au cas où ». Elle portait les 4 SEULS mutants
+//    survivants du dépôt (`NoCoverage`, canari.js à 93,85 %) et masquait la
+//    question qui compte : *pourquoi une fonction que rien n'appelle vit-elle
+//    encore ici ?* Écrire un test pour la couvrir aurait figé du code inutile
+//    pour toujours — mutation = ÉLIMINER, jamais TESTER.
 
 module.exports = { verdict, etiquette, compterInjections, SEUIL_EMISSIONS, FENETRE_OCTETS, MARQUE_INJECTION };
