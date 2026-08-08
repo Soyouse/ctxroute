@@ -955,3 +955,31 @@ test('suffixeMorceaux: mélange entier + morcelé → seul le morcelé est annon
 test('suffixeMorceaux: TOTALE — entrée non-tableau → chaîne vide, jamais un jet', () => {
   for (const x of [undefined, null, 'a#1/2', 42]) assert.strictEqual(suffixeMorceaux(x), '');
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// ORDRE ENTRE DOCUMENTS — le trou symetrique de MORCEAU j/m (08/08/2026)
+// ═══════════════════════════════════════════════════════════════════════
+// Le protocole recolle UN document (MORCEAU j/m) mais ne dit RIEN de la
+// position d'un document dans l'ordre global decide par `rank`. En regime
+// scelle les trames arrivent DANS LE DESORDRE : une doc livree ENTIERE ne
+// porte aucun en-tete, donc sa place est INOBSERVABLE. Le tri est pourtant
+// exact en amont (loader.js) — c'est le TRANSPORT qui perd l'information.
+test('ORDRE DOCUMENTS : chaque document annonce sa position globale (DOC i/T)', () => {
+  // 3 docs qui tiennent chacune ENTIERE, forcees en regime scelle (4 trames).
+  const liste = [seg('a', 300), seg('b', 300), seg('c', 300)];
+  const paquets = planifierPaquets(liste, 900, 4);
+  const tout = paquets.map((p) => p.texte).join('');
+  for (const [i, s] of liste.entries()) {
+    assert.ok(tout.includes('DOC ' + (i + 1) + '/' + liste.length),
+      'le document ' + s.id + ' n\'annonce pas sa position ' + (i + 1) + '/' + liste.length
+      + ' — l\'ordre voulu par rank est INOBSERVABLE une fois les trames melangees');
+  }
+});
+
+// CONTRE-EPREUVE — l'ordinal ne doit JAMAIS apparaitre quand tout tient dans
+// UNE trame : c'est le regime de parite a l'octet (protect-files, Codex a
+// budget infini). Y coller une enveloppe casserait porte-differential.
+test('ORDRE DOCUMENTS : AUCUN ordinal quand tout tient dans une seule trame', () => {
+  const r = planifier([seg('a', 50), seg('b', 50)], 8000);
+  assert.ok(!r.texte.includes('DOC 1/'), 'ordinal parasite dans le regime de parite');
+});
