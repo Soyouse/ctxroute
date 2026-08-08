@@ -264,7 +264,7 @@
     "doNotFollow": {
       "path": "node_modules"
     },
-    "includeOnly": "(^(legacy-mcp-inject|ctxroute-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure|explain|collect-core|budget|porte-core|emission-core|guard-core|codex-doc-inject|codex-doc-write-guard|canari|canari-check|fuite-pure)\\.js$|^(fs|path|child_process|os|crypto)$)",
+    "includeOnly": "(^(legacy-mcp-inject|ctxroute-reset|lib-pure|lock|stdin-json|paths|doctor|deadline|frontmatter|migrate|migrate-to-frontmatter|vendor-deadline|lint|lint-corpus|loader|gate|corpus|doc-inject|shadow-inject|shadow-reconcile|oracle|session-store|sources/file|sources/tool|sources/mcp|sources/session|sources/skill|source-adapters|session-inject|collisions|check-collisions|doc-write-guard|turn-count|deps-criticite-pure|explain|collect-core|budget|porte-core|emission-core|guard-core|codex-doc-inject|codex-doc-write-guard|canari|canari-check|fuite-pure|differential-normalise)\\.js$|^(fs|path|child_process|os|crypto)$)",
     "tsPreCompilationDeps": false
   }
 }
