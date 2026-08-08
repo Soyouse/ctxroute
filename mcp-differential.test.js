@@ -24,6 +24,7 @@ import { test as base, expect } from 'vitest';
 const test = (name, fn) => base(name, { timeout: 60000 }, fn);
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { sansOrdinal } from './differential-normalise.js';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -48,7 +49,11 @@ function run(engine, payload, env) {
   if (!out) return null;
   const json = JSON.parse(out);
   return {
-    context: json.hookSpecificOutput ? json.hookSpecificOutput.additionalContext : undefined,
+    // ⚠️ ORDINAL RETIRE AVANT COMPARAISON — l'oracle est FIGE depuis juillet
+    //    et ignore tout ce qui est ne apres lui. Meme doctrine que le
+    //    descellement cote fichier : on compare le CONTENU, pas l'enveloppe.
+    //    SOURCE UNIQUE : `differential-normalise.js`, jamais une copie ici.
+    context: json.hookSpecificOutput ? sansOrdinal(json.hookSpecificOutput.additionalContext) : undefined,
     systemMessage: json.systemMessage,
   };
 }

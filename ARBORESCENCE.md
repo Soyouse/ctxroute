@@ -108,6 +108,8 @@
 - `Desktop/ctxroute/gate.test.js` — tests DÉTERMINISTES de gate.js (cible Stryker). WRITE_TOOLS épinglés EN DUR (contrat protect-files).
 - `Desktop/ctxroute/gate.property.test.js` — property-based de gate.js (fast-check, inputs générés). JAMAIS lancé par Stryker (non déterministe) : chaque invariant a AUSSI son cas déterministe dans gate.test.js.
 - `Desktop/ctxroute/doc-inject.test.js` — intégration de la porte (spawn, corpus tmpdir) : allow/ask/rush/dédup smart/fail-open, zéro écriture d'état en corpus dumb.
+- `Desktop/ctxroute/differential-normalise.js` — NORMALISATION PARTAGÉE par les 2 différentiels : retire l'ordinal `[DOC i/T]` avant comparaison (l'oracle est FIGÉ, il ignore ce qui est né après lui). Ancré sur le tag source, jamais un effacement aveugle. SOURCE UNIQUE — jamais une copie dans une suite.
+- `Desktop/ctxroute/differential-normalise.test.js` — NEGATIVE-CHECK du module ci-dessus : un filtre de comparaison non testé peut avaler une VRAIE régression. Volet clé = un `[DOC x/y]` du CORPS d'une doc SURVIT.
 - `Desktop/ctxroute/porte-differential.test.js` — DIFFÉRENTIEL DE PORTE : vieux vs nouveau moteur sur parc RÉEL, contenu injecté À L'OCTET PRÈS + décision miroir du `.rush`. Gate de parité de la bascule. Skippé sur clone vierge.
 - `Desktop/ctxroute/gitignore-gate.test.js` — GATE STATIQUE : aucun fichier de `state/` (quel que soit son format) n'est tracké par git. Né d'un incident réel (16/07/2026 : journal shadow `.jsonl` non couvert par le pattern par-extension → payloads réels partis sur GitHub). `state/` = runtime PRIVÉ, jamais committable.
 - `Desktop/ctxroute/frontmatter.test.js` — tests DÉTERMINISTES du parser (cible Stryker). ⚠️ Il n'avait QUE des properties → 100% de ses mutants auraient survécu.

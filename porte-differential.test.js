@@ -17,6 +17,10 @@
 
 import { test } from 'vitest';
 import assert from 'node:assert';
+// ⚠️ SOURCE UNIQUE partagee avec `mcp-differential` — jamais une copie :
+//    deux normalisations divergent, et deux filets qui ne filtrent plus la
+//    meme chose ne prouvent plus rien ensemble.
+import { sansOrdinal } from './differential-normalise.js';
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -86,7 +90,7 @@ test.skipIf(!parcPresent)('LECTURE : contenu injecté IDENTIQUE à l\'octet prè
   assert.ok(vieux && neuf, 'les deux moteurs doivent injecter sur ce payload connu');
   assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'allow');
   assert.strictEqual(neuf.hookSpecificOutput.permissionDecision, 'allow');
-  assert.strictEqual(desceller(neuf.hookSpecificOutput.additionalContext), vieux.hookSpecificOutput.additionalContext);
+  assert.strictEqual(sansOrdinal(desceller(neuf.hookSpecificOutput.additionalContext)), vieux.hookSpecificOutput.additionalContext);
   // ⚠️ ÉCART DÉCLARÉ SUR LE BADGE — LE NOUVEAU EN NOMME PLUS (07/08/2026).
   //
   // 🔴 DÉFAUT RÉEL, mesuré ICI sur le parc : l'ancien moteur (et le nôtre
@@ -123,7 +127,7 @@ test.skipIf(!parcPresent)('ÉCRITURE : décision miroir du rush réel, mêmes do
   if (RUSH) {
     assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'allow');
     assert.strictEqual(neuf.hookSpecificOutput.permissionDecision, 'allow');
-    assert.strictEqual(RUSH_PREFIX + desceller(neuf.hookSpecificOutput.additionalContext), vieux.hookSpecificOutput.additionalContext);
+    assert.strictEqual(RUSH_PREFIX + sansOrdinal(desceller(neuf.hookSpecificOutput.additionalContext)), vieux.hookSpecificOutput.additionalContext);
   } else {
     assert.strictEqual(vieux.hookSpecificOutput.permissionDecision, 'ask');
     assert.strictEqual(neuf.hookSpecificOutput.permissionDecision, 'ask');
@@ -135,7 +139,7 @@ test.skipIf(!parcPresent)('BASH : reconstruction cd && — mêmes docs injectée
   const { vieux, neuf } = await both({ toolName: 'Bash', toolInput: { command: 'cd C:/Users/dev/Desktop/ctxroute && node doctor.js' } });
   // Silence des deux OU injection identique — jamais l'un sans l'autre.
   assert.strictEqual(neuf === null, vieux === null, 'un moteur parle, l\'autre se tait');
-  if (vieux) assert.strictEqual(desceller(neuf.hookSpecificOutput.additionalContext), vieux.hookSpecificOutput.additionalContext);
+  if (vieux) assert.strictEqual(sansOrdinal(desceller(neuf.hookSpecificOutput.additionalContext)), vieux.hookSpecificOutput.additionalContext);
 });
 
 test.skipIf(!parcPresent)('GIT + NON-MATCH : silence des deux côtés', async () => {
