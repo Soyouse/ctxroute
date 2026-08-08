@@ -639,3 +639,45 @@ test('REPLI SANS VERROU : une doc JAMAIS vue est quand même livrée (fail-open 
     fs.rmSync(lockDir, { recursive: true, force: true });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════
+// CONTRAT `[source: <chemin>]` — L'AGENT DOIT POUVOIR ALLER CORRIGER LA DOC
+// ═══════════════════════════════════════════════════════════════════════
+// 🛑 CE N'EST PAS DE L'AFFICHAGE, C'EST LA BOUCLE D'AUTO-RÉPARATION DU
+//    CORPUS : un agent qui reçoit une doc FAUSSE ou INCOMPLÈTE doit savoir
+//    QUEL FICHIER éditer, sans chercher. Le chemin doit donc rester
+//    extractible TEL QUEL — jamais mêlé à autre chose entre les crochets.
+// 🔴 NÉ D'UN DÉFAUT RÉEL (08/08/2026) : l'ordinal `DOC i/T` avait été glissé
+//    À L'INTÉRIEUR du tag, rendant "<chemin> — DOC 2/5", donc un chemin
+//    INVALIDE. **538 tests étaient VERTS** — aucun n'assertait le contenu du
+//    tag en multi-documents. C'est le mainteneur qui l'a vu, à l'œil.
+//    Ce test existe pour que la MACHINE le voie la prochaine fois.
+test('CONTRAT SOURCE : le chemin reste extractible TEL QUEL, même avec l\'ordinal', async () => {
+  troisDocs();
+  const vus = [];
+  for (let k = 1; k <= 3; k++) {
+    const r = await run(geste(), { args: ['--paquet', String(k), '--paquets', '3'] });
+    for (const m of r.stdout.matchAll(/\[source:\s*([^\]]+)\]/g)) vus.push(m[1]);
+  }
+  // ⚠️ TÉMOIN ANTI-SONDE-MUETTE : sans capture, « aucun chemin invalide »
+  //    serait un faux vert. Piège qui a coûté 5 sondes fausses sur ce dépôt.
+  assert.ok(vus.length >= 3, 'sonde muette : ' + vus.length + ' tag(s) [source:] captúré(s)');
+  for (const chemin of vus) {
+    assert.ok(chemin.endsWith('.md') && !chemin.includes('DOC '),
+      'chemin NON exploitable : ' + JSON.stringify(chemin)
+      + ' — l\'agent ne pourrait pas aller corriger cette doc.');
+  }
+});
+
+// L'ordinal doit bien être LÀ (sinon le test ci-dessus passerait en le supprimant).
+test('ORDRE DOCUMENTS : les 3 documents annoncent leur position globale', async () => {
+  troisDocs();
+  let tout = '';
+  for (let k = 1; k <= 3; k++) {
+    tout += (await run(geste(), { args: ['--paquet', String(k), '--paquets', '3'] })).stdout;
+  }
+  for (const attendu of ['[DOC 1/3]', '[DOC 2/3]', '[DOC 3/3]']) {
+    assert.ok(tout.includes(attendu),
+      attendu + ' absent — l\'ordre voulu par rank redevient inobservable');
+  }
+});
