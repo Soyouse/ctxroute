@@ -13,7 +13,7 @@ branche. Toute édition d'un fichier vivant est active pour tous les agents au g
 branche protège l'HISTORIQUE ; seul un worktree séparé isolerait le runtime — mais alors on ne
 testerait plus le vrai câblage.
 
-## Les 38 commits du jour, dans l'ordre
+## Les 39 commits du jour, dans l'ordre
 `cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
@@ -41,7 +41,8 @@ rien affaiblir · `52ec4c5` **2 manques que seul le COMMIT a révélés** (un fi
 DEUX fois — une 🟠, une ✅ — soit un jugement renversé qui s'était empilé) ·
 **`afc65d5` ㉜ volet ③ : la tête ne peut plus OUBLIER de commits** ·
 **`1829294` ㉛ vérifié inexistant + ㉜ fermé** ·
-**`edd4358` ㉘ bis fermé EN DONNÉES — la « fenêtre calme » était une fausse contrainte.**
+**`edd4358` ㉘ bis fermé EN DONNÉES — la « fenêtre calme » était une fausse contrainte** ·
+**`b0603e9` ㉞ plancher de mutation PAR FICHIER (le seuil global est une moyenne).**
 **Preuves de clôture, MESURÉES le 08/08/2026** : **1112 tests** (60 fichiers) · doctor **14 ok /
 0 problème** sur les câblages réels, exit 0 · dependency-cruiser **0 violation**, exit 0 · jscpd
 0,51 % · miroirs parc ⟷ repo identiques · arbre **propre**. ✅ **CI VERTE cross-OS + mutation sur
