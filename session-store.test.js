@@ -49,6 +49,12 @@ fs.writeFileSync(ECRIVAIN, [
   "const etat = " + JSON.stringify(etat) + ";",
   "const fin = Date.now() + 1500;",
   "while (Date.now() < fin) store.saveState('doc-seen-', 'course', etat);",
+  // Témoin de fin PROPRE : c'est lui qui distingue « l'écrivain a terminé »
+  // de « l'écrivain a été tué » — seul le premier cas peut promettre 0 .tmp.
+  // ⚠️ Chemin INLINE : le script écrivain ne require PAS le module path —
+  //    l'y appeler levait une ReferenceError, le témoin n'était jamais écrit,
+  //    et l'attente partait au bout de ses 10 s (vert, mais 12 s au lieu de 2).
+  "require('fs').writeFileSync(" + JSON.stringify(path.join(DIR, 'fini.flag')) + ", 'ok');",
 ].join('\\n'));
 const enfant = spawn(process.execPath, [ECRIVAIN], { stdio: 'ignore' });
 // 🛑 ATTENDRE LE PREMIER ÉTAT AVANT DE COMPTER — sans ça on compte la latence
@@ -67,7 +73,29 @@ while (Date.now() < fin) {
   lectures++;
   if (Object.keys(s).length === 0) vides++;
 }
-enfant.kill();
+// 🛑 NE JAMAIS TUER L'ÉCRIVAIN AVANT DE COMPTER LES .tmp — CI ROUGE sur macOS
+//    le 08/08/2026. Un processus TUÉ entre le \`writeFileSync(tmp)\` et le
+//    \`rename\` laisse forcément son temporaire : aucun programme ne peut y
+//    survivre, l'assertion exigeait donc l'impossible. L'invariant RÉEL est
+//    « un écrivain qui termine NORMALEMENT ne laisse rien ».
+//    (Un tmp de processus tué n'est pas un déchet éternel : il porte le préfixe
+//    du store, donc \`ctxroute-reset.js\` le balaie à la compaction suivante.)
+// ⚠️ Attente par FICHIER TÉMOIN, pas par événement : la boucle de lecture est
+//    un busy-wait synchrone, elle bloquerait la réception d'un \`exit\`.
+const FINI = path.join(DIR, 'fini.flag');
+// ⚠️ ATTENTE QUI DORT (Atomics.wait, même primitive que lock.js) plutôt qu'une
+//    boucle serrée : sur un runner CI à 2 cœurs, brûler un cœur à attendre
+//    ralentit l'écrivain qu'on attend. Coût nul, bénéfice réel.
+// 🛑 J'AI D'ABORD IMPUTÉ À CETTE BOUCLE UN RALENTISSEMENT DE 12 s — C'ÉTAIT
+//    FAUX. La vraie cause : le script écrivain n'avait pas le module path,
+//    donc le témoin n'était JAMAIS écrit et l'attente allait au bout de ses
+//    10 s. Le test était VERT en mesurant le mauvais phénomène. Le passage à
+//    Atomics.wait reste bon, mais il n'a rien corrigé — ne pas croire ce
+//    commentaire sur parole : la durée observée est de ~2 s.
+const dors = (ms) => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); } catch { /* env restreint */ } };
+const limiteFin = Date.now() + 10000;
+while (!fs.existsSync(FINI) && Date.now() < limiteFin) dors(20);
+enfant.kill(); // filet seulement : normalement déjà terminé
 const restes = fs.readdirSync(DIR).filter((f) => f.endsWith('.tmp'));
 console.log(JSON.stringify({ lectures, vides, restes: restes.length }));
 `);
