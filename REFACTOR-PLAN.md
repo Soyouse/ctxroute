@@ -13,23 +13,28 @@ branche. Toute édition d'un fichier vivant est active pour tous les agents au g
 branche protège l'HISTORIQUE ; seul un worktree séparé isolerait le runtime — mais alors on ne
 testerait plus le vrai câblage.
 
-## Les 18 commits du jour, dans l'ordre
+## Les 25 commits du jour, dans l'ordre
 `cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
-audit des valeurs de rank · **`466a0bc` ㉘ la marque `[source:` CITÉE n'est plus comptée comme
-LIVRÉE (+ ② bis fermé par run Codex réel)** · `31c1ccd` + `e0d5ad3` la tête du backlog annonçait
-un état périmé (DEUX fois — d'où ㉚) · `b8a17c0` ㉙ la suite legacy n'écrit plus dans le `state/`
-vivant · `382436d` ㉚ le gate de décompte de la tête · `f21d17f` ④ le contrat canari ⟷ afficheur ·
-**`cb05f2a` le repli sans verrou DEVINAIT l'état au lieu de le lire — le doublon de morceau
-EXISTAIT, et la « réfutation » du matin était la vraie erreur** (une reproduction RATÉE convertie
-en RÉFUTATION).
-`1444f70` dégraissage (le récit va au backlog, pas au chemin chaud) · `1cf7557` gate
-`etat-devine` au tableau des couches · **`f874e16` écriture ATOMIQUE du store — le lecteur
-sans verrou voyait du JSON TRONQUÉ** (4 779 lectures creuses sur 16 656 mesurées).
-**Preuves de clôture** : **1096 tests** (58 fichiers) · mutation `canari.js` **100 % / 0 survivant**
-· doctor **0 problème** sur les câblages réels · dependency-cruiser 0 violation (49 modules) ·
-jscpd 0,52 % · arbre **propre**. ✅ **CI VERTE sur `f21d17f`**.
+audit des valeurs de rank · `a0d6d22` · **`466a0bc` ㉘ la marque `[source:` CITÉE n'est plus
+comptée comme LIVRÉE (+ ② bis fermé par run Codex réel)** · `31c1ccd` + `e0d5ad3` la tête du
+backlog annonçait un état périmé (DEUX fois — d'où ㉚) · `b8a17c0` ㉙ la suite legacy n'écrit plus
+dans le `state/` vivant · `382436d` ㉚ le gate de décompte de la tête · `679bae2` · `f21d17f` ④ le
+contrat canari ⟷ afficheur · `c447469` · **`cb05f2a` le repli sans verrou DEVINAIT l'état au lieu
+de le lire — le doublon de morceau EXISTAIT, et la « réfutation » du matin était la vraie erreur**
+(une reproduction RATÉE convertie en RÉFUTATION) · `f609163` · `1444f70` dégraissage (le récit va
+au backlog, pas au chemin chaud) · `1cf7557` gate `etat-devine` au tableau des couches ·
+**`f874e16` écriture ATOMIQUE du store — le lecteur sans verrou voyait du JSON TRONQUÉ**
+(4 779 lectures creuses sur 16 656 mesurées) · `22ae600` · `44ed356` ㉛ au backlog · **`09d1d98`
+mon test exigeait qu'un processus TUÉ survive à sa mort** (CI rouge macOS : un écrivain tué entre
+le `writeFileSync(tmp)` et le `rename` laisse forcément son temporaire — l'invariant réel est
+« un écrivain qui termine NORMALEMENT ne laisse rien »).
+**Preuves de clôture** : **1102 tests** (59 fichiers) · doctor **14 ok / 0 problème** sur les
+câblages réels · dependency-cruiser 0 violation (49 modules) · jscpd 0,52 % · miroirs parc ⟷ repo
+identiques · arbre **propre**. ✅ **CI VERTE sur `09d1d98`** (lue APRÈS complétion, sans tube).
+⚠️ Mutation `canari.js` 100 % / 0 survivant — mesure du 07/08, NON rejouée depuis : aucun module
+PUR n'a été touché après (`porte-core`/`session-store` sont de l'I/O, jamais mutés).
 ⚠️ **Le commit qui écrit CETTE ligne ne peut pas s'y citer** — la mise à jour de la tête est
 toujours le commit N+1. Ne pas le compter comme un mensonge.
 
