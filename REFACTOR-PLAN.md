@@ -2,7 +2,7 @@
 
 ---
 
-# 📍 ÉTAT AU 07/08/2026 (NUIT) — REPRISE DE SESSION, LIRE CECI EN PREMIER
+# 📍 ÉTAT AU 08/08/2026 — REPRISE DE SESSION, LIRE CECI EN PREMIER
 
 ## ⚠️ OÙ VIT LE TRAVAIL — RIEN EN COURS (vérifié 07/08/2026)
 Tout est sur **`master`**, mergé (fast-forward) et **poussé** ; `canari-codex-reel` a été
@@ -13,7 +13,7 @@ branche. Toute édition d'un fichier vivant est active pour tous les agents au g
 branche protège l'HISTORIQUE ; seul un worktree séparé isolerait le runtime — mais alors on ne
 testerait plus le vrai câblage.
 
-## Les 25 commits du jour, dans l'ordre
+## Les 34 commits du jour, dans l'ordre
 `cfeab92` canari multi-harnais (② fermé) · `6f7f415` doc injectable manquante · `b7ed90c` fenêtre
 d'aveuglement post-compaction scellée · `eb31e2d` gate ㉕ (couplage par le stockage) · `e69e5a2`
 le skill se contredisait · `228ae8a` ㉖ piste fermée · `f0ed560` `rank` = z-index · `47531fa` ㉗
@@ -30,11 +30,21 @@ au backlog, pas au chemin chaud) · `1cf7557` gate `etat-devine` au tableau des 
 mon test exigeait qu'un processus TUÉ survive à sa mort** (CI rouge macOS : un écrivain tué entre
 le `writeFileSync(tmp)` et le `rename` laisse forcément son temporaire — l'invariant réel est
 « un écrivain qui termine NORMALEMENT ne laisse rien »).
-**Preuves de clôture** : **1102 tests** (59 fichiers) · doctor **14 ok / 0 problème** sur les
-câblages réels · dependency-cruiser 0 violation (49 modules) · jscpd 0,52 % · miroirs parc ⟷ repo
-identiques · arbre **propre**. ✅ **CI VERTE sur `09d1d98`** (lue APRÈS complétion, sans tube).
-⚠️ Mutation `canari.js` 100 % / 0 survivant — mesure du 07/08, NON rejouée depuis : aucun module
-PUR n'a été touché après (`porte-core`/`session-store` sont de l'I/O, jamais mutés).
+**Puis la journée du 08/08** : `1595c94` la tête annonçait 18 commits pour 25 réels · `17748dc` ㉜
+et ㉝ gravés · **`3b5b87e` test ROUGE d'abord : l'ordre ENTRE documents n'était pas recollable** ·
+`54e9fc8` ㉗ l'ordinal `[DOC i/T]` rend l'ordre CONNAISSABLE · `bd028be` le contrat
+`[source: <chemin>]` scellé par spawn réel · `ae971e1` parité des 2 différentiels rétablie sans
+rien affaiblir · `52ec4c5` **2 manques que seul le COMMIT a révélés** (un fichier non suivi passait
+`couverture-gate` à 4/4) · `c9b3dcf` limite 10 000 re-vérifiée à la source officielle ·
+`f3f8dcd` ㉟ la classe « un gate dérivé est aveugle aux états qu'il ne dérive pas ».
+**Preuves de clôture, MESURÉES le 08/08/2026** : **1109 tests** (60 fichiers) · doctor **14 ok /
+0 problème** sur les câblages réels, exit 0 · dependency-cruiser **0 violation**, exit 0 · jscpd
+0,51 % · miroirs parc ⟷ repo identiques · arbre **propre**. ✅ **CI VERTE cross-OS + mutation sur
+la PR du chantier `rank`.**
+⚠️ **Mutation globale 99,64 % — et `canari.js` à 89,23 % avec 7 SURVIVANTS** (passe COMPLÈTE, sans
+cache incrémental). 🛑 **La ligne précédente affirmait ici « canari.js 100 % / 0 survivant » : c'était
+un VERT QUI MENT**, produit par le cache qui ne rejouait plus ces mutants (= ㉞). Ne pas restaurer
+ce chiffre sans une passe complète datée.
 ⚠️ **Le commit qui écrit CETTE ligne ne peut pas s'y citer** — la mise à jour de la tête est
 toujours le commit N+1. Ne pas le compter comme un mensonge.
 
@@ -57,7 +67,6 @@ d'env · fixture ambigu) — le motif EXACT que `explain.md` documente. Réflexe
 |---|---|---|
 | ㉚ | **Fraîcheur de la tête du backlog** — ✅ **FERMÉ 07/08/2026** (volet ② de `backlog-coherence-gate`). 🛑 Portée réduite ASSUMÉE : vérifier que les empreintes EXISTENT est impossible en CI (`fetch-depth: 1`) ⇒ cohérence INTERNE du décompte seulement | ✅ |
 | ㉘ bis | **Marque `[source:` auto-référente — reste 4 docs du parc** citant un `.md`. Fix total = n'accepter que les étiquettes RÉELLEMENT émises (store `emission-core`) ⇒ touche le chemin chaud de TOUS les agents ⮕ **à faire quand aucun autre agent ne travaille** | 🟠 |
-| ㉙ | **`legacy-mcp-inject.test.js` est FLAKY** — son `STATE_DIR` est le dossier `state/` **VIVANT**, où les hooks en prod écrivent en permanence (12 processus par appel d'outil). Ses tests de purge listent ce dossier pendant que d'autres agents y écrivent ⇒ 3 rouges aléatoires le 07/08, **verts en 2 runs isolés consécutifs**. Fix = tmpdir jeté (test-only, zéro risque runtime) | 🟠 |
 | ㉙ | **`legacy-mcp-inject.test.js` flaky** — ✅ **FERMÉ 07/08/2026** : son état vit en tmpdir jeté (`CTXROUTE_STATE_DIR`), plus aucune lecture du `state/` vivant. 2 runs consécutifs verts (46/46). 🛑 **AUCUN gate — 3 critères mesurés, 3 fois du bruit** : « toute suite qui spawne un hook doit isoler » ⇒ **6 faux positifs** (doctor, deadline, lint-corpus, doc-write-guard, deps-purete, vendor-deadline : elles laissent au pire un fichier inerte, jamais relu, purgé) ; « aucune suite ne résout un chemin `state` » ⇒ **8 faux positifs** (elles joignent un TMPDIR à `state`). Distinguer exigerait de savoir si la BASE est la racine du repo = analyse de flot, pas du texte. Ne pas réessayer sans nouveau critère | ✅ |
 | ㉗ | **Valeurs de `rank`** — ✅ **FERMÉ 08/08/2026, et la recommandation de la veille était MAUVAISE.** J'allais clore en constat (« l'ordre de lecture n'est pas observable, donc inauditable ») ; le mainteneur a tranché l'inverse : **on rend l'ordre observable au lieu de renoncer à l'ordre.** Livré : chaque document porte `[DOC i/T]` à côté de son tag source — le trou symétrique de `MORCEAU j/m`, qui recolle UN document mais ne disait rien de la place d'un document dans l'ENSEMBLE. ⚠️ L'ordinal ne FORCE pas le harnais à livrer dans l'ordre (impossible, hooks parallèles) : il le rend **CONNAISSABLE**. Une trame ⇒ ordre exact (déjà vrai avant, vérifié `loader.js:92` → `budget.js:218`) ; N trames ⇒ reconstructible sans ambiguïté. 🛑 **DEUX EMPLACEMENTS ESSAYÉS PUIS ANNULÉS le même jour** : `budget.js` (mauvaise COUCHE — l'ordinal est de l'IDENTITÉ, pas du TRANSPORT ; 2 fonctions d'en-tête donc 2 points de divergence, ~35 c/doc au lieu de ~12, densité de paquet mesurée en chute par le test FRONTIÈRE) · DANS le tag `[source:]` (cassait le CONTRAT ENVERS L'AGENT : capture = « <chemin> — DOC 2/5 », chemin INVALIDE, donc plus moyen d'aller CORRIGER la doc — **538 tests VERTS dessus, vu à l'œil par le mainteneur**). Retenu : tag intact à l'octet, ordinal APRÈS le crochet, muet à T=1. Parité des 2 différentiels rétablie par `differential-normalise.js` (source unique + 5 volets de negative-check, dont « un `[DOC x/y]` du CORPS survit »). | ✅ |
 | ㉕ | **Couplage par le stockage** — moitié décidable LIVRÉE (gate), moitié sémantique indécidable | 🟠 |
@@ -73,7 +82,7 @@ d'env · fixture ambigu) — le motif EXACT que `explain.md` documente. Réflexe
 | ㉑ | `tsc --checkJs` | 🟢 |
 | ㉒ | Langue du code | 🧊 **GELÉ** — réveil : quand le projet aura de la popularité |
 | ㉖ | Gate sur les constantes citées | 🛑 **FERMÉ** sur mesure, ne pas rouvrir |
-| — | Worktree orphelin `mcp-doc-hooks-paquets` (105 Mo) | scorie, marche à suivre écrite |
+| — | Worktree orphelin `mcp-doc-hooks-paquets` (105 Mo) — ✅ **DISPARU, vérifié 08/08/2026** : `git worktree list` ne rend que le dépôt principal, et le dossier `../mcp-doc-hooks-paquets` n'existe plus sur le disque. 🛑 Ligne gardée (et non supprimée) parce que la scorie était RÉELLE : c'est la trace qu'un worktree abandonné ne se signale JAMAIS tout seul — seul un `git worktree list` le révèle. | ✅ |
 
 ⚠️ **AUCUN de ces trous ne dégrade ce qui est LIVRÉ à l'agent.** Le moteur d'injection est en prod
 depuis le 17/07 et prouvé sur le terrain (341 injections atterries mesurées dans un transcript de
